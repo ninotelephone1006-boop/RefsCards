@@ -30,7 +30,7 @@ const cardsDatabase = [
     description: 'Ça donne envie de les lécher.',
     rarity: 'uncommon',
     emoji: '🦅',
-    image: 'pieds-de-rapace',
+    image: 'assets/Cartes/pieds-de-rapace.jpg',
     color: '#8fb6a6'
   },
   {
@@ -39,7 +39,7 @@ const cardsDatabase = [
     description: 'Je tombe amoureux.',
     rarity: 'ultraepic',
     emoji: '😍',
-    image: 'royer-rizz',
+    image: 'assets/Cartes/royer-rizz.jpg',
     color: '#ff8fd1'
   },
   {
@@ -48,7 +48,7 @@ const cardsDatabase = [
     description: 'Il chasse la gazelle.',
     rarity: 'common',
     emoji: '🏹',
-    image: 'chasseur-royer',
+    image: 'assets/Cartes/chasseur-royer.jpg',
     color: '#c8b48c'
   },
   {
@@ -57,7 +57,7 @@ const cardsDatabase = [
     description: 'Skibidi shooting.',
     rarity: 'rare',
     emoji: '📸',
-    image: 'gros-plan-royer',
+    image: 'assets/Cartes/gros-plan-royer.jpg',
     color: '#8fc8ef'
   },
   {
@@ -66,7 +66,7 @@ const cardsDatabase = [
     description: 'Grand fan.',
     rarity: 'superrare',
     emoji: '⭐',
-    image: 'bierry-patrick',
+    image: 'assets/Cartes/bierry-patrick.jpg',
     color: '#67e0d0'
   },
   {
@@ -75,7 +75,7 @@ const cardsDatabase = [
     description: 'UwU',
     rarity: 'epic',
     emoji: '🌸',
-    image: 'kawai-rapace',
+    image: 'assets/Cartes/kawai-rapace.jpg',
     color: '#c6a0eb'
   },
   {
@@ -84,7 +84,7 @@ const cardsDatabase = [
     description: 'Fagar a des talents.',
     rarity: 'legendary',
     emoji: '🥋',
-    image: 'karate-fagar',
+    image: 'assets/Cartes/karate-fagar.jpg',
     color: '#f5d979'
   },
   {
@@ -93,7 +93,7 @@ const cardsDatabase = [
     description: "C'est… intéressant.",
     rarity: 'uncommon',
     emoji: '🚽',
-    image: 'toilet-call',
+    image: 'assets/Cartes/toilet-call.jpg',
     color: '#9dbfc4'
   },
   {
@@ -102,7 +102,7 @@ const cardsDatabase = [
     description: 'Grand peintre.',
     rarity: 'divine',
     emoji: '🎨',
-    image: 'artiste-brazile',
+    image: 'assets/Cartes/artiste-brazile.jpg',
     color: '#bff3ff'
   },
   {
@@ -111,7 +111,7 @@ const cardsDatabase = [
     description: "Y'avait pas de cuillère.",
     rarity: 'rare',
     emoji: '🍨',
-    image: 'petite-degustation',
+    image: 'assets/Cartes/petite-degustation.jpg',
     color: '#8fc8ef'
   },
   {
@@ -120,7 +120,7 @@ const cardsDatabase = [
     description: 'Grand musicien.',
     rarity: 'secret',
     emoji: '🎼',
-    image: 'babault-musique',
+    image: 'assets/Cartes/babault-musique.png',
     color: '#e6c8ff'
   },
   {
@@ -129,7 +129,7 @@ const cardsDatabase = [
     description: 'Maquilleur pro.',
     rarity: 'mythic',
     emoji: '🖌️',
-    image: 'marker-bierry',
+    image: 'assets/Cartes/marker-bierry.jpg',
     color: '#ffb372'
   },
   {
@@ -138,7 +138,7 @@ const cardsDatabase = [
     description: 'Brazil is shocked.',
     rarity: 'superrare',
     emoji: '😱',
-    image: 'shock-brazil',
+    image: 'assets/Cartes/shock-brazil.jpeg',
     color: '#67e0d0'
   }
 ];
