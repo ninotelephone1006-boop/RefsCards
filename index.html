@@ -10,17 +10,42 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-auth-compat.js" defer></script>
+  <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore-compat.js" defer></script>
+  <script src="firebase-config.js" defer></script>
   <script src="cards.js" defer></script>
   <script src="audio.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <div class="app" id="app" data-tab="pack">
+    <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+      <div class="auth-card">
+        <a class="brand auth-brand" href="./" aria-label="Refs Cards, accueil">
+          <span class="brand-mark">✳</span>
+          <span class="brand-name">REFS<span>CARDS</span><small>LE JEU DE CARTES</small></span>
+        </a>
+        <p class="kicker"><span>✦</span> TON COMPTE · TA COLLECTION <span>✦</span></p>
+        <h1 id="auth-title">Ta collection<br><em>t'attend.</em></h1>
+        <p class="auth-intro">Crée un compte gratuit ou connecte-toi. Tes cartes et tes pièces sont sauvegardées en ligne.</p>
+        <form class="auth-form" id="auth-form">
+          <label for="auth-email">Adresse e-mail</label>
+          <input id="auth-email" name="email" type="email" autocomplete="email" placeholder="toi@exemple.fr" maxlength="254" required>
+          <label for="auth-password">Mot de passe</label>
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="8 caractères minimum" minlength="8" maxlength="128" required>
+          <p class="auth-error" id="auth-error" role="alert" hidden></p>
+          <button class="auth-submit" id="auth-submit" type="submit">SE CONNECTER</button>
+        </form>
+        <button class="auth-switch" id="auth-switch" type="button">Pas encore de compte ? <strong>Créer un compte gratuit</strong></button>
+        <p class="auth-free">Gratuit · Sauvegarde liée à ton compte</p>
+      </div>
+    </section>
     <canvas class="dust" id="dust" aria-hidden="true"></canvas>
     <div class="bg-grid" aria-hidden="true"></div>
     <div class="bg-glow" aria-hidden="true"></div>
 
-    <header class="hud">
+    <header class="hud" inert>
       <a class="brand" href="./" aria-label="Refs Cards, accueil">
         <span class="brand-mark">✳</span>
         <span class="brand-name">REFS<span>CARDS</span><small>LE JEU DE CARTES</small></span>
@@ -39,10 +64,14 @@
           <strong id="coins">0</strong>
           <span class="coin-float" id="coin-float" aria-hidden="true"></span>
         </div>
+        <div class="account-control">
+          <span id="account-email"></span>
+          <button id="logout-btn" type="button" aria-label="Se déconnecter">Déconnexion</button>
+        </div>
       </div>
     </header>
 
-    <main class="stage" id="stage">
+    <main class="stage" id="stage" inert>
       <div class="stage-vignette" aria-hidden="true"></div>
       <canvas class="fx" id="fx" aria-hidden="true"></canvas>
 
@@ -185,7 +214,7 @@
     </main>
 
     <!-- ============================ NAVIGATION ============================ -->
-    <nav class="tabbar" id="tabbar" aria-label="Navigation principale">
+    <nav class="tabbar" id="tabbar" aria-label="Navigation principale" inert>
       <span class="tab-ind" aria-hidden="true"></span>
       <button class="tab is-active" type="button" data-tab="pack" aria-current="page">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M7 3.5h10l1.2 3.5H5.8z"/><path d="M6 7v12.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7"/><path d="m12 10.6 1 2.2 2.3.3-1.7 1.6.5 2.3-2.1-1.2-2.1 1.2.5-2.3-1.7-1.6 2.3-.3z"/></svg>
@@ -198,7 +227,7 @@
       </button>
     </nav>
 
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" inert></div>
   </div>
 </body>
 </html>

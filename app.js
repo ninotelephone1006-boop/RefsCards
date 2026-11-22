@@ -104,6 +104,16 @@
   const inspectCard = $('inspect-card');
   const inspectX = $('inspect-x');
   const inspectBackdrop = $('inspect-backdrop');
+  const authScreen = $('auth-screen');
+  const authForm = $('auth-form');
+  const authEmail = $('auth-email');
+  const authPassword = $('auth-password');
+  const authError = $('auth-error');
+  const authSubmit = $('auth-submit');
+  const authSwitch = $('auth-switch');
+  const accountEmail = $('account-email');
+  const logoutBtn = $('logout-btn');
+  const gameRegions = document.querySelectorAll('.hud, #stage, #tabbar, .toast');
 
   /* ----------------------------------------------------------------- state */
 
@@ -1558,6 +1568,7 @@
   fusionChip.addEventListener('click', () => openFusion(false));
 
   document.addEventListener('keydown', (e) => {
+    if (!currentUser || !currentEmail) return;
     if (e.key === 'Escape' && !inspect.hidden) {
       closeInspect();
       return;
@@ -1691,7 +1702,6 @@
 
   /* ============================================ NAVIGATION · COLLECTION · SAUVEGARDE */
 
-  const SAVE_KEY = 'refs-cards-save-v1';
   const tabs = [...document.querySelectorAll('.tab')];
   const collView = $('collection-view');
   const collGrid = $('coll-grid');
@@ -1703,26 +1713,178 @@
   const fresh = new Set(); // cartes obtenues depuis la dernière visite de la collection
   let collFilter = 'all';
 
-  function save() {
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        coins: state.coins,
-        firstPack: state.firstPack,
-        collection: state.collection.map((c) => c.id)
-      }));
-    } catch (e) { /* stockage indisponible : on joue sans sauvegarde */ }
+  let firebaseAuth = null;
+  let cloudDb = null;
+  let currentUser = null;
+  let currentEmail = '';
+  let saveTimer = 0;
+  let authIsRegistering = false;
+
+  function setAuthError(message) {
+    authError.textContent = message || '';
+    authError.hidden = !message;
   }
 
-  function loadSave() {
+  function updateAuthMode() {
+    authSubmit.textContent = authIsRegistering ? 'CRÉER MON COMPTE GRATUIT' : 'SE CONNECTER';
+    authPassword.autocomplete = authIsRegistering ? 'new-password' : 'current-password';
+    authSwitch.innerHTML = authIsRegistering
+      ? 'Déjà un compte ? <strong>Se connecter</strong>'
+      : 'Pas encore de compte ? <strong>Créer un compte gratuit</strong>';
+    setAuthError('');
+  }
+
+  function authErrorMessage(error) {
+    const messages = {
+      'auth/email-already-in-use': 'Un compte existe déjà avec cette adresse e-mail.',
+      'auth/invalid-email': 'Entre une adresse e-mail valide.',
+      'auth/invalid-credential': 'Adresse e-mail ou mot de passe incorrect.',
+      'auth/user-not-found': 'Adresse e-mail ou mot de passe incorrect.',
+      'auth/wrong-password': 'Adresse e-mail ou mot de passe incorrect.',
+      'auth/weak-password': 'Le mot de passe doit contenir au moins 8 caractères.',
+      'auth/too-many-requests': 'Trop de tentatives. Réessaie un peu plus tard.',
+      'auth/network-request-failed': 'Connexion impossible. Vérifie ta connexion internet.',
+      'permission-denied': 'Accès cloud refusé. Vérifie les règles Firestore indiquées dans le README.'
+    };
+    return messages[error && error.code] || error.message || 'Une erreur est survenue. Réessaie.';
+  }
+
+  function applySave(d) {
+    state.coins = Math.max(0, Number(d && d.coins) || 0);
+    state.firstPack = !d || d.firstPack !== false;
+    state.collection = ((d && d.collection) || [])
+      .map((id) => cardsDatabase.find((c) => c.id === id))
+      .filter(Boolean);
+    state.phase = 'pack';
+    state.deck = [];
+    state.loot = [];
+    state.packIndex = 0;
+    updateCoins();
+    renderCollection();
+  }
+
+  async function saveNow() {
+    if (!currentUser || !cloudDb) return true;
+    clearTimeout(saveTimer);
+    const userId = currentUser.uid;
     try {
-      const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-      if (!d) return;
-      state.coins = Math.max(0, Number(d.coins) || 0);
-      state.firstPack = d.firstPack !== false;
-      state.collection = (d.collection || [])
-        .map((id) => cardsDatabase.find((c) => c.id === id))
-        .filter(Boolean);
-    } catch (e) { /* sauvegarde illisible : on repart de zéro */ }
+      await cloudDb.collection('playerSaves').doc(userId).set({
+        coins: state.coins,
+        firstPack: state.firstPack,
+        collection: state.collection.map((c) => c.id),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      return true;
+    } catch (error) {
+      console.warn('Sauvegarde cloud impossible:', error);
+      showToast('Sauvegarde impossible pour le moment. Vérifie ta connexion.');
+      return false;
+    }
+  }
+
+  function save() {
+    if (!currentUser || !cloudDb) return;
+    clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => { saveNow(); }, 250);
+  }
+
+  function showGame(user, saveData) {
+    currentUser = user;
+    currentEmail = user.email || '';
+    accountEmail.textContent = currentEmail;
+    applySave(saveData);
+    authScreen.hidden = true;
+    gameRegions.forEach((region) => region.removeAttribute('inert'));
+    app.classList.add('is-authenticated');
+    setAuthError('');
+    authPassword.value = '';
+    setTab('pack');
+  }
+
+  function showAuth() {
+    clearTimeout(saveTimer);
+    currentUser = null;
+    currentEmail = '';
+    accountEmail.textContent = '';
+    app.classList.remove('is-authenticated');
+    gameRegions.forEach((region) => region.setAttribute('inert', ''));
+    authScreen.hidden = false;
+    authPassword.value = '';
+  }
+
+  authSwitch.addEventListener('click', () => {
+    authIsRegistering = !authIsRegistering;
+    updateAuthMode();
+  });
+
+  authForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!firebaseAuth) {
+      setAuthError('Le service de comptes cloud n’est pas configuré. Consulte la section Firebase du README.');
+      return;
+    }
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+    if (password.length < 8) {
+      setAuthError('Le mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    authSubmit.disabled = true;
+    authSubmit.textContent = authIsRegistering ? 'CRÉATION…' : 'CONNEXION…';
+    setAuthError('');
+    try {
+      if (authIsRegistering) await firebaseAuth.createUserWithEmailAndPassword(email, password);
+      else await firebaseAuth.signInWithEmailAndPassword(email, password);
+    } catch (error) {
+      setAuthError(authErrorMessage(error));
+    } finally {
+      authSubmit.disabled = false;
+      authSubmit.textContent = authIsRegistering ? 'CRÉER MON COMPTE GRATUIT' : 'SE CONNECTER';
+    }
+  });
+
+  logoutBtn.addEventListener('click', async () => {
+    if (!await saveNow()) return;
+    try { await firebaseAuth.signOut(); }
+    catch (error) { showToast(authErrorMessage(error)); }
+  });
+
+  function initializeCloud() {
+    const config = window.REFS_FIREBASE_CONFIG;
+    const configured = config && config.apiKey && config.projectId && config.appId &&
+      !Object.values(config).some((value) => typeof value === 'string' && value.includes('REMPLACE_PAR'));
+    if (!window.firebase || !configured) {
+      authSubmit.disabled = true;
+      setAuthError('Le compte cloud n’est pas encore configuré. Suis les étapes Firebase du README, puis recharge cette page.');
+      return;
+    }
+    try {
+      if (!firebase.apps.length) firebase.initializeApp(config);
+      firebaseAuth = firebase.auth();
+      cloudDb = firebase.firestore();
+      authSubmit.disabled = false;
+      firebaseAuth.onAuthStateChanged(async (user) => {
+        if (!user) {
+          if (currentUser) showAuth();
+          return;
+        }
+        currentUser = user;
+        try {
+          const snapshot = await cloudDb.collection('playerSaves').doc(user.uid).get();
+          if (!currentUser || currentUser.uid !== user.uid) return;
+          showGame(user, snapshot.exists ? snapshot.data() : null);
+        } catch (error) {
+          currentUser = null;
+          setAuthError(authErrorMessage(error));
+          try { await firebaseAuth.signOut(); } catch (ignored) { /* reste bloqué sur l'écran de compte */ }
+        }
+      }, (error) => {
+        setAuthError(authErrorMessage(error));
+      });
+    } catch (error) {
+      authSubmit.disabled = true;
+      setAuthError(`Configuration Firebase invalide : ${error.message}`);
+    }
   }
 
   function setTab(tab) {
@@ -1861,7 +2023,6 @@
   inspectCard.addEventListener('pointercancel', resetInspTilt);
 
   function boot() {
-    loadSave();
     updateCoins();
     renderFilters();
     renderOdds();
@@ -1882,4 +2043,5 @@
   }
 
   boot();
+  initializeCloud();
 })();
