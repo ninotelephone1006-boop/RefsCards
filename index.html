@@ -15,7 +15,7 @@
   <script src="app.js" defer></script>
 </head>
 <body>
-  <div class="app" id="app">
+  <div class="app" id="app" data-tab="pack">
     <canvas class="dust" id="dust" aria-hidden="true"></canvas>
     <div class="bg-grid" aria-hidden="true"></div>
     <div class="bg-glow" aria-hidden="true"></div>
@@ -112,6 +112,19 @@
         </div>
       </section>
 
+      <!-- ============================ COLLECTION ============================ -->
+      <section class="view collection-view" id="collection-view" aria-label="Collection">
+        <div class="coll-head">
+          <div class="coll-title"><h2>Collection</h2><span class="coll-count" id="coll-count" aria-live="polite">0 / 0</span></div>
+          <div class="coll-bar" aria-hidden="true"><i id="coll-fill"></i></div>
+          <div class="coll-filters" id="coll-filters" aria-label="Filtres"></div>
+        </div>
+        <div class="coll-scroll">
+          <div class="coll-grid" id="coll-grid"></div>
+          <p class="coll-empty" id="coll-empty" hidden></p>
+        </div>
+      </section>
+
       <div class="flash" id="flash" aria-hidden="true"></div>
 
       <!-- ============================== RECAP ============================== -->
@@ -170,6 +183,20 @@
         </div>
       </div>
     </main>
+
+    <!-- ============================ NAVIGATION ============================ -->
+    <nav class="tabbar" id="tabbar" aria-label="Navigation principale">
+      <span class="tab-ind" aria-hidden="true"></span>
+      <button class="tab is-active" type="button" data-tab="pack" aria-current="page">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M7 3.5h10l1.2 3.5H5.8z"/><path d="M6 7v12.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7"/><path d="m12 10.6 1 2.2 2.3.3-1.7 1.6.5 2.3-2.1-1.2-2.1 1.2.5-2.3-1.7-1.6 2.3-.3z"/></svg>
+        <span>Pack</span>
+      </button>
+      <button class="tab" type="button" data-tab="collection">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="6.5" width="12" height="15" rx="2"/><path d="M8.5 3.5h9a2 2 0 0 1 2 2V16"/></svg>
+        <span>Collection</span>
+        <i class="tab-badge" id="tab-badge" hidden aria-label="Nouvelles cartes"></i>
+      </button>
+    </nav>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
