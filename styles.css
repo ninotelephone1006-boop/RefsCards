@@ -2157,6 +2157,13 @@ html,body{background:var(--bg)}
 .google-btn:disabled{opacity:.65;cursor:wait;transform:none}
 .google-btn svg{flex:0 0 auto}
 .auth-error{margin:2px 0 0;padding:10px 12px;border:1px solid #fb718555;border-radius:8px;background:#7f1d1d30;color:#fecaca;font-size:12px;line-height:1.45;text-align:left}
+.auth-status{margin:2px 0 0;padding:10px 12px;border:1px solid #c084fc44;border-radius:8px;background:#7c3aed1f;color:#ded1f6;font-size:12px;line-height:1.45;text-align:left}
+.auth-error[hidden],.auth-status[hidden],.auth-hint[hidden]{display:none}
+.auth-hint{margin:12px 0 0;color:#8d8298;font-size:11px;line-height:1.6}
+.auth-tab-link{display:inline-block;margin-left:4px;color:#c4a1ff;text-decoration:underline;text-underline-offset:2px}
+.auth-tab-link:hover,.auth-tab-link:focus-visible{color:#e9d5ff}
+.google-btn[aria-busy="true"]{cursor:progress;filter:brightness(.96)}
+.google-btn[aria-busy="true"] svg{opacity:.4}
 .auth-free{margin:17px 0 0;color:#71687b;font-size:11px}
 .account-control{display:flex;align-items:center;gap:9px;max-width:230px;color:#a99fb2;font-size:11px}
 .account-avatar{flex:0 0 auto;width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid #ffffff2b;background:#241c2e}

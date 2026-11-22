@@ -107,6 +107,11 @@
   const authScreen = $('auth-screen');
   const authError = $('auth-error');
   const googleSignIn = $('google-signin');
+  const googleLabel = googleSignIn.querySelector('.google-label');
+  const authStatus = $('auth-status');
+  const authHint = $('auth-hint');
+  const authHintText = $('auth-hint-text');
+  const authOpenTab = $('auth-open-tab');
   const accountAvatar = $('account-avatar');
   const accountEmail = $('account-email');
   const logoutBtn = $('logout-btn');
@@ -1716,22 +1721,80 @@
   let currentEmail = '';
   let saveTimer = 0;
 
+  /* Délai au bout duquel on considère que la fenêtre Google ne répond pas.
+     Sans cela, un pop-up bloqué par le navigateur laissait le bouton inerte
+     pour toujours (aucun message, aucun clic possible). */
+  const AUTH_POPUP_TIMEOUT = 25000;
+  /* Erreurs qui justifient de retenter la connexion par redirection complète. */
+  const REDIRECT_FALLBACK = new Set([
+    'auth/popup-blocked',
+    'auth/operation-not-supported-in-environment',
+    'auth/web-storage-unsupported'
+  ]);
+  /* Un aperçu intégré (iframe) ne peut ni ouvrir de pop-up de façon fiable ni
+     partager les cookies de accounts.google.com : il faut alors un onglet. */
+  const authEmbedded = (() => {
+    try { return window.self !== window.top; } catch (error) { return true; }
+  })();
+  let authBusy = false;
+  let authAttempt = 0;
+
+  const siteLabel = () => window.location.hostname || window.location.host || 'ce site';
+
   function setAuthError(message) {
     authError.textContent = message || '';
     authError.hidden = !message;
+  }
+
+  function setAuthStatus(message) {
+    authStatus.textContent = message || '';
+    authStatus.hidden = !message;
+  }
+
+  function setAuthHint(message) {
+    authHintText.textContent = message || '';
+    authHint.hidden = !message;
+  }
+
+  function setAuthBusy(busy) {
+    authBusy = busy;
+    googleLabel.textContent = busy ? 'Connexion en cours…' : 'Se connecter avec Google';
+    if (busy) {
+      googleSignIn.setAttribute('aria-busy', 'true');
+      googleSignIn.disabled = true;
+    } else {
+      googleSignIn.removeAttribute('aria-busy');
+      googleSignIn.disabled = false;
+    }
   }
 
   function authErrorMessage(error) {
     const messages = {
       'auth/popup-closed-by-user': 'Connexion annulée : la fenêtre Google a été fermée avant la fin.',
       'auth/cancelled-popup-request': 'Une autre fenêtre de connexion est déjà ouverte.',
-      'auth/popup-blocked': 'Le navigateur a bloqué la fenêtre de connexion. Autorise les pop-ups pour ce site, puis réessaie.',
+      'auth/popup-blocked': authEmbedded
+        ? 'Le navigateur a bloqué la fenêtre Google dans cet aperçu intégré. Ouvre le jeu dans un onglet, puis réessaie.'
+        : 'Le navigateur a bloqué la fenêtre de connexion. Autorise les pop-ups pour ce site, puis réessaie.',
       'auth/network-request-failed': 'Connexion impossible. Vérifie ta connexion internet.',
-      'auth/unauthorized-domain': 'Ce domaine n’est pas autorisé. Ajoute-le dans Firebase → Authentication → Settings → Authorized domains.',
+      'auth/unauthorized-domain': `Ce domaine (${siteLabel()}) n’est pas autorisé. Ajoute-le dans Firebase → Authentication → Settings → Authorized domains.`,
       'auth/operation-not-allowed': 'La connexion Google n’est pas activée dans Firebase Authentication (Sign-in method → Google).',
+      'auth/operation-not-supported-in-environment': 'Ce navigateur ne permet pas la connexion par fenêtre Google. Ouvre le jeu dans un onglet ou un autre navigateur.',
+      'auth/web-storage-unsupported': 'Le navigateur bloque le stockage nécessaire à la connexion (navigation privée ou cookies bloqués). Autorise les cookies pour ce site, puis réessaie.',
+      'auth/internal-error': 'Google a renvoyé une réponse incomplète. Réessaie dans un instant.',
       'permission-denied': 'Accès cloud refusé. Vérifie les règles Firestore publiées (playerSaves/{userId}).'
     };
-    return messages[error && error.code] || (error && error.message) || 'Une erreur est survenue. Réessaie.';
+    const code = error && error.code;
+    const message = (code && messages[code]) || (error && error.message) || 'Une erreur est survenue. Réessaie.';
+    // Le code technique aide au diagnostic quand l’interface semble ne rien faire.
+    return code && !message.includes(code) ? `${message} (${code})` : message;
+  }
+
+  function resetAuthFeedback() {
+    setAuthError('');
+    setAuthStatus('');
+    setAuthHint(authEmbedded
+      ? 'Aperçu intégré : la connexion Google s’ouvre mieux dans un onglet dédié.'
+      : '');
   }
 
   function applySave(d) {
@@ -1791,7 +1854,8 @@
     authScreen.hidden = true;
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
-    setAuthError('');
+    setAuthBusy(false);
+    resetAuthFeedback();
     setTab('pack');
   }
 
@@ -1806,27 +1870,96 @@
     app.classList.remove('is-authenticated');
     gameRegions.forEach((region) => region.setAttribute('inert', ''));
     authScreen.hidden = false;
-    googleSignIn.disabled = !firebaseAuth;
+    setAuthBusy(false);
+    resetAuthFeedback();
   }
 
-  googleSignIn.addEventListener('click', async () => {
+  /* La connexion doit toujours donner un retour visible : bouton occupé,
+     message d’état, erreur explicite et, en dernier recours, un lien pour
+     ouvrir le jeu dans un onglet (les aperçus intégrés ne peuvent pas
+     terminer un signInWithPopup). */
+  async function signInWithGoogle() {
+    if (authBusy) return;
     if (!firebaseAuth) {
-      setAuthError('Le service de comptes cloud n’est pas configuré. Consulte la section Firebase du README.');
+      setAuthStatus('');
+      setAuthError(window.firebase && window.firebase.auth
+        ? 'Le service de comptes n’est pas encore prêt. Recharge la page, puis réessaie.'
+        : 'Les scripts Firebase n’ont pas pu être chargés (hors ligne, bloqueur de publicités ou réseau filtré). Vérifie ta connexion, puis recharge la page.');
+      setAuthHint('La connexion Google a besoin d’internet et des scripts Firebase.');
       return;
     }
-    googleSignIn.disabled = true;
-    setAuthError('');
+
+    let provider;
     try {
-      const provider = new firebase.auth.GoogleAuthProvider();
+      provider = new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
+    } catch (error) {
+      setAuthError(authErrorMessage(error));
+      return;
+    }
+
+    const attempt = ++authAttempt;
+    const current = () => attempt === authAttempt;
+    setAuthError('');
+    setAuthStatus('Ouverture de la fenêtre Google…');
+    setAuthHint(authEmbedded ? 'Aperçu intégré : si rien ne s’ouvre, utilise le lien vers un onglet.' : '');
+    setAuthBusy(true);
+
+    // Garde-fou : un pop-up qui ne se ferme jamais ne doit pas bloquer le bouton.
+    const watchdog = window.setTimeout(() => {
+      if (!current()) return;
+      authAttempt += 1;
+      setAuthBusy(false);
+      setAuthStatus('');
+      setAuthError(authEmbedded
+        ? 'La fenêtre Google ne répond pas dans cet aperçu intégré. Ouvre le jeu dans un onglet, puis réessaie.'
+        : 'La fenêtre Google ne répond pas. Autorise les pop-ups pour ce site, puis réessaie.');
+      setAuthHint(authEmbedded
+        ? 'La connexion Google ne peut pas aboutir dans un aperçu intégré : passe par un onglet.'
+        : 'Tu peux aussi ouvrir le jeu dans un onglet dédié, puis réessayer.');
+    }, AUTH_POPUP_TIMEOUT);
+
+    try {
       // GoogleAuthProvider + signInWithPopup : la connexion se fait dans la fenêtre Google.
       await firebaseAuth.signInWithPopup(provider);
       // onAuthStateChanged prend le relais : chargement de la sauvegarde + affichage du jeu.
+      if (current()) setAuthStatus('Connexion réussie, chargement de ta collection…');
     } catch (error) {
+      if (!current()) return; // tentative déjà abandonnée par le garde-fou
+      const code = error && error.code;
+      setAuthStatus('');
+      if (!authEmbedded && REDIRECT_FALLBACK.has(code) && typeof firebaseAuth.signInWithRedirect === 'function') {
+        // Pop-up impossible : on retente en redirection complète.
+        setAuthStatus('Redirection vers la page Google…');
+        try {
+          await firebaseAuth.signInWithRedirect(provider);
+          return; // la page se recharge, onAuthStateChanged reprend la main
+        } catch (redirectError) {
+          setAuthError(authErrorMessage(redirectError));
+          return;
+        }
+      }
       setAuthError(authErrorMessage(error));
+      if (code === 'auth/popup-blocked') {
+        setAuthHint(authEmbedded
+          ? 'La connexion Google ne peut pas aboutir dans un aperçu intégré : ouvre le jeu dans un onglet.'
+          : 'Si les pop-ups restent bloqués, ouvre le jeu dans un onglet dédié pour te connecter.');
+      } else if (authEmbedded && code === 'auth/popup-closed-by-user') {
+        setAuthHint('La connexion Google ne peut pas aboutir dans un aperçu intégré : ouvre le jeu dans un onglet.');
+      }
     } finally {
-      googleSignIn.disabled = false;
+      window.clearTimeout(watchdog);
+      if (current()) setAuthBusy(false);
     }
+  }
+
+  googleSignIn.addEventListener('click', () => {
+    // Aucune erreur inattendue ne doit laisser le bouton inerte.
+    signInWithGoogle().catch((error) => {
+      setAuthBusy(false);
+      setAuthStatus('');
+      setAuthError(authErrorMessage(error));
+    });
   });
 
   logoutBtn.addEventListener('click', async () => {
@@ -1836,25 +1969,38 @@
   });
 
   function initializeCloud() {
+    authOpenTab.href = window.location.href;
     const config = window.REFS_FIREBASE_CONFIG;
     const configured = config && config.apiKey && config.projectId && config.appId &&
       !Object.values(config).some((value) => typeof value === 'string' && value.includes('REMPLACE_PAR'));
-    if (!window.firebase || !configured) {
-      googleSignIn.disabled = true;
-      setAuthError('Le compte cloud n’est pas encore configuré. Suis les étapes Firebase du README, puis recharge cette page.');
+    if (!window.firebase || !window.firebase.auth || !configured) {
+      // Le bouton reste cliquable : chaque clic réaffiche la cause au lieu de ne rien faire.
+      setAuthError(window.firebase && window.firebase.auth
+        ? 'La configuration Firebase est incomplète. Vérifie firebase-config.js (voir la section Firebase du README), puis recharge la page.'
+        : 'Les scripts Firebase n’ont pas pu être chargés (hors ligne, bloqueur de publicités ou réseau filtré). Vérifie ta connexion, puis recharge la page.');
+      setAuthHint('Sans connexion, ta collection ne peut pas être enregistrée.');
       return;
     }
     try {
       if (!firebase.apps.length) firebase.initializeApp(config);
       firebaseAuth = firebase.auth();
       cloudDb = firebase.firestore();
-      googleSignIn.disabled = false;
+      resetAuthFeedback();
+      // Connexion par redirection (repli des navigateurs sans pop-up).
+      if (typeof firebaseAuth.getRedirectResult === 'function') {
+        firebaseAuth.getRedirectResult().then((result) => {
+          if (result && result.user) setAuthStatus('Connexion réussie, chargement de ta collection…');
+        }).catch((error) => {
+          setAuthError(authErrorMessage(error));
+        });
+      }
       firebaseAuth.onAuthStateChanged(async (user) => {
         if (!user) {
           if (currentUser) showAuth();
           return;
         }
         currentUser = user;
+        setAuthStatus('Chargement de ta collection…');
         try {
           const snapshot = await cloudDb.collection('playerSaves').doc(user.uid).get();
           if (!currentUser || currentUser.uid !== user.uid) return;
@@ -1869,8 +2015,8 @@
         setAuthError(authErrorMessage(error));
       });
     } catch (error) {
-      googleSignIn.disabled = true;
       setAuthError(`Configuration Firebase invalide : ${error.message}`);
+      setAuthHint('Vérifie les valeurs de firebase-config.js.');
     }
   }
 
