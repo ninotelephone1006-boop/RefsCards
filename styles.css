@@ -5,16 +5,16 @@
 
 :root {
   color-scheme: dark;
-  --bg: #08090a;
-  --bg-2: #0d0f11;
-  --panel: #111417;
-  --line: #23272b;
-  --line-soft: #1a1e21;
-  --white: #f2f4ee;
-  --muted: #8b928c;
-  --lime: #d6ff3f;
-  --lime-dim: #a9cc2c;
-  --common: #dfe4dc;
+  --bg: #09070b;
+  --bg-2: #0f0c12;
+  --panel: #131018;
+  --line: #261f2f;
+  --line-soft: #1d1823;
+  --white: #f1eef4;
+  --muted: #8f8994;
+  --lime: #b388ff;
+  --lime-dim: #8b5cf6;
+  --common: #e0dbe5;
   --rare: #5fb8ff;
   --epic: #b47bff;
   --legendary: #ffd45e;
@@ -47,7 +47,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   outline-offset: 4px;
 }
 [hidden] { display: none !important; }
-::selection { background: var(--lime); color: #10130a; }
+::selection { background: var(--lime); color: #0e0914; }
 
 /* ------------------------------------------------------------------ shell */
 
@@ -60,7 +60,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   overflow: hidden;
   isolation: isolate;
   background:
-    radial-gradient(120% 70% at 50% -10%, #1a2110 0%, transparent 55%),
+    radial-gradient(120% 70% at 50% -10%, #180f22 0%, transparent 55%),
     radial-gradient(90% 60% at 50% 110%, #0e1a1c 0%, transparent 60%),
     var(--bg);
 }
@@ -69,8 +69,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   position: absolute;
   inset: -20%;
   background-image:
-    linear-gradient(#d6ff3f0a 1px, transparent 1px),
-    linear-gradient(90deg, #d6ff3f0a 1px, transparent 1px);
+    linear-gradient(#b388ff0a 1px, transparent 1px),
+    linear-gradient(90deg, #b388ff0a 1px, transparent 1px);
   background-size: 54px 54px;
   mask-image: radial-gradient(ellipse at 50% 42%, #000 0%, transparent 72%);
   -webkit-mask-image: radial-gradient(ellipse at 50% 42%, #000 0%, transparent 72%);
@@ -85,7 +85,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   width: min(760px, 130vw);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, #7fb4ff1f 0%, #a5d22012 34%, transparent 62%);
+  background: radial-gradient(circle, #b97fff1f 0%, #6a13df12 34%, transparent 62%);
   filter: blur(14px);
   pointer-events: none;
   z-index: 0;
@@ -116,7 +116,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   padding-left: max(16px, env(safe-area-inset-left));
   padding-right: max(16px, env(safe-area-inset-right));
   border-bottom: 1px solid #ffffff0d;
-  background: linear-gradient(180deg, #08090acc, #08090a66);
+  background: linear-gradient(180deg, #09070bcc, #09070b66);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
 }
@@ -138,7 +138,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 28px;
   color: var(--lime);
   line-height: 1;
-  text-shadow: 0 0 18px #d6ff3f88;
+  text-shadow: 0 0 18px #b388ff88;
   animation: mark-spin 14s linear infinite;
 }
 
@@ -150,7 +150,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 7px;
   font-weight: 700;
   letter-spacing: 1.8px;
-  color: #6f786a;
+  color: #716979;
 }
 .brand-name > span:first-child { color: var(--lime); }
 
@@ -163,7 +163,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 1.4px;
-  color: #939b8e;
+  color: #948d9c;
 }
 .season i {
   width: 5px; height: 5px; border-radius: 50%;
@@ -181,11 +181,11 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #ffffff05;
-  color: #b9c0b4;
+  color: #bab3c1;
   cursor: pointer;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.icon-btn:hover { background: #ffffff0d; color: var(--lime); border-color: #46502f; }
+.icon-btn:hover { background: #ffffff0d; color: var(--lime); border-color: #3d2d52; }
 .icon-btn .mute-x { display: none; }
 .icon-btn[aria-pressed='true'] .mute-x { display: block; }
 .icon-btn[aria-pressed='true'] .wave { display: none; }
@@ -196,9 +196,9 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   align-items: center;
   gap: 7px;
   padding: 7px 11px;
-  border: 1px solid #3a4231;
+  border: 1px solid #393043;
   border-radius: 10px;
-  background: linear-gradient(180deg, #1b2016, #14170f);
+  background: linear-gradient(180deg, #1b1521, #130e18);
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
   font-size: 14px;
@@ -289,7 +289,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 8.5px;
   font-weight: 700;
   letter-spacing: 1.9px;
-  color: #a4ac9c;
+  color: #a39bad;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -309,9 +309,9 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .pack-head h1 em {
   font-style: normal;
   color: var(--lime);
-  text-shadow: 0 0 26px #d6ff3f42;
+  text-shadow: 0 0 26px #b388ff42;
 }
-.pack-sub { margin: 0; font-size: 11.5px; color: #8b938a; letter-spacing: 0.1px; }
+.pack-sub { margin: 0; font-size: 11.5px; color: #8f8994; letter-spacing: 0.1px; }
 
 .pack-area {
   position: relative;
@@ -334,7 +334,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   aspect-ratio: 1;
   border-radius: 50%;
   background:
-    radial-gradient(circle, #4f8cff2e 0%, #4f8cff10 38%, transparent 66%);
+    radial-gradient(circle, #a24fff2e 0%, #a24fff10 38%, transparent 66%);
   filter: blur(6px);
   pointer-events: none;
   animation: halo-breathe 5s ease-in-out infinite;
@@ -360,13 +360,13 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  filter: drop-shadow(0 26px 36px #000000b8) drop-shadow(0 0 34px #3d7bff38);
+  filter: drop-shadow(0 26px 36px #000000b8) drop-shadow(0 0 34px #993dff38);
   transition: filter 0.3s ease;
   will-change: transform;
 }
 .pack:active { cursor: grabbing; }
-.pack:hover { filter: drop-shadow(0 26px 36px #000000cc) drop-shadow(0 0 44px #5f9dff5c); }
-.pack.is-ripped { filter: drop-shadow(0 26px 36px #000000b8) drop-shadow(0 0 60px #b9ff3f66); }
+.pack:hover { filter: drop-shadow(0 26px 36px #000000cc) drop-shadow(0 0 44px #a85fff5c); }
+.pack.is-ripped { filter: drop-shadow(0 26px 36px #000000b8) drop-shadow(0 0 60px #a874ff66); }
 
 .pack-img {
   position: absolute;
@@ -454,8 +454,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   width: 9px;
   height: 13px;
   border-radius: 1.5px;
-  background: linear-gradient(160deg, #f7f8ef, #c9d3bd);
-  box-shadow: 0 0 10px #eaffb0aa;
+  background: linear-gradient(160deg, #f2eef9, #c7bbd5);
+  box-shadow: 0 0 10px #e6d9ffaa;
 }
 
 .cut {
@@ -475,7 +475,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   right: 0;
   height: 1px;
   border-radius: 2px;
-  background: repeating-linear-gradient(90deg, #d6ff3fcc 0 6px, #d6ff3f26 6px 12px);
+  background: repeating-linear-gradient(90deg, #b388ffcc 0 6px, #b388ff26 6px 12px);
   opacity: 0.85;
   animation: dash 1.1s linear infinite;
 }
@@ -485,8 +485,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   height: 2px;
   width: calc(var(--p) * 100%);
   border-radius: 2px;
-  background: linear-gradient(90deg, #fff2b0, #d6ff3f 45%, #ffffff);
-  box-shadow: 0 0 9px #f3ffb0, 0 0 22px #d6ff3f9c, 0 0 40px #b6ff2e56;
+  background: linear-gradient(90deg, #f4eaff, #b388ff 45%, #ffffff);
+  box-shadow: 0 0 9px #f1e8ff, 0 0 22px #b388ff9c, 0 0 40px #9d6bff56;
 }
 .cut-head {
   position: absolute;
@@ -495,8 +495,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   height: 12px;
   margin-left: -6px;
   border-radius: 50%;
-  background: radial-gradient(circle, #ffffff 0 30%, #eaff8a 45%, #d6ff3f00 72%);
-  box-shadow: 0 0 12px #f4ffbe, 0 0 30px #d6ff3f;
+  background: radial-gradient(circle, #ffffff 0 30%, #dccaff 45%, #b388ff00 72%);
+  box-shadow: 0 0 12px #d9beff, 0 0 30px #b388ff;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
@@ -507,7 +507,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   transform: translateX(-50%);
   font-size: 15px;
   color: var(--lime);
-  text-shadow: 0 0 14px #d6ff3fcf;
+  text-shadow: 0 0 14px #b388ffcf;
   animation: nudge 1.25s ease-in-out infinite;
   opacity: 0.95;
 }
@@ -524,8 +524,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 6.5px;
   font-weight: 700;
   letter-spacing: 1.6px;
-  color: #dbe6ffb0;
-  text-shadow: 0 1px 6px #001033cc;
+  color: #ecdbffb0;
+  text-shadow: 0 1px 6px #180033cc;
   white-space: nowrap;
   pointer-events: none;
 }
@@ -549,21 +549,21 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   gap: 11px;
   margin-top: 12px;
   padding: 9px 13px 9px 10px;
-  border: 1px solid #2c3327;
+  border: 1px solid #2d2634;
   border-radius: 12px;
-  background: #0e110dcc;
+  background: #0f0d11cc;
   backdrop-filter: blur(6px);
   max-width: 100%;
 }
 .pack-hint strong { display: block; font-size: 9px; letter-spacing: 1.5px; color: var(--lime); }
-.pack-hint div span { display: block; margin-top: 3px; font-size: 10.5px; color: #99a093; }
+.pack-hint div span { display: block; margin-top: 3px; font-size: 10.5px; color: #9992a1; }
 .finger {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
-  border: 1px solid #46512f;
+  border: 1px solid #3e2c54;
   border-radius: 50%;
   font-size: 14px;
   animation: finger-swipe 2.4s ease-in-out infinite;
@@ -574,12 +574,12 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 12px;
   font-weight: 700;
-  color: #7f8a74;
+  color: #7e728c;
   font-variant-numeric: tabular-nums;
   min-width: 42px;
   text-align: right;
 }
-.hint-pct.hot { color: var(--lime); text-shadow: 0 0 12px #d6ff3f77; }
+.hint-pct.hot { color: var(--lime); text-shadow: 0 0 12px #b388ff77; }
 
 .pack-odds {
   display: flex;
@@ -591,7 +591,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  color: #747c70;
+  color: #766f7d;
   z-index: 2;
 }
 .pack-odds .odds { white-space: nowrap; }
@@ -619,7 +619,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-weight: 700;
 }
 .reveal-head h2 em { font-style: normal; color: var(--lime); }
-.reveal-head p:not(.kicker) { margin: 0; font-size: 11px; color: #899187; }
+.reveal-head p:not(.kicker) { margin: 0; font-size: 11px; color: #8c8692; }
 
 .table {
   position: relative;
@@ -641,7 +641,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   border-radius: 50%;
   pointer-events: none;
   opacity: 0.5;
-  background: radial-gradient(circle, #6f9cff1c, transparent 62%);
+  background: radial-gradient(circle, #b46fff1c, transparent 62%);
   transition: background 0.6s ease, opacity 0.6s ease;
   filter: blur(4px);
 }
@@ -705,7 +705,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 }
 .card.is-top { cursor: pointer; }
 .card:not(.is-top) { pointer-events: none; }
-.card.is-top:hover { filter: drop-shadow(0 16px 24px #000000b8) drop-shadow(0 0 16px #d6ff3f2e); }
+.card.is-top:hover { filter: drop-shadow(0 16px 24px #000000b8) drop-shadow(0 0 16px #b388ff2e); }
 .card:active.is-top:not(.is-flipped) { transform: translateY(calc(var(--depth) * -9px)) scale(calc(1 - var(--depth) * 0.045)) rotate(0deg); }
 
 .card-inner {
@@ -746,10 +746,10 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .card-back {
   padding: 6.5%;
   background:
-    repeating-linear-gradient(135deg, #ffffff00 0 9px, #d6ff3f0a 9px 10px),
-    radial-gradient(120% 90% at 30% 10%, #2a3620, #141a12 60%, #0d1109);
-  border: 1px solid #647c33;
-  box-shadow: inset 0 0 0 3px #0e120b, inset 0 0 0 4px #3c4d24, inset 0 0 44px #000000a8;
+    repeating-linear-gradient(135deg, #ffffff00 0 9px, #b388ff0a 9px 10px),
+    radial-gradient(120% 90% at 30% 10%, #2a1e38, #16111b 60%, #0d0812);
+  border: 1px solid #522e81;
+  box-shadow: inset 0 0 0 3px #0e0a13, inset 0 0 0 4px #362150, inset 0 0 44px #000000a8;
 }
 .card-back::after {
   content: '';
@@ -766,11 +766,11 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 6.5px;
   font-weight: 700;
   letter-spacing: 1.1px;
-  color: #a9c46b;
+  color: #9164cb;
   position: relative;
   z-index: 2;
 }
-.back-row.bottom { color: #7f9257; margin-top: auto; }
+.back-row.bottom { color: #705396; margin-top: auto; }
 .back-emblem {
   position: relative;
   flex: 1;
@@ -781,14 +781,14 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   position: absolute;
   width: 54%;
   aspect-ratio: 1;
-  border: 1px solid #9dbb57;
+  border: 1px solid #8150c2;
   transform: rotate(45deg);
-  box-shadow: inset 0 0 0 3px #10160d, inset 0 0 0 4px #55692f, 0 0 26px #d6ff3f26;
+  box-shadow: inset 0 0 0 3px #110c17, inset 0 0 0 4px #482b6d, 0 0 26px #b388ff26;
   animation: emblem-spin 18s linear infinite;
 }
 .back-emblem i:nth-child(2) {
   width: 36%;
-  border-color: #6d843e;
+  border-color: #5c3989;
   transform: rotate(65deg);
   animation-direction: reverse;
   animation-duration: 26s;
@@ -797,7 +797,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   position: relative;
   font-size: 42px;
   color: var(--lime);
-  text-shadow: 0 0 22px #d6ff3f9c, 0 0 48px #d6ff3f4a;
+  text-shadow: 0 0 22px #b388ff9c, 0 0 48px #b388ff4a;
 }
 .back-num {
   position: absolute;
@@ -806,7 +806,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 26px;
   font-weight: 700;
-  color: #3c4c26;
+  color: #37234f;
 }
 
 /* -- face avant : le visuel occupe toute la carte -- */
@@ -815,8 +815,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   padding: 0;
   border-radius: 12px;
   overflow: hidden;
-  background: #0b0d0f;
-  border: 2px solid var(--r-color, #e6ebdf);
+  background: #0d0a10;
+  border: 2px solid var(--r-color, #e4deec);
   box-shadow:
     0 0 0 1px #000000a6,
     inset 0 0 0 1px #ffffff1a,
@@ -831,7 +831,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   display: block;
   overflow: hidden;
   border-radius: inherit;
-  background: #0a0c0d;
+  background: #0b090e;
   isolation: isolate;
   aspect-ratio: 5 / 7;
 }
@@ -859,7 +859,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   background:
     radial-gradient(circle at 30% 22%, #ffffff3d, transparent 52%),
     radial-gradient(circle at 76% 84%, #00000052, transparent 60%),
-    var(--art, #2a3130);
+    var(--art, #2f2932);
 }
 .cf-fallback .card-emoji { font-size: 20cqw; }
 .cf.has-img .cf-fallback { opacity: 0; transition: opacity 0.3s ease; }
@@ -893,8 +893,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   line-height: 1;
   padding: 0.55em 0.7em 0.45em;
   border-radius: 99px;
-  background: var(--r-color, #e6ebdf);
-  color: var(--r-ink, #20261b);
+  background: var(--r-color, #e4deec);
+  color: var(--r-ink, #201a27);
   box-shadow: 0 0 14px -2px var(--r-glow, #fff), inset 0 0 0 1px #ffffff66;
 }
 .cf-name {
@@ -904,7 +904,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   line-height: 1.02;
   letter-spacing: -0.02em;
   color: #fff;
-  background: linear-gradient(180deg, #fff 0%, #fff 55%, var(--r-color, #dfe4dc) 130%);
+  background: linear-gradient(180deg, #fff 0%, #fff 55%, var(--r-color, #e0dbe5) 130%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -933,7 +933,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: clamp(7px, 4cqw, 18px);
   line-height: 1.25;
   font-weight: 500;
-  color: #f3f4ee;
+  color: #f0eef4;
   text-shadow: 0 1px 3px #000000cc;
 }
 .cf-meta {
@@ -972,8 +972,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   background:
     radial-gradient(circle at var(--mx, 50%) var(--my, 50%), #ffffffb0 0%, transparent 34%),
     linear-gradient(calc(var(--ma, 120deg)),
-      #ff5cc811 0%, #5cc8ff22 18%, #b6ff5c1c 36%,
-      #ffe45c22 54%, #ff5cc81c 72%, #5cffe122 88%, #ff5cc811 100%);
+      #ff5cc811 0%, #9b5cff22 18%, #a75cff1c 36%,
+      #ffe45c22 54%, #ff5cc81c 72%, #ce5cff22 88%, #ff5cc811 100%);
   background-blend-mode: screen;
   filter: saturate(1.4) contrast(1.1);
 }
@@ -1058,7 +1058,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 1.3px;
-  color: #6f776d;
+  color: #726c78;
 }
 .foot-left { display: inline-flex; align-items: center; gap: 6px; }
 .foot-left i {
@@ -1085,7 +1085,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   gap: 7px;
   padding: 9px 14px calc(9px + env(safe-area-inset-bottom));
   border-top: 1px solid #ffffff0f;
-  background: linear-gradient(180deg, #0a0c0bc9, #0a0c0bf2);
+  background: linear-gradient(180deg, #0b0a0cc9, #0b0a0cf2);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transition: transform 0.45s var(--ease-out), opacity 0.4s ease;
@@ -1105,7 +1105,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 1.6px;
-  color: #8b9389;
+  color: #8e8894;
 }
 .recap-kicker i {
   width: 5px; height: 5px; border-radius: 50%;
@@ -1121,7 +1121,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   padding: 3px 2px;
   border: 0;
   background: none;
-  color: #77806f;
+  color: #776e81;
   font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 1.2px;
@@ -1159,7 +1159,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   height: 46px;
   aspect-ratio: 5 / 7;
   border-radius: 5px;
-  border: 1px dashed #2b312b;
+  border: 1px dashed #2e2b31;
   background: #ffffff04;
   display: grid;
   place-items: center;
@@ -1169,11 +1169,11 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .slot::after {
   content: '✳';
   font-size: 12px;
-  color: #2f362e;
+  color: #322d37;
 }
 .slot.is-filled {
-  border: 1px solid var(--slot-color, #55604f);
-  background: linear-gradient(165deg, #171d15, #0d100c);
+  border: 1px solid var(--slot-color, #574e61);
+  background: linear-gradient(165deg, #19141e, #0e0c10);
   box-shadow: 0 0 14px -2px var(--slot-color, transparent);
   animation: slot-in 0.55s var(--ease-spring);
 }
@@ -1186,8 +1186,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 1px;
-  background: linear-gradient(165deg, var(--slot-bg, #e8ecdf), #c7d0bd);
-  color: #1a2412;
+  background: linear-gradient(165deg, var(--slot-bg, #e5deed), #c6bcd1);
+  color: #1b1125;
 }
 /* Miniature : le visuel remplit la vignette, sans texte (trop petit). */
 .slot-mini .cf { position: absolute; inset: 0; border-radius: inherit; }
@@ -1213,7 +1213,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: #4c5744;
+  color: #4d4358;
 }
 .slot.is-new::before {
   content: '';
@@ -1239,17 +1239,17 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   border: 0;
   border-radius: 10px;
   background: var(--lime);
-  color: #15200a;
+  color: #140822;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.3px;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: 0 6px 22px -8px #d6ff3fb8, inset 0 -2px 0 #0000001f;
+  box-shadow: 0 6px 22px -8px #b388ffb8, inset 0 -2px 0 #0000001f;
   transition: transform 0.16s ease, box-shadow 0.25s, background 0.25s;
   animation: buy-in 0.6s var(--ease-spring);
 }
-.buy-btn:hover { background: #e2ff70; transform: translateY(-1px); }
+.buy-btn:hover { background: #cbb2ff; transform: translateY(-1px); }
 .buy-btn:active { transform: translateY(1px) scale(0.995); }
 .buy-btn::after {
   content: '';
@@ -1274,8 +1274,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 }
 .buy-price .coin-glyph { font-size: 11px; }
 .buy-btn:disabled {
-  background: #2a2f26;
-  color: #6f7967;
+  background: #2a2530;
+  color: #70667a;
   box-shadow: none;
   cursor: not-allowed;
   animation: none;
@@ -1304,7 +1304,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .fusion-backdrop {
   position: absolute;
   inset: 0;
-  background: #050608d9;
+  background: #060508d9;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: fade-in 0.3s ease;
@@ -1316,17 +1316,17 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   max-height: min(86vh, 720px);
   overflow-y: auto;
   padding: 20px 18px calc(16px + env(safe-area-inset-bottom));
-  border: 1px solid #37402f;
+  border: 1px solid #372e41;
   border-radius: 18px;
   background:
-    radial-gradient(120% 60% at 50% -10%, #24301a, transparent 60%),
-    linear-gradient(180deg, #14181300, #0b0e0b),
+    radial-gradient(120% 60% at 50% -10%, #241832, transparent 60%),
+    linear-gradient(180deg, #16131800, #0d0b0e),
     var(--panel);
   box-shadow: 0 30px 70px -20px #000, 0 0 0 1px #ffffff08, inset 0 1px 0 #ffffff12;
   text-align: center;
   animation: dialog-in 0.45s var(--ease-spring);
   scrollbar-width: thin;
-  scrollbar-color: #39432f transparent;
+  scrollbar-color: #382e44 transparent;
 }
 .fusion-glow {
   position: absolute;
@@ -1335,7 +1335,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   width: 340px;
   height: 200px;
   transform: translateX(-50%);
-  background: radial-gradient(ellipse, #d6ff3f2e, transparent 68%);
+  background: radial-gradient(ellipse, #b388ff2e, transparent 68%);
   pointer-events: none;
 }
 .fusion-dialog .kicker { position: relative; }
@@ -1353,7 +1353,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   max-width: 330px;
   font-size: 11.5px;
   line-height: 1.55;
-  color: #949c8f;
+  color: #958e9d;
 }
 
 .fusion-stage {
@@ -1364,7 +1364,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   margin: 14px 0 12px;
   min-height: 78px;
   font-size: 10px;
-  color: #7d8776;
+  color: #7e7588;
 }
 .fusion-stage .fs-card {
   position: relative;
@@ -1375,7 +1375,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   place-items: center;
   overflow: hidden;
   font-size: 18px;
-  background: linear-gradient(165deg, #e9eddf, #cbd4c1);
+  background: linear-gradient(165deg, #e5deee, #cac0d5);
   border: 1px solid #ffffff3d;
   box-shadow: 0 6px 14px #000000800;
   animation: fs-float 2.4s ease-in-out infinite;
@@ -1384,7 +1384,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .fusion-stage .fs-card .cf-top, .fusion-stage .fs-card .cf-bottom { display: none; }
 .fusion-stage .fs-card .cf-fallback .card-emoji { font-size: 17px; }
 .fusion-stage .fs-card:nth-child(2) { animation-delay: -1.2s; }
-.fusion-stage .fs-plus { font-family: 'Space Grotesk', sans-serif; font-size: 16px; color: #6a7561; }
+.fusion-stage .fs-plus { font-family: 'Space Grotesk', sans-serif; font-size: 16px; color: #6a6076; }
 .fusion-stage .fs-arrow {
   font-size: 15px;
   color: var(--lime);
@@ -1407,16 +1407,16 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid #2a3126;
+  border: 1px solid #2b2532;
   border-radius: 11px;
   background: #ffffff05;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s, transform 0.15s;
   text-align: left;
 }
-.fusion-row:hover { background: #ffffff0b; border-color: #4a5738; }
+.fusion-row:hover { background: #ffffff0b; border-color: #463659; }
 .fusion-row:active { transform: scale(0.99); }
-.fusion-row.is-selected { border-color: var(--lime); background: #d6ff3f10; }
+.fusion-row.is-selected { border-color: var(--lime); background: #b388ff10; }
 .fusion-row .fr-emoji {
   position: relative;
   width: 34px;
@@ -1426,7 +1426,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   place-items: center;
   border-radius: 5px;
   font-size: 17px;
-  background: linear-gradient(165deg, var(--fr-bg, #e9eddf), #c8d1be);
+  background: linear-gradient(165deg, var(--fr-bg, #e5deee), #c7bdd2);
   border: 1px solid #ffffff2b;
   overflow: hidden;
   aspect-ratio: 5 / 7;
@@ -1445,7 +1445,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.fusion-row .fr-meta { display: block; margin-top: 2px; font-size: 9px; color: #8b9486; }
+.fusion-row .fr-meta { display: block; margin-top: 2px; font-size: 9px; color: #8d8595; }
 .fusion-row .fr-count {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 11px;
@@ -1453,15 +1453,15 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   color: var(--lime);
   padding: 3px 7px;
   border-radius: 20px;
-  background: #d6ff3f14;
+  background: #b388ff14;
 }
 .fusion-empty {
   padding: 18px 12px;
-  border: 1px dashed #333b2e;
+  border: 1px dashed #342d3c;
   border-radius: 12px;
   font-size: 11.5px;
   line-height: 1.55;
-  color: #8d958a;
+  color: #908996;
 }
 .fusion-empty b { color: var(--lime); font-weight: 600; }
 
@@ -1477,24 +1477,24 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   flex: 1 1 auto;
   min-width: 0;
   padding: 11px 14px;
-  border: 1px solid #3b4434;
+  border: 1px solid #3c3345;
   border-radius: 10px;
   background: #ffffff06;
-  color: #c2c9bd;
+  color: #c3bcca;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.1px;
   cursor: pointer;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.ghost-btn:hover { background: #ffffff10; color: #fff; border-color: #5a6749; }
-.ghost-btn.primary { background: var(--lime); color: #16200a; border-color: transparent; }
-.ghost-btn.primary:hover { background: #e4ff7a; }
+.ghost-btn:hover { background: #ffffff10; color: #fff; border-color: #574769; }
+.ghost-btn.primary { background: var(--lime); color: #140822; border-color: transparent; }
+.ghost-btn.primary:hover { background: #cbb2ff; }
 .fusion-hint {
   margin: 9px 0 0;
   font-size: 8.5px;
   letter-spacing: 0.5px;
-  color: #6f786a;
+  color: #716979;
 }
 
 /* ---------------------------------------------------------------- divers */
@@ -1505,7 +1505,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   z-index: 22;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 46%, #ffffff, #eaffb0 34%, #b6ff2e00 72%);
+  background: radial-gradient(circle at 50% 46%, #ffffff, #e6d9ff 34%, #9d6bff00 72%);
 }
 .flash.run { animation: flash-out 0.68s ease-out; }
 
@@ -1517,10 +1517,10 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   z-index: 80;
   max-width: min(400px, 88vw);
   padding: 10px 15px;
-  border: 1px solid #3d4930;
+  border: 1px solid #3c2e4b;
   border-radius: 30px;
-  background: #141a10ee;
-  color: #e7eddd;
+  background: #150f1bee;
+  color: #e4dcee;
   font-size: 11px;
   letter-spacing: 0.2px;
   box-shadow: 0 14px 34px -12px #000;
@@ -1626,7 +1626,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .inspect-backdrop {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 45%, #101415d9, #050607f2 70%);
+  background: radial-gradient(circle at 50% 45%, #120f16d9, #060507f2 70%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   opacity: 0;
@@ -1651,7 +1651,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   border-radius: 18px;
   container-type: inline-size;
   overflow: hidden;
-  border: 2px solid var(--r-color, #e6ebdf);
+  border: 2px solid var(--r-color, #e4deec);
   box-shadow:
     0 0 0 1px #000000, 
     0 26px 60px #000000cc,
@@ -1670,14 +1670,14 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   place-items: center;
   border: 1px solid #ffffff2e;
   border-radius: 50%;
-  background: #0a0c0df2;
-  color: #cfd6ca;
+  background: #0b090ef2;
+  color: #d0c9d7;
   font-size: 13px;
   cursor: pointer;
   transform: translate(38%, -38%);
   transition: background 0.2s, color 0.2s, transform 0.2s;
 }
-.inspect-x:hover { background: var(--lime); color: #131a08; transform: translate(38%, -38%) scale(1.06); }
+.inspect-x:hover { background: var(--lime); color: #10071b; transform: translate(38%, -38%) scale(1.06); }
 
 @keyframes inspect-glow {
   0%, 100% { box-shadow: 0 0 0 1px #000000, 0 26px 60px #000000cc, 0 0 48px -14px var(--r-glow, #fff); }
@@ -1807,17 +1807,17 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   gap: 7px;
   width: 100%;
   padding: 9px 14px;
-  border: 1px dashed #4a5738;
+  border: 1px dashed #463659;
   border-radius: 10px;
-  background: #d6ff3f0a;
-  color: #cfd8c4;
+  background: #b388ff0a;
+  color: #cdc2da;
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 1.3px;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
-.fusion-chip:hover { background: #d6ff3f18; border-color: var(--lime); color: #fff; }
+.fusion-chip:hover { background: #b388ff18; border-color: var(--lime); color: #fff; }
 .chip-icon { font-size: 12px; color: var(--lime); }
 .chip-badge {
   display: inline-grid;
@@ -1827,7 +1827,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   padding: 0 5px;
   border-radius: 20px;
   background: var(--lime);
-  color: #17200a;
+  color: #140822;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0;
@@ -1861,7 +1861,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   100% { filter: brightness(1); }
 }
 
-.fusion-stage .fs-empty { color: #6f786a; font-size: 10px; letter-spacing: 0.6px; }
+.fusion-stage .fs-empty { color: #716979; font-size: 10px; letter-spacing: 0.6px; }
 
 @media (max-width: 559px) {
   .recap {
@@ -1872,7 +1872,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   }
   .recap-head { grid-area: head; align-self: center; gap: 6px; }
   .recap-kicker { display: none; }
-  .recap-toggle { margin: 0; color: #5f675a; }
+  .recap-toggle { margin: 0; color: #605968; }
   .recap-count { font-size: 9px; }
   .recap-slots { grid-area: slots; justify-content: flex-start; }
   .recap-actions { grid-area: actions; flex-direction: row; align-items: center; gap: 6px; }
@@ -1891,18 +1891,18 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 
 /* -- fusion : verrou / états -- */
 .fusion-chip[hidden] { display: none; }
-.fusion-chip.has-doubles { border-style: solid; border-color: #6c7d4b; color: var(--lime); }
+.fusion-chip.has-doubles { border-style: solid; border-color: #614781; color: var(--lime); }
 .chip-arrow { color: var(--lime); font-size: 11px; }
 .free-tag {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: #1d2a0f;
+  color: #1b0d2c;
   background: #ffffff4d;
   padding: 1px 6px;
   border-radius: 20px;
 }
-.buy-btn.is-free { background: linear-gradient(100deg, #e9ff9a, #d6ff3f 55%, #b9ef16); }
+.buy-btn.is-free { background: linear-gradient(100deg, #d9c8ff, #b388ff 55%, #9f6bff); }
 .buy-btn.is-denied { animation: denied 0.42s ease; }
 @keyframes denied {
   0%, 100% { transform: translateX(0); }
@@ -1935,15 +1935,15 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   height: 30px;
   display: grid;
   place-items: center;
-  border: 1px solid #333b2e;
+  border: 1px solid #342d3c;
   border-radius: 50%;
   background: #ffffff08;
-  color: #909a8b;
+  color: #928a9b;
   font-size: 11px;
   cursor: pointer;
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.fusion-x:hover { background: #ffffff14; color: #fff; border-color: #5a6749; }
+.fusion-x:hover { background: #ffffff14; color: #fff; border-color: #574769; }
 
 /* Action explicite, accessible même quand la carte remplit la table mobile. */
 .next-card {
@@ -1955,10 +1955,81 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   border: 0;
   border-radius: 12px;
   background: var(--lime);
-  color: #20261b;
+  color: #201a27;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
 }
 .next-card[hidden] { display: none; }
+
+
+/* ==========================================================================
+   THÈME NOIR & VIOLET + CORRECTIFS (couche finale)
+   ========================================================================== */
+:root{--bg:#06040b;--bg-2:#0b0814;--panel:#0f0b1a;--lime:#b388ff;--lime-dim:#8b5cf6;--violet:#a855f7;--pink:#e879f9}
+html,body{background:var(--bg)}
+.app{background:radial-gradient(110% 70% at 50% -12%,#2a1250 0%,transparent 58%),radial-gradient(80% 60% at 50% 115%,#1b0c3a 0%,transparent 62%),var(--bg)}
+
+/* aurore : deux nappes qui dérivent (transform seul = GPU) */
+.app::before,.app::after{content:'';position:absolute;z-index:0;pointer-events:none;width:70vmax;height:70vmax;border-radius:50%;will-change:transform}
+.app::before{left:-25vmax;top:-22vmax;background:radial-gradient(circle,#7c3aed46,transparent 62%);animation:aurora-a 18s ease-in-out infinite alternate}
+.app::after{right:-28vmax;bottom:-28vmax;background:radial-gradient(circle,#c026d33a,transparent 62%);animation:aurora-b 22s ease-in-out infinite alternate}
+.bg-grid{animation:grid-drift 26s linear infinite}
+.bg-glow{filter:none;background:radial-gradient(circle,#a855f72b 0%,#7c3aed14 36%,transparent 62%)}
+.hud{backdrop-filter:none;-webkit-backdrop-filter:none;background:linear-gradient(180deg,#07050ff0,#07050fa0)}
+.brand-mark{filter:drop-shadow(0 0 10px #a855f7)}
+
+.pack-head h1 em,.reveal-head h2 em{background:linear-gradient(100deg,#c4a1ff,#f0abfc 38%,#8b5cf6 72%,#c4a1ff);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;text-shadow:none;animation:text-flow 5s linear infinite}
+.pack-halo::before{content:'';position:absolute;inset:4%;border-radius:50%;background:conic-gradient(transparent,#a855f77a,transparent 28%,#e879f966,transparent 60%,#7c3aed7a,transparent);-webkit-mask:radial-gradient(circle,transparent 55%,#000 56%,#000 61%,transparent 62%);mask:radial-gradient(circle,transparent 55%,#000 56%,#000 61%,transparent 62%);animation:spin-slow 16s linear infinite}
+.pack::after{mix-blend-mode:normal;opacity:.4}
+
+/* ----- CORRECTIF : retournement de la carte ----- */
+.card.is-flipped .card-inner{--flip:180deg}
+.card-inner{transition:transform .95s cubic-bezier(.25,1.15,.35,1)}
+.card{touch-action:manipulation;-webkit-user-select:none;user-select:none;outline-offset:6px}
+.card.is-top.is-flipped{transform:translateY(-6px) scale(1.035) rotate(0deg)}
+
+/* ----- CORRECTIF : envol vers le butin (aucun style n'existait) ----- */
+.card.is-flying{pointer-events:none;z-index:60;opacity:0;
+  transition:transform .62s cubic-bezier(.55,-.12,.25,1),opacity .55s ease .12s;
+  transform:translate(var(--fly-x),var(--fly-y)) scale(var(--fly-s)) rotate(-8deg)!important}
+
+/* ----- perf : plus de filter sur les cartes 3D, ombres/auras en pseudo-éléments ----- */
+.app .card,.app .card[data-fx],.app .card.is-flipped,.app .card[data-fx].is-flipped,
+.app .card[data-fx].is-revealed:not(.is-top),.app .card.is-top:hover{filter:none}
+.card::before,.card::after{content:'';position:absolute;pointer-events:none;border-radius:16px;transform:translateZ(-30px)}
+.card::after{inset:5% 4% -3%;background:#000;filter:blur(14px);opacity:.55;z-index:-1}
+.card::before{inset:-12%;z-index:-2;background:radial-gradient(circle,var(--r-glow,#a855f7) 0%,transparent 64%);opacity:0;transition:opacity .5s}
+.card[data-fx='rare'].is-flipped::before{opacity:.38}
+.card[data-fx='epic'].is-flipped::before{opacity:.6;animation:aura 2.4s ease-in-out infinite}
+.card[data-fx='gold'].is-flipped::before{opacity:.8;animation:aura 1.8s ease-in-out infinite}
+.card-front::after{content:'';position:absolute;inset:-20%;z-index:9;pointer-events:none;opacity:0;
+  background:linear-gradient(105deg,transparent 42%,#ffffff59 50%,transparent 58%);transform:translateX(-120%)}
+.card.is-flipped .card-front::after{animation:front-sweep 1.1s .5s ease-out both}
+.card.is-flipped .cf-badge{animation:badge-pop .6s .4s var(--ease-spring) backwards}
+.back-star{animation:star-pulse 2.6s ease-in-out infinite}
+
+/* ----- boutons violets ----- */
+.next-card,.buy-btn,.buy-btn.is-free,.ghost-btn.primary{background:linear-gradient(100deg,#8b5cf6,#c026d3);color:#fff;box-shadow:0 8px 26px -8px #a855f7cc,inset 0 1px 0 #ffffff40}
+.buy-btn:hover,.ghost-btn.primary:hover,.next-card:hover{background:linear-gradient(100deg,#9d74fa,#d946ef);transform:translateY(-1px)}
+.buy-btn:disabled{background:#241d33;color:#6f6785;box-shadow:none}
+.free-tag{color:#fff;background:#ffffff2e}
+.next-card{overflow:hidden;font-size:11px;letter-spacing:1.4px;transition:transform .16s,box-shadow .25s}
+.next-card::after{content:'';position:absolute;top:0;bottom:0;width:44%;left:-60%;background:linear-gradient(100deg,transparent,#ffffff59,transparent);transform:skewX(-18deg);animation:buy-shine 3s ease-in-out infinite}
+.next-card:not([hidden]){animation:buy-in .5s var(--ease-spring)}
+/* la place du bouton est réservée : la pile ne saute plus quand il apparaît */
+.reveal-view .next-card[hidden]{display:inline-flex!important;visibility:hidden}
+.recap{backdrop-filter:none;-webkit-backdrop-filter:none;background:#09061cf5}
+.toast{background:#150f26f2;border-color:#4b3a78}
+
+@keyframes aurora-a{to{transform:translate3d(14vmax,10vmax,0) scale(1.15)}}
+@keyframes aurora-b{to{transform:translate3d(-12vmax,-9vmax,0) scale(1.2)}}
+@keyframes grid-drift{to{transform:translate3d(54px,54px,0)}}
+@keyframes text-flow{to{background-position:-240% 0}}
+@keyframes spin-slow{to{transform:rotate(360deg)}}
+@keyframes aura{0%,100%{transform:translateZ(-30px) scale(.96)}50%{transform:translateZ(-30px) scale(1.06)}}
+@keyframes front-sweep{0%{opacity:1;transform:translateX(-120%)}100%{opacity:0;transform:translateX(120%)}}
+@keyframes badge-pop{0%{transform:scale(.5);opacity:0}100%{transform:none;opacity:1}}
+@keyframes star-pulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.14);opacity:1}}
+@media (hover:none){.card.is-top:hover{filter:none}}
