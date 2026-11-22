@@ -30,6 +30,22 @@
   const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
 
   const $ = (id) => document.getElementById(id);
+  /* Sélecteur tolérant : renvoie null au lieu de lever une exception quand le
+     parent manque (HTML en cache obsolète, bloc retiré, aperçu partiel…). */
+  const qs = (root, selector) => (root && typeof root.querySelector === 'function'
+    ? root.querySelector(selector)
+    : null);
+  /* Écouteur tolérant : même rôle que addEventListener, mais un élément absent
+     n'interrompt plus le script (c'était la cause du bouton Google inerte :
+     `Cannot read properties of null (reading 'addEventListener')`). */
+  const on = (target, type, handler, options) => {
+    if (target && typeof target.addEventListener === 'function') {
+      target.addEventListener(type, handler, options);
+      return true;
+    }
+    console.warn(`[Refs Cards] élément absent pour l'écouteur « ${type} »`);
+    return false;
+  };
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n);
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -61,9 +77,9 @@
   const pack = $('pack');
   const packFlap = $('pack-flap');
   const packFloat = $('pack-float');
-  const gapGlow = pack.querySelector('.gap-glow');
-  const gapCards = pack.querySelector('.gap-cards');
-  const packSave = pack.querySelector('.pack-and-save');
+  const gapGlow = qs(pack, '.gap-glow');
+  const gapCards = qs(pack, '.gap-cards');
+  const packSave = qs(pack, '.pack-and-save');
   const cut = $('cut');
   const hintPct = $('hint-pct');
   const hintText = $('hint-text');
@@ -89,7 +105,8 @@
   const fusionBuy = $('fusion-buy');
   const fusionStage = $('fusion-stage');
   const fusionGo = $('fusion-go');
-  const buyLabel = buyBtn.querySelector('.buy-label');
+  const buyLabel = qs(buyBtn, '.buy-label');
+  const buyPrice = qs(buyBtn, '.buy-price');
   const fusionLater = $('fusion-later');
   const fusionDesc = $('fusion-desc');
   const toast = $('toast');
@@ -107,7 +124,7 @@
   const authScreen = $('auth-screen');
   const authError = $('auth-error');
   const googleSignIn = $('google-signin');
-  const googleLabel = googleSignIn.querySelector('.google-label');
+  const googleLabel = qs(googleSignIn, '.google-label');
   const authStatus = $('auth-status');
   const authHint = $('auth-hint');
   const authHintText = $('auth-hint-text');
@@ -501,11 +518,15 @@
     packFlap.style.transform = `translateY(${(-tearP * 8).toFixed(2)}px) rotateX(${(-tearP * 10).toFixed(2)}deg) translateZ(${(tearP * 6).toFixed(2)}px)`;
     hintPct.textContent = `${Math.round(tearP * 100)} %`;
     hintPct.classList.toggle('hot', tearP >= TEAR_THRESHOLD);
-    gapGlow.style.opacity = tearP > 0.02 ? String(Math.min(1, tearP * 1.8)) : '0';
-    gapGlow.style.transform = `scaleX(${tearP})`;
-    gapCards.style.opacity = tearP > 0.32 ? '1' : '0';
-    gapCards.style.transform = `translateY(${(6 - tearP * 14).toFixed(1)}px)`;
-    packSave.style.opacity = String(clamp(1 - tearP * 2.4, 0, 1));
+    if (gapGlow) {
+      gapGlow.style.opacity = tearP > 0.02 ? String(Math.min(1, tearP * 1.8)) : '0';
+      gapGlow.style.transform = `scaleX(${tearP})`;
+    }
+    if (gapCards) {
+      gapCards.style.opacity = tearP > 0.32 ? '1' : '0';
+      gapCards.style.transform = `translateY(${(6 - tearP * 14).toFixed(1)}px)`;
+    }
+    if (packSave) packSave.style.opacity = String(clamp(1 - tearP * 2.4, 0, 1));
   }
 
   function resetTear() {
@@ -682,8 +703,8 @@
     window.setTimeout(showReveal, reduceMotion.matches ? 320 : 720);
   }
 
-  packArea.addEventListener('pointerdown', onDragStart);
-  packArea.addEventListener('pointermove', (e) => {
+  on(packArea, 'pointerdown', onDragStart);
+  on(packArea, 'pointermove', (e) => {
     if (drag || state.phase !== 'pack' || reduceMotion.matches) return;
     const r = packArea.getBoundingClientRect();
     const x = clamp((e.clientX - r.left) / r.width, 0, 1) - 0.5;
@@ -691,12 +712,12 @@
     packFloat.style.setProperty('--py', `${(x * 16).toFixed(1)}deg`);
     packFloat.style.setProperty('--px', `${(-y * 12).toFixed(1)}deg`);
   });
-  packArea.addEventListener('pointerleave', () => {
+  on(packArea, 'pointerleave', () => {
     packFloat.style.setProperty('--py', '0deg');
     packFloat.style.setProperty('--px', '0deg');
   });
-  pack.addEventListener('contextmenu', (e) => e.preventDefault());
-  pack.addEventListener('keydown', (e) => {
+  on(pack, 'contextmenu', (e) => e.preventDefault());
+  on(pack, 'keydown', (e) => {
     if (state.phase !== 'pack') return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -713,7 +734,7 @@
       emitCutSparks();
     }
   });
-  pack.addEventListener('keyup', (e) => {
+  on(pack, 'keyup', (e) => {
     if (e.key === 'ArrowRight' && drag && drag.id === 'kbd') {
       drag = null;
       SFX.tearStop();
@@ -795,7 +816,7 @@
     resolveCardImage(card).then((src) => {
       if (!src) return;
       img.src = src;
-      img.addEventListener('load', () => frame.classList.add('has-img'), { once: true });
+      on(img, 'load', () => frame.classList.add('has-img'), { once: true });
       frame.classList.add('has-src');
     });
 
@@ -838,7 +859,7 @@
     btn.append(inner);
 
     // 1er clic : retourne. 2e clic (après 650 ms, pour éviter le double-clic) : carte suivante.
-    btn.addEventListener('click', () => {
+    on(btn, 'click', () => {
       if (!btn.classList.contains('is-top') || btn.classList.contains('is-flying')) return;
       if (!btn.classList.contains('is-revealed')) revealCard(btn, card);
       else if (btn.classList.contains('is-flipped') && performance.now() - Number(btn.dataset.flipAt || 0) > 650) {
@@ -849,7 +870,7 @@
     // Parallaxe : une seule mise à jour de style par frame.
     let tiltRaf = 0;
     let tiltEv = null;
-    btn.addEventListener('pointermove', (e) => {
+    on(btn, 'pointermove', (e) => {
       if (reduceMotion.matches || e.pointerType === 'touch' || !btn.classList.contains('is-top')) return;
       tiltEv = e;
       if (tiltRaf) return;
@@ -873,7 +894,7 @@
       });
     });
 
-    btn.addEventListener('keydown', (event) => {
+    on(btn, 'keydown', (event) => {
       if (event.key === 'Enter' && btn.classList.contains('is-flipped') && event.shiftKey) {
         event.preventDefault();
         event.stopPropagation();
@@ -881,13 +902,13 @@
       }
     });
 
-    btn.addEventListener('pointerleave', () => {
+    on(btn, 'pointerleave', () => {
       delete btn.dataset.hovered;
       btn.style.setProperty('--rx', '0deg');
       btn.style.setProperty('--ry', '0deg');
     });
 
-    btn.addEventListener('pointerenter', () => {
+    on(btn, 'pointerenter', () => {
       if (btn.classList.contains('is-top') && !btn.classList.contains('is-flipped')) SFX.tick();
     });
 
@@ -1043,20 +1064,20 @@
     inspectReturnFocus = null;
   }
 
-  inspectX.addEventListener('click', closeInspect);
-  inspectBackdrop.addEventListener('click', closeInspect);
+  on(inspectX, 'click', closeInspect);
+  on(inspectBackdrop, 'click', closeInspect);
 
   /* ----------------------------------------------------------- vers le butin */
 
   let flying = false;
 
-  nextCard.addEventListener('click', () => {
+  on(nextCard, 'click', () => {
     if (state.phase !== 'reveal' || !current || flying) return;
     if (!current.node.classList.contains('is-flipped')) return;
     sendToRecap(current.node, current.data);
   });
 
-  tableEl.addEventListener('click', (event) => {
+  on(tableEl, 'click', (event) => {
     if (event.target.closest('.card') || !current || flying || state.phase !== 'reveal') return;
     if (!current.node.classList.contains('is-top') || !current.node.classList.contains('is-flipped')) return;
     sendToRecap(current.node, current.data);
@@ -1241,12 +1262,14 @@
       buyBtn.hidden = false;
       buyBtn.disabled = false;
       buyBtn.classList.remove('is-denied');
-      buyLabel.textContent = state.firstPack ? 'PREMIER BOOSTER OFFERT' : 'OUVRIR UN BOOSTER';
+      if (buyLabel) buyLabel.textContent = state.firstPack ? 'PREMIER BOOSTER OFFERT' : 'OUVRIR UN BOOSTER';
       if (state.firstPack) buyBtn.classList.add('is-free');
       else buyBtn.classList.remove('is-free');
-      buyBtn.querySelector('.buy-price').innerHTML = state.firstPack
-        ? '<span class="free-tag">OFFERT</span>'
-        : '<span class="coin-glyph" aria-hidden="true">🪙</span>100';
+      if (buyPrice) {
+        buyPrice.innerHTML = state.firstPack
+          ? '<span class="free-tag">OFFERT</span>'
+          : '<span class="coin-glyph" aria-hidden="true">🪙</span>100';
+      }
       if (state.firstPack) buyBtn.disabled = false;
       else if (state.coins < PACK_PRICE) {
         buyBtn.disabled = true;
@@ -1434,7 +1457,7 @@
         el('span', 'fr-meta', `2 doublons → 1 ${next.label}`)
       );
       row.append(emoji, main, el('span', 'fr-count', `×${entry.count}`));
-      row.addEventListener('click', () => {
+      on(row, 'click', () => {
         state.fusionSelection = entry.card.id;
         SFX.tick();
         [...fusionGrid.querySelectorAll('.fusion-row')].forEach((r) => r.classList.toggle('is-selected', r === row));
@@ -1498,10 +1521,12 @@
     state.collection.push(result);
     save();
 
-    const dlg = fusion.querySelector('.fusion-dialog');
-    dlg.classList.remove('is-fusing');
-    void dlg.offsetWidth;
-    dlg.classList.add('is-fusing');
+    const dlg = qs(fusion, '.fusion-dialog');
+    if (dlg) {
+      dlg.classList.remove('is-fusing');
+      void dlg.offsetWidth;
+      dlg.classList.add('is-fusing');
+    }
     SFX.pop();
     window.setTimeout(() => SFX.rarity(result.rarity), 120);
 
@@ -1559,15 +1584,15 @@
     });
   }
 
-  fusionGo.addEventListener('click', doFusion);
-  fusionLater.addEventListener('click', closeFusion);
-  $('fusion-x').addEventListener('click', closeFusion);
-  fusionBuy.addEventListener('click', () => {
+  on(fusionGo, 'click', doFusion);
+  on(fusionLater, 'click', closeFusion);
+  on($('fusion-x'), 'click', closeFusion);
+  on(fusionBuy, 'click', () => {
     closeFusion();
     window.setTimeout(buyPack, 180);
   });
-  $('fusion-backdrop').addEventListener('click', closeFusion);
-  fusionChip.addEventListener('click', () => openFusion(false));
+  on($('fusion-backdrop'), 'click', closeFusion);
+  on(fusionChip, 'click', () => openFusion(false));
 
   document.addEventListener('keydown', (e) => {
     if (!currentUser) return;
@@ -1590,15 +1615,15 @@
 
   /* --------------------------------------------------------------- boutons */
 
-  buyBtn.addEventListener('click', buyPack);
-  recapToggle.addEventListener('click', () => {
+  on(buyBtn, 'click', buyPack);
+  on(recapToggle, 'click', () => {
     const collapsed = !recap.classList.contains('is-collapsed');
     setRecapCollapsed(collapsed);
     SFX.tick();
   });
-  buyBtn.addEventListener('pointerenter', () => SFX.tick());
+  on(buyBtn, 'pointerenter', () => SFX.tick());
 
-  soundBtn.addEventListener('click', () => {
+  on(soundBtn, 'click', () => {
     SFX.unlock();
     const muted = !SFX.muted;
     SFX.setMuted(muted);
@@ -1672,13 +1697,13 @@
   window.addEventListener('orientationchange', handleResize);
 
   /* Un clic sur une vignette du butin ouvre la carte en grand. */
-  recapSlots.addEventListener('click', (event) => {
+  on(recapSlots, 'click', (event) => {
     const slot = event.target.closest('.slot');
     if (!slot || !slot.dataset.cardId) return;
     openInspect(cardById(slot.dataset.cardId));
   });
 
-  recapSlots.addEventListener('keydown', (event) => {
+  on(recapSlots, 'keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const slot = event.target.closest('.slot');
     if (!slot || !slot.dataset.cardId) return;
@@ -1741,24 +1766,31 @@
 
   const siteLabel = () => window.location.hostname || window.location.host || 'ce site';
 
+  /* Ces retours visuels ne doivent jamais lever d'exception : si l'écran de
+     compte manque (HTML en cache obsolète, aperçu partiel), le reste du script
+     continue et la connexion reste possible. */
   function setAuthError(message) {
+    if (!authError) return;
     authError.textContent = message || '';
     authError.hidden = !message;
   }
 
   function setAuthStatus(message) {
+    if (!authStatus) return;
     authStatus.textContent = message || '';
     authStatus.hidden = !message;
   }
 
   function setAuthHint(message) {
+    if (!authHintText || !authHint) return;
     authHintText.textContent = message || '';
     authHint.hidden = !message;
   }
 
   function setAuthBusy(busy) {
     authBusy = busy;
-    googleLabel.textContent = busy ? 'Connexion en cours…' : 'Se connecter avec Google';
+    if (googleLabel) googleLabel.textContent = busy ? 'Connexion en cours…' : 'Se connecter avec Google';
+    if (!googleSignIn) return;
     if (busy) {
       googleSignIn.setAttribute('aria-busy', 'true');
       googleSignIn.disabled = true;
@@ -1840,18 +1872,22 @@
     currentUser = user;
     currentEmail = user.email || '';
     const displayName = user.displayName || currentEmail || 'Joueur';
-    accountEmail.textContent = displayName;
-    accountEmail.title = currentEmail || displayName;
-    if (user.photoURL) {
-      accountAvatar.src = user.photoURL;
-      accountAvatar.alt = `Photo de profil de ${displayName}`;
-      accountAvatar.hidden = false;
-    } else {
-      accountAvatar.removeAttribute('src');
-      accountAvatar.hidden = true;
+    if (accountEmail) {
+      accountEmail.textContent = displayName;
+      accountEmail.title = currentEmail || displayName;
+    }
+    if (accountAvatar) {
+      if (user.photoURL) {
+        accountAvatar.src = user.photoURL;
+        accountAvatar.alt = `Photo de profil de ${displayName}`;
+        accountAvatar.hidden = false;
+      } else {
+        accountAvatar.removeAttribute('src');
+        accountAvatar.hidden = true;
+      }
     }
     applySave(saveData);
-    authScreen.hidden = true;
+    if (authScreen) authScreen.hidden = true;
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
     setAuthBusy(false);
@@ -1863,13 +1899,17 @@
     clearTimeout(saveTimer);
     currentUser = null;
     currentEmail = '';
-    accountEmail.textContent = '';
-    accountEmail.removeAttribute('title');
-    accountAvatar.removeAttribute('src');
-    accountAvatar.hidden = true;
-    app.classList.remove('is-authenticated');
+    if (accountEmail) {
+      accountEmail.textContent = '';
+      accountEmail.removeAttribute('title');
+    }
+    if (accountAvatar) {
+      accountAvatar.removeAttribute('src');
+      accountAvatar.hidden = true;
+    }
+    if (app) app.classList.remove('is-authenticated');
     gameRegions.forEach((region) => region.setAttribute('inert', ''));
-    authScreen.hidden = false;
+    if (authScreen) authScreen.hidden = false;
     setAuthBusy(false);
     resetAuthFeedback();
   }
@@ -1953,7 +1993,7 @@
     }
   }
 
-  googleSignIn.addEventListener('click', () => {
+  on(googleSignIn, 'click', () => {
     // Aucune erreur inattendue ne doit laisser le bouton inerte.
     signInWithGoogle().catch((error) => {
       setAuthBusy(false);
@@ -1962,14 +2002,14 @@
     });
   });
 
-  logoutBtn.addEventListener('click', async () => {
+  on(logoutBtn, 'click', async () => {
     if (!await saveNow()) return;
     try { await firebaseAuth.signOut(); }
     catch (error) { showToast(authErrorMessage(error)); }
   });
 
   function initializeCloud() {
-    authOpenTab.href = window.location.href;
+    if (authOpenTab) authOpenTab.href = window.location.href;
     const config = window.REFS_FIREBASE_CONFIG;
     const configured = config && config.apiKey && config.projectId && config.appId &&
       !Object.values(config).some((value) => typeof value === 'string' && value.includes('REMPLACE_PAR'));
@@ -2098,7 +2138,7 @@
       t.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
       if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
       if (fresh.has(card.id)) t.classList.add('is-fresh');
-      t.addEventListener('click', () => openInspect(card));
+      on(t, 'click', () => openInspect(card));
       frag.append(t);
     });
     collGrid.replaceChildren(frag);
@@ -2110,8 +2150,8 @@
         : 'Aucune carte de cette rareté pour l\'instant.';
   }
 
-  tabs.forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
-  collFilters.addEventListener('click', (e) => {
+  tabs.forEach((t) => on(t, 'click', () => setTab(t.dataset.tab)));
+  on(collFilters, 'click', (e) => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
     collFilter = chip.dataset.filter;
@@ -2133,7 +2173,7 @@
     s.setProperty('--ry', '0deg');
     ['--mx', '--my', '--sx', '--sy'].forEach((p) => s.setProperty(p, '50%'));
   }
-  inspectCard.addEventListener('pointermove', (e) => {
+  on(inspectCard, 'pointermove', (e) => {
     if (reduceMotion.matches) return;
     inspEv = e;
     if (inspRaf) return;
@@ -2152,10 +2192,16 @@
       s.setProperty('--ma', `${(100 + x * 160).toFixed(0)}deg`);
     });
   });
-  inspectCard.addEventListener('pointerleave', resetInspTilt);
-  inspectCard.addEventListener('pointercancel', resetInspTilt);
+  on(inspectCard, 'pointerleave', resetInspTilt);
+  on(inspectCard, 'pointercancel', resetInspTilt);
 
   function boot() {
+    // Sans ces deux éléments, la page n'est pas celle attendue (ancien HTML en
+    // cache, bloc supprimé…) : on l'explique au lieu de planter en silence.
+    if (!app || !googleSignIn) {
+      reportStartupProblem('La page Refs Cards est incomplète : recharge-la avec Ctrl+Maj+R (ou vide le cache du navigateur).');
+      return;
+    }
     updateCoins();
     renderFilters();
     renderOdds();
@@ -2175,6 +2221,47 @@
     }
   }
 
-  boot();
-  initializeCloud();
+  /* Message visible même quand le reste du script ne peut pas s'initialiser. */
+  function reportStartupProblem(message) {
+    try {
+      const host = document.querySelector('.auth-card') || document.body;
+      if (!host) return;
+      let box = document.getElementById('startup-error');
+      if (!box) {
+        box = el('p', 'auth-error');
+        box.id = 'startup-error';
+        box.setAttribute('role', 'alert');
+        host.insertBefore(box, host.firstChild);
+      }
+      box.textContent = message;
+    } catch (error) {
+      console.error('[Refs Cards]', message, error);
+    }
+  }
+
+  /* Les scripts de index.html sont classiques et chargés en `defer` : le DOM est
+     donc prêt. Ce garde-fou couvre aussi le cas d'un script placé dans <head>
+     sans defer, pour que la connexion Google soit branchée dans tous les cas. */
+  function start() {
+    try {
+      boot();
+    } catch (error) {
+      console.error('[Refs Cards] démarrage du jeu impossible :', error);
+      reportStartupProblem('Le jeu n’a pas pu démarrer complètement. Recharge la page avec Ctrl+Maj+R.');
+    }
+    try {
+      initializeCloud();
+    } catch (error) {
+      console.error('[Refs Cards] initialisation Firebase impossible :', error);
+      setAuthError(authErrorMessage(error));
+    }
+    // Signale au filet de sécurité de index.html que les écouteurs sont posés.
+    window.REFS_CARDS_READY = true;
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
 })();

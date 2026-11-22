@@ -23,11 +23,12 @@ function makeAuth(signInWithPopup, extra = {}, firestore = {}) {
   return { firebase: { apps: [], initializeApp() {}, auth, firestore: () => firestore }, state };
 }
 
-async function boot({ makeFirebase = null, embedded = false, fastWatchdog = false } = {}) {
+async function boot({ makeFirebase = null, embedded = false, fastWatchdog = false, mutate = null } = {}) {
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url: 'https://refs-cards.test/', runScripts: 'outside-only', pretendToBeVisual: true
   });
   const w = dom.window;
+  if (mutate) mutate(w.document);
   w.matchMedia = () => ({ matches: true, addEventListener() {} });
   const noop = () => {};
   const ctx = new Proxy({}, { get: () => noop, set: () => true });
@@ -62,6 +63,7 @@ async function boot({ makeFirebase = null, embedded = false, fastWatchdog = fals
      doit rester cliquable et expliquer la cause au lieu de ne rien faire. */
   {
     const ui = await boot();
+    assert.equal(ui.w.REFS_CARDS_READY, true, 'app.js doit signaler son démarrage');
     assert.equal(ui.button.disabled, false, 'le bouton doit rester cliquable');
     assert.match(ui.error(), /scripts Firebase/);
     const before = ui.error();
@@ -122,6 +124,24 @@ async function boot({ makeFirebase = null, embedded = false, fastWatchdog = fals
     assert.equal(ui.button.disabled, false);
     ui.w.close();
     console.log('PASS domaine non autorisé = domaine affiché dans le message');
+  }
+
+  /* 6. HTML incomplet (ancienne version en cache) : un élément manquant ne doit
+     pas empêcher le branchement du bouton Google ni lever d'exception. */
+  {
+    const ui = await boot({
+      mutate: (doc) => {
+        doc.querySelector('.google-label').remove();
+        doc.getElementById('auth-hint-text').remove();
+      }
+    });
+    assert.equal(ui.button.disabled, false);
+    ui.button.click();
+    await wait(40);
+    assert.match(ui.error(), /Firebase/, 'le clic doit toujours donner un retour');
+    assert.equal(ui.button.disabled, false, 'le bouton doit rester cliquable');
+    ui.w.close();
+    console.log('PASS DOM incomplet = pas de TypeError, le bouton Google répond');
   }
 
   /* 5. Connexion réussie : statut puis écran de jeu avec la sauvegarde cloud. */

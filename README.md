@@ -43,10 +43,21 @@ service cloud.firestore {
 
 Le premier booster est offert ; chaque booster suivant coûte 100 pièces, déduites au moment de l'achat.
 
+## Chargement des scripts
+
+`index.html` charge quatre fichiers locaux **comme scripts classiques, en `defer`**, dans cet ordre : `firebase-config.js`, `cards.js`, `audio.js`, puis `app.js`.
+
+- **Pas de `type="module"`** : `cards.js`, `audio.js` et `app.js` partagent des variables globales (`cardsDatabase`, `Sound`, `demoDraw`, `window.REFS_FIREBASE_CONFIG`). En modules ES, chaque fichier aurait sa propre portée et `app.js` ne verrait plus ces variables. Aucun fichier n'utilise `import`/`export`, donc un script classique est le bon mode de chargement.
+- **`defer`** : les scripts s'exécutent après l'analyse du DOM, sans bloquer l'affichage. `app.js` ajoute en plus un garde-fou (`DOMContentLoaded`) au cas où il serait déplacé dans `<head>` sans `defer`.
+- **`?v=…` sur chaque URL locale** : évite qu'un navigateur rejoue un ancien `app.js` resté en cache après une mise à jour. Incrémente ce numéro (dans `index.html`) quand tu modifies `app.js`, `cards.js` ou `audio.js` en production.
+- **Aucun `addEventListener` sur un élément nul** : `app.js` passe par les helpers `on()` / `qs()`, qui se contentent d'un avertissement si un élément manque, et l'écran de compte comme le bouton Google restent fonctionnels.
+- **Filet de sécurité** : un petit script inline de `index.html` affiche un message dans l'écran de compte si `app.js` n'a pas démarré (cache obsolète, script bloqué). `app.js` signale son démarrage via `window.REFS_CARDS_READY`.
+
 ## Dépannage : « je clique sur Se connecter avec Google et rien ne se passe »
 
 L'écran de compte affiche désormais toujours la cause d'un échec (message d'erreur, code technique `auth/…`). Correspondances utiles :
 
+- **`Uncaught SyntaxError: Cannot use import statement outside a module`** puis **`Cannot read properties of null (reading 'addEventListener')`** → le navigateur exécute un ancien `app.js` (ou un ancien `index.html` qui le déclarait en `type="module"`) resté en cache. Les scripts actuels sont classiques et versionnés (`app.js?v=…`) : recharge avec **Ctrl+Maj+R** (ou `Cmd+Maj+R`), ou vide le cache du site. Si le message persiste, vérifie qu'aucun `type="module"` ni `import` n'a été ajouté à `index.html` / `app.js` (`npm test` le contrôle).
 - **Rien ne s'ouvre, aucun message** → les scripts Firebase n'ont pas pu être chargés (hors ligne, bloqueur de publicités, réseau filtré). Recharge la page et vérifie l'accès à `www.gstatic.com`. Le bouton reste cliquable : un nouveau clic réaffiche le diagnostic.
 - **« La fenêtre Google ne répond pas »** → le navigateur bloque les pop-ups, ou les cookies tiers sont bloqués (fréquent en navigation privée et dans un aperçu intégré). Autorise les pop-ups pour le site, ou ouvre le jeu dans un onglet dédié. Un garde-fou de 25 s réactive le bouton.
 - **« Le navigateur a bloqué la fenêtre Google dans cet aperçu intégré »** → tu utilises l'aperçu dans une iframe (Arena, panneau de prévisualisation…). Google refuse d'afficher sa page de connexion encadrée : clique sur **Ouvrir dans un nouvel onglet**, puis connecte-toi depuis l'onglet. Sur un site publié (Firebase Hosting, domaine HTTPS), le problème disparaît.
@@ -62,6 +73,7 @@ Quand c'est possible, le jeu retente automatiquement la connexion par redirectio
 npm install --no-save jsdom          # uniquement pour les tests
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/auth-flow.cjs             # états du bouton de connexion Google
+node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 ```
 
 ## Déroulé d'une ouverture

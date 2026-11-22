@@ -9,14 +9,44 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2026.11.22-1">
+  <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
+       exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-auth-compat.js" defer></script>
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore-compat.js" defer></script>
-  <script src="firebase-config.js" defer></script>
-  <script src="cards.js" defer></script>
-  <script src="audio.js" defer></script>
-  <script src="app.js" defer></script>
+  <!-- Scripts locaux : volontairement SANS type="module". cards.js, audio.js et
+       app.js se partagent des variables globales (cardsDatabase, Sound, …) ;
+       en modules, chaque fichier aurait sa propre portée et app.js ne verrait
+       plus rien. `defer` garantit en plus une exécution après l'analyse du DOM,
+       dans l'ordre ci-dessous. Le paramètre ?v= évite de rejouer un ancien
+       app.js resté en cache (source de « Cannot use import statement outside a
+       module » et de « addEventListener of null » après une mise à jour). -->
+  <script src="firebase-config.js?v=2026.11.22-1" defer></script>
+  <script src="cards.js?v=2026.11.22-1" defer></script>
+  <script src="audio.js?v=2026.11.22-1" defer></script>
+  <script src="app.js?v=2026.11.22-1" defer></script>
+  <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
+       version en cache, script bloqué, syntaxe invalide…), le clic sur
+       « Se connecter avec Google » affiche une explication au lieu de rester
+       sans effet. app.js pose window.REFS_CARDS_READY dès qu'il est branché. -->
+  <script>
+    (function () {
+      var message = 'Le jeu n’a pas pu démarrer (ancienne version en cache ou scripts bloqués). Recharge la page avec Ctrl+Maj+R, puis réessaie.';
+      function warn() {
+        if (window.REFS_CARDS_READY) return;
+        var error = document.getElementById('auth-error');
+        if (!error) return;
+        error.textContent = message;
+        error.hidden = false;
+      }
+      document.addEventListener('DOMContentLoaded', function () {
+        var button = document.getElementById('google-signin');
+        if (button) button.addEventListener('click', function () { window.setTimeout(warn, 350); });
+      });
+      window.addEventListener('load', function () { window.setTimeout(warn, 2000); });
+    })();
+  </script>
 </head>
 <body>
   <div class="app" id="app" data-tab="pack">
