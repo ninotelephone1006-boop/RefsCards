@@ -59,6 +59,7 @@
   const coinFloat = $('coin-float');
   const stack = $('stack');
   const tableEl = $('table');
+  const nextCard = $('next-card');
   const rays = $('rays');
   const tableGlow = $('table-glow');
   const flash = $('flash');
@@ -907,9 +908,11 @@
     const cy = c.y;
     const quiet = reduceMotion.matches;
 
-    btn.setAttribute('aria-label', `Carte ${state.deck.indexOf(card) + 1}. ${card.name}, ${info.label}. ${card.description}. Cliquez à côté de la carte pour continuer.`);
+    btn.setAttribute('aria-label', `Carte ${state.deck.indexOf(card) + 1}. ${card.name}, ${info.label}. ${card.description}. Activez le bouton Carte suivante pour continuer.`);
     revealKicker.innerHTML = `<span>✦</span> ${info.label.toUpperCase()} <span>✦</span>`;
-    footRight.textContent = 'CLIQUE À CÔTÉ POUR CONTINUER →';
+    footRight.textContent = 'CARTE SUIVANTE POUR CONTINUER →';
+    nextCard.hidden = false;
+    nextCard.textContent = remaining.length === 1 ? 'TERMINER LE BOOSTER →' : 'CARTE SUIVANTE →';
 
     clearEffects();
 
@@ -957,8 +960,8 @@
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${CARD_COUNT} · RÉVÉLÉE`;
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
-      ? `${info.label.toUpperCase()} ! Clique à côté de la carte pour continuer.`
-      : 'Clique à côté de la carte pour passer à la suivante.';
+      ? `${info.label.toUpperCase()} ! Appuie sur le bouton ci-dessous pour continuer.`
+      : 'Appuie sur Carte suivante pour continuer.';
   }
 
   /* ------------------------------------------------------- inspection grand */
@@ -1008,6 +1011,12 @@
 
   let flying = false;
 
+  nextCard.addEventListener('click', () => {
+    if (state.phase !== 'reveal' || !current || flying) return;
+    if (!current.node.classList.contains('is-flipped')) return;
+    sendToRecap(current.node, current.data);
+  });
+
   tableEl.addEventListener('click', (event) => {
     if (event.target.closest('.card') || !current || flying || state.phase !== 'reveal') return;
     if (!current.node.classList.contains('is-top') || !current.node.classList.contains('is-flipped')) return;
@@ -1017,6 +1026,8 @@
   function sendToRecap(btn, card) {
     if (flying) return;
     flying = true;
+    nextCard.hidden = true;
+    const restoreFocus = document.activeElement === nextCard || document.activeElement === btn;
     Sound.whoosh();
     btn.classList.remove('is-flipped', 'is-revealed', 'is-incoming');
     const target = recapSlots.children[state.loot.length] || recapSlots.lastElementChild;
@@ -1043,6 +1054,7 @@
       remaining.shift();
       flying = false;
       advanceStack();
+      if (restoreFocus && current) current.node.focus({ preventScroll: true });
       if (!remaining.length) finishPack();
       else updateHintForNext();
     }, reduceMotion.matches ? 120 : 640);
@@ -1102,6 +1114,7 @@
       showToast('Ajoute au moins une carte valide dans cards.js.');
       return;
     }
+    nextCard.hidden = true;
     state.deck = drawPack();
     packView.hidden = true;
     revealView.hidden = false;
@@ -1159,7 +1172,8 @@
     current = remaining[0] || null;
     if (!current) return;
     current.node.classList.add('is-top', 'is-incoming');
-    window.setTimeout(() => current.node.classList.remove('is-incoming'), 600);
+    const incoming = current.node;
+    window.setTimeout(() => incoming.classList.remove('is-incoming'), 600);
     pileLabel.textContent = `CARTE ${state.packIndex + 1 > CARD_COUNT ? CARD_COUNT : state.packIndex + 1} / ${CARD_COUNT}`;
   }
 
