@@ -61,9 +61,9 @@
   const pack = $('pack');
   const packFlap = $('pack-flap');
   const packFloat = $('pack-float');
-  const gapGlow = gapGlow;
-  const gapCards = gapCards;
-  const packSave = packSave;
+  const gapGlow = pack.querySelector('.gap-glow');
+  const gapCards = pack.querySelector('.gap-cards');
+  const packSave = pack.querySelector('.pack-and-save');
   const cut = $('cut');
   const hintPct = $('hint-pct');
   const hintText = $('hint-text');
