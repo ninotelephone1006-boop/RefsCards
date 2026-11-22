@@ -139,6 +139,7 @@
     if (!n) return;
     state.coins = Math.max(0, state.coins + n);
     updateCoins(n);
+    save();
   }
 
   let toastTimer = null;
@@ -977,6 +978,9 @@
 
     window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
 
+    const isNew = !state.collection.some((c) => c.id === card.id);
+    state.collection.push(card);
+    if (isNew) { fresh.add(card.id); tabBadge.hidden = false; }
     addCoins(info.reward);
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${CARD_COUNT} · RÉVÉLÉE`;
@@ -1004,6 +1008,8 @@
     inspectCard.style.setProperty('--r-color', info.color);
     inspectCard.style.setProperty('--r-glow', info.glow);
     inspectCard.dataset.rarity = card.rarity;
+    inspectCard.dataset.fx = info.fx || 'calm';
+    resetInspTilt();
     inspectReturnFocus = document.activeElement;
     inspect.hidden = false;
     void inspect.offsetWidth;
@@ -1069,7 +1075,6 @@
       setRecapCollapsed(false);
       fillSlot(state.loot.length, card);
       state.loot.push(card);
-      state.collection.push(card);
       recapCount.textContent = `${state.loot.length} / ${CARD_COUNT}`;
       btn.remove();
       remaining.shift();
@@ -1256,6 +1261,7 @@
     if (state.firstPack) {
       SFX.chaChing();
       state.firstPack = false;
+      save();
       resetToPack();
       return;
     }
@@ -1270,6 +1276,7 @@
     SFX.chaChing();
     addCoins(-PACK_PRICE);
     state.firstPack = false;
+      save();
     resetToPack();
   }
 
@@ -1356,6 +1363,7 @@
 
   function openFusion(auto = false) {
     if (state.fusionOpen || state.phase !== 'done') return;
+    if (auto && app.dataset.tab !== 'pack') return;
     SFX.unlock();
     state.fusionOpen = true;
     state.fusionSelection = null;
@@ -1476,6 +1484,7 @@
       return true;
     });
     state.collection.push(result);
+    save();
 
     const dlg = fusion.querySelector('.fusion-dialog');
     dlg.classList.remove('is-fusing');
@@ -1557,7 +1566,7 @@
       closeFusion();
       return;
     }
-    if (state.phase !== 'reveal' || state.fusionOpen || !current) return;
+    if (app.dataset.tab !== 'pack' || state.phase !== 'reveal' || state.fusionOpen || !current) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
     if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle) return;
     e.preventDefault();
@@ -1680,8 +1689,181 @@
 
   /* ---------------------------------------------------------------- début */
 
+  /* ============================================ NAVIGATION · COLLECTION · SAUVEGARDE */
+
+  const SAVE_KEY = 'refs-cards-save-v1';
+  const tabs = [...document.querySelectorAll('.tab')];
+  const collView = $('collection-view');
+  const collGrid = $('coll-grid');
+  const collCount = $('coll-count');
+  const collFill = $('coll-fill');
+  const collFilters = $('coll-filters');
+  const collEmpty = $('coll-empty');
+  const tabBadge = $('tab-badge');
+  const fresh = new Set(); // cartes obtenues depuis la dernière visite de la collection
+  let collFilter = 'all';
+
+  function save() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        coins: state.coins,
+        firstPack: state.firstPack,
+        collection: state.collection.map((c) => c.id)
+      }));
+    } catch (e) { /* stockage indisponible : on joue sans sauvegarde */ }
+  }
+
+  function loadSave() {
+    try {
+      const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (!d) return;
+      state.coins = Math.max(0, Number(d.coins) || 0);
+      state.firstPack = d.firstPack !== false;
+      state.collection = (d.collection || [])
+        .map((id) => cardsDatabase.find((c) => c.id === id))
+        .filter(Boolean);
+    } catch (e) { /* sauvegarde illisible : on repart de zéro */ }
+  }
+
+  function setTab(tab) {
+    if (app.dataset.tab === tab) return;
+    app.dataset.tab = tab;
+    tabs.forEach((t) => {
+      const on = t.dataset.tab === tab;
+      t.classList.toggle('is-active', on);
+      if (on) t.setAttribute('aria-current', 'page');
+      else t.removeAttribute('aria-current');
+    });
+    const view = tab === 'collection'
+      ? collView
+      : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
+    view.classList.remove('view-in');
+    void view.offsetWidth;
+    view.classList.add('view-in');
+    if (tab === 'collection') {
+      renderCollection();
+      fresh.clear();
+      tabBadge.hidden = true;
+    } else {
+      // Les vues Pack étaient masquées : on remesure tout.
+      if (!recap.classList.contains('is-idle')) setRecapCollapsed(recap.classList.contains('is-collapsed'));
+      scheduleSizing(8);
+    }
+    SFX.tick();
+  }
+
+  function renderFilters() {
+    const rarities = Object.keys(RARITIES).filter((r) => cardsDatabase.some((c) => c.rarity === r));
+    const defs = [['all', 'Toutes'], ['owned', 'Possédées'], ...rarities.map((r) => [r, RARITIES[r].label])];
+    collFilters.replaceChildren(...defs.map(([key, label]) => {
+      const b = el('button', key === collFilter ? 'chip is-active' : 'chip');
+      b.type = 'button';
+      b.dataset.filter = key;
+      b.setAttribute('aria-pressed', String(key === collFilter));
+      if (RARITIES[key]) {
+        const dot = el('i');
+        dot.style.setProperty('--c', RARITIES[key].color);
+        b.append(dot);
+      }
+      b.append(document.createTextNode(label));
+      return b;
+    }));
+  }
+
+  function renderCollection() {
+    const owned = countMap();
+    const total = cardsDatabase.length;
+    const got = cardsDatabase.filter((c) => owned.has(c.id)).length;
+    collCount.textContent = `${got} / ${total}`;
+    collFill.style.transform = `scaleX(${total ? got / total : 0})`;
+
+    const frag = document.createDocumentFragment();
+    let shown = 0;
+    cardsDatabase.forEach((card, i) => {
+      const n = owned.get(card.id) || 0;
+      // Filtre de rareté / possédées : jamais de carte verrouillée, pour ne rien dévoiler.
+      if (collFilter !== 'all' && (!n || (collFilter !== 'owned' && card.rarity !== collFilter))) return;
+      shown++;
+      if (!n) {
+        const t = el('div', 'coll-tile is-locked');
+        t.style.setProperty('--i', i);
+        t.setAttribute('aria-label', `Carte verrouillée, numéro ${i + 1}`);
+        t.append(el('span', 'lock-q', '???'), el('span', 'lock-n', `N° ${String(i + 1).padStart(3, '0')}`));
+        frag.append(t);
+        return;
+      }
+      const info = RARITIES[card.rarity] || RARITIES.common;
+      const t = el('button', 'coll-tile');
+      t.type = 'button';
+      t.dataset.rarity = card.rarity;
+      t.style.setProperty('--i', i);
+      t.style.setProperty('--r-color', info.color);
+      t.style.setProperty('--r-glow', info.glow);
+      t.setAttribute('aria-label', `${card.name}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}. Voir en grand.`);
+      t.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
+      if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
+      if (fresh.has(card.id)) t.classList.add('is-fresh');
+      t.addEventListener('click', () => openInspect(card));
+      frag.append(t);
+    });
+    collGrid.replaceChildren(frag);
+    collEmpty.hidden = shown > 0;
+    collEmpty.textContent = collFilter === 'all'
+      ? 'Aucune carte dans la base.'
+      : collFilter === 'owned'
+        ? 'Rien pour l\'instant. Ouvre un booster pour commencer ta collection.'
+        : 'Aucune carte de cette rareté pour l\'instant.';
+  }
+
+  tabs.forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  collFilters.addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    collFilter = chip.dataset.filter;
+    collFilters.querySelectorAll('.chip').forEach((c) => {
+      c.classList.toggle('is-active', c === chip);
+      c.setAttribute('aria-pressed', String(c === chip));
+    });
+    collGrid.parentElement.scrollTop = 0;
+    renderCollection();
+    SFX.tick();
+  });
+
+  /* Inspection : la carte suit le doigt / la souris (tilt + reflet holographique). */
+  let inspRaf = 0;
+  let inspEv = null;
+  function resetInspTilt() {
+    const s = inspectCard.style;
+    s.setProperty('--rx', '0deg');
+    s.setProperty('--ry', '0deg');
+    ['--mx', '--my', '--sx', '--sy'].forEach((p) => s.setProperty(p, '50%'));
+  }
+  inspectCard.addEventListener('pointermove', (e) => {
+    if (reduceMotion.matches) return;
+    inspEv = e;
+    if (inspRaf) return;
+    inspRaf = requestAnimationFrame(() => {
+      inspRaf = 0;
+      const r = inspectCard.parentElement.getBoundingClientRect(); // parent fixe : pas de jitter
+      const x = clamp((inspEv.clientX - r.left) / r.width, 0, 1);
+      const y = clamp((inspEv.clientY - r.top) / r.height, 0, 1);
+      const s = inspectCard.style;
+      s.setProperty('--rx', `${((0.5 - y) * 18).toFixed(1)}deg`);
+      s.setProperty('--ry', `${((x - 0.5) * 20).toFixed(1)}deg`);
+      s.setProperty('--mx', `${(x * 100).toFixed(0)}%`);
+      s.setProperty('--my', `${(y * 100).toFixed(0)}%`);
+      s.setProperty('--sx', `${(x * 100).toFixed(0)}%`);
+      s.setProperty('--sy', `${(y * 100).toFixed(0)}%`);
+      s.setProperty('--ma', `${(100 + x * 160).toFixed(0)}deg`);
+    });
+  });
+  inspectCard.addEventListener('pointerleave', resetInspTilt);
+  inspectCard.addEventListener('pointercancel', resetInspTilt);
+
   function boot() {
+    loadSave();
     updateCoins();
+    renderFilters();
     renderOdds();
     FX.resize();
     Dust.resize();
