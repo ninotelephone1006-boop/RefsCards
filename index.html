@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10110f">
+  <meta name="description" content="Ouvre un booster et découvre tes nouvelles cartes.">
+  <title>Refs Cards — Ouvre ton booster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="cards.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Refs Cards, accueil"><span class="brand-mark">✳</span><span>REFS<span class="brand-muted">CARDS</span><small>LE JEU DE CARTES</small></span></a>
+      <div class="header-right"><span class="collection-label"><span class="status-dot"></span> SAISON 01</span><div class="wallet" aria-label="Solde de pièces"><span class="coin">✦</span><strong id="coins">1 000</strong><span class="wallet-label">PIÈCES</span></div></div>
+    </header>
+
+    <main>
+      <div class="section-heading"><span><span class="tiny-diamond">✦</span> &nbsp; ESPACE D'OUVERTURE</span><span class="heading-right">SÉRIE 01 <span class="slash">/</span> 01</span></div>
+      <section class="experience" aria-labelledby="main-title">
+        <div class="intro">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> LE PLAISIR DE LA SURPRISE</div>
+          <h1 id="main-title">La chance<br>est dans <span>le pack.</span></h1>
+          <p class="intro-copy">Un booster, cinq cartes, des possibilités infinies. Prêt à découvrir ce qui se cache à l'intérieur ?</p>
+          <div class="intro-divider"></div>
+          <div class="pack-info"><div class="info-icon">✳</div><div><strong>BOOSTER MYSTÈRE</strong><span>5 cartes à collectionner</span></div><span class="info-number">01 / 01</span></div>
+          <div class="rarities"><span class="rarities-label">À L'INTÉRIEUR</span><div class="rarity-list"><span><i class="common-dot"></i> Commune</span><span><i class="rare-dot"></i> Rare</span><span><i class="epic-dot"></i> Épique</span><span><i class="legendary-dot"></i> Légendaire</span></div></div>
+        </div>
+        <div class="stage" id="stage">
+          <div class="stage-grid" aria-hidden="true"></div><div class="stage-glow" aria-hidden="true"></div>
+          <div class="stage-corner corner-top">✳ <span>REFS / DROP 01</span></div><div class="stage-corner corner-right">BONNE CHANCE <span>↗</span></div>
+          <div class="pack-scene" id="pack-scene">
+            <div class="pack-label"><span>✦</span> TON BOOSTER T'ATTEND <span>✦</span></div>
+            <button class="pack-button" id="pack-button" aria-label="Ouvrir le booster mystère"><img src="assets/packet.png" alt="Booster mystère Refs Cards" draggable="false"><span class="pack-shine"></span></button>
+            <div class="pack-shadow"></div>
+            <div class="action-hint"><span class="tap-icon">☝</span><div><strong>À TOI DE JOUER</strong><span>Touche le booster pour l'ouvrir</span></div></div>
+          </div>
+          <div class="reveal-scene" id="reveal-scene" hidden>
+            <div class="reveal-heading"><span class="reveal-kicker">✦ &nbsp; C'EST LE MOMENT</span><h2>À toi de jouer<span>.</span></h2><p id="reveal-instruction">Touche chaque carte pour la révéler.</p></div>
+            <div class="cards" id="cards" aria-label="Les cartes du booster"></div>
+            <div class="reveal-bottom"><div class="progress"><span id="progress-text">0 / 5 CARTES RÉVÉLÉES</span><div class="progress-track"><div id="progress-bar"></div></div></div><button class="again-button" id="again-button" hidden>Ouvrir un autre booster <span>100 ✦ &nbsp; ↗</span></button><p class="balance-message" id="balance-message" role="status"></p></div>
+          </div>
+          <div class="particles" id="particles" aria-hidden="true"></div><div class="flash" id="flash" aria-hidden="true"></div>
+          <div class="stage-bottom"><span>OUVRE. DÉCOUVRE. COLLECTIONNE.</span><span>✳</span></div>
+        </div>
+      </section>
+      <div class="underbar"><span><span class="under-star">✳</span> UNE SURPRISE À CHAQUE OUVERTURE</span><span>FAIT POUR LES COLLECTIONNEURS <span class="heart">♥</span></span></div>
+    </main>
+    <footer><span>© 2025 REFS CARDS</span><span>TA COLLECTION COMMENCE ICI. <b>✦</b></span></footer>
+  </div>
+</body>
+</html>
