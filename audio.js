@@ -103,7 +103,7 @@ const Sound = (() => {
 
   /* -------------------------------------------------------------- helpers */
 
-  function envelope(t, peak, attack, decay, hold) {
+  function envelope(t, peak, attack, decay, hold = 0) {
     const g = ac.createGain();
     const top = Math.max(0.0002, peak);
     g.gain.setValueAtTime(0.0001, t);
