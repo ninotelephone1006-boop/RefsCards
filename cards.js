@@ -2,13 +2,13 @@
    Refs Cards — base de données des cartes
    --------------------------------------------------------------------------
    Chaque carte possède :
-     • id          identifiant unique (sert aussi d'ID affiché, en tout petit)
-     • name        titre affiché en haut de la carte
-     • description courte affichée en bas
-     • rarity      clé de rareté (voir RARITIES dans app.js)
-     • emoji       secours visuel si l'image manque
-     • color       fond de secours (dégradé) si l'image manque
-     • image       nom de fichier (sans extension) dans assets/Cartes/
+- id          identifiant unique (sert aussi d'ID affiché, en tout petit)
+- name        titre affiché en haut de la carte
+- description courte affichée en bas
+- rarity      clé de rareté (voir RARITIES dans app.js)
+- emoji       secours visuel si l'image manque
+- color       fond de secours (dégradé) si l'image manque
+- image       nom de fichier (sans extension) dans assets/Cartes/
                    ex. 'pieds-de-rapace' → assets/Cartes/pieds-de-rapace.png
                    On peut aussi y mettre un chemin complet :
                    'assets/Cartes/mon-visuel.jpg'.
@@ -27,7 +27,7 @@ const cardsDatabase = [
   {
     id: 'pieds-de-rapace',
     name: 'Les pieds de rapace',
-    description: 'Ça donne envie de les lécher.',
+    description: 'LES GROS PIEDS DE RAPACE LA PUTAIN !!',
     rarity: 'uncommon',
     emoji: '🦅',
     image: 'assets/Cartes/pieds-de-rapace.jpg',
@@ -36,7 +36,7 @@ const cardsDatabase = [
   {
     id: 'royer-rizz',
     name: 'Royer Rizz',
-    description: 'Je tombe amoureux.',
+    description: 'Ma grand-mère est amoureuse',
     rarity: 'ultraepic',
     emoji: '😍',
     image: 'assets/Cartes/royer-rizz.jpg',
@@ -45,7 +45,7 @@ const cardsDatabase = [
   {
     id: 'chasseur-royer',
     name: 'Chasseur Royer',
-    description: 'Il chasse la gazelle.',
+    description: "Il a l'œil affuté.",
     rarity: 'common',
     emoji: '🏹',
     image: 'assets/Cartes/chasseur-royer.jpg',
@@ -54,7 +54,7 @@ const cardsDatabase = [
   {
     id: 'gros-plan-royer',
     name: 'Gros plan Royer',
-    description: 'Skibidi shooting.',
+    description: 'Un visage de dieu grec',
     rarity: 'rare',
     emoji: '📸',
     image: 'assets/Cartes/gros-plan-royer.jpg',
@@ -63,7 +63,7 @@ const cardsDatabase = [
   {
     id: 'bierry-patrick',
     name: 'Bierry Patrick',
-    description: 'Grand fan.',
+    description: "L'aura de Patrick dans ses yeux…",
     rarity: 'superrare',
     emoji: '⭐',
     image: 'assets/Cartes/bierry-patrick.jpg',
@@ -72,7 +72,7 @@ const cardsDatabase = [
   {
     id: 'kawai-rapace',
     name: 'Kawai Rapace',
-    description: 'UwU',
+    description: 'oni-chan',
     rarity: 'epic',
     emoji: '🌸',
     image: 'assets/Cartes/kawai-rapace.jpg',
@@ -81,7 +81,7 @@ const cardsDatabase = [
   {
     id: 'karate-fagar',
     name: 'Karate Fagar',
-    description: 'Fagar a des talents.',
+    description: 'Cette homme est dangereux',
     rarity: 'legendary',
     emoji: '🥋',
     image: 'assets/Cartes/karate-fagar.jpg',
@@ -90,7 +90,7 @@ const cardsDatabase = [
   {
     id: 'toilet-call',
     name: 'Toilet Call',
-    description: "C'est… intéressant.",
+    description: 'Meeting de la plus haute importance',
     rarity: 'uncommon',
     emoji: '🚽',
     image: 'assets/Cartes/toilet-call.jpg',
@@ -99,7 +99,7 @@ const cardsDatabase = [
   {
     id: 'artiste-brazile',
     name: 'Artiste Brazile',
-    description: 'Grand peintre.',
+    description: 'Hommage à un célèbre peintre allemand…',
     rarity: 'divine',
     emoji: '🎨',
     image: 'assets/Cartes/artiste-brazile.jpg',
@@ -108,7 +108,7 @@ const cardsDatabase = [
   {
     id: 'petite-degustation',
     name: 'Petite dégustation',
-    description: "Y'avait pas de cuillère.",
+    description: 'Deux Critiques Gastronomique de renom',
     rarity: 'rare',
     emoji: '🍨',
     image: 'assets/Cartes/petite-degustation.jpg',
@@ -117,7 +117,7 @@ const cardsDatabase = [
   {
     id: 'babault-musique',
     name: 'Babault Musique',
-    description: 'Grand musicien.',
+    description: "Homme polyvalent(Acteur,Musicien,Prof d'histoire…)",
     rarity: 'secret',
     emoji: '🎼',
     image: 'assets/Cartes/babault-musique.png',
@@ -126,7 +126,7 @@ const cardsDatabase = [
   {
     id: 'marker-bierry',
     name: 'Marker Bierry',
-    description: 'Maquilleur pro.',
+    description: "Styliste qui farm l'aura",
     rarity: 'mythic',
     emoji: '🖌️',
     image: 'assets/Cartes/marker-bierry.jpg',
@@ -135,7 +135,7 @@ const cardsDatabase = [
   {
     id: 'shock-brazil',
     name: 'Shock Brazil',
-    description: 'Brazil is shocked.',
+    description: 'Brazil est outré',
     rarity: 'superrare',
     emoji: '😱',
     image: 'assets/Cartes/shock-brazil.jpeg',
