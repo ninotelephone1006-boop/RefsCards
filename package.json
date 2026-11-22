@@ -1,0 +1,12 @@
+{
+  "name": "refs-cards",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Refs Cards avec comptes et sauvegardes Firebase cloud",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

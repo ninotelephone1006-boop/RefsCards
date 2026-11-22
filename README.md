@@ -1,8 +1,47 @@
 # Refs Cards
 
-Expérience mobile-first d'ouverture de boosters, en HTML, CSS et JavaScript sans dépendances ni build. Ouvrir `index.html` dans un navigateur ou servir le dossier avec un serveur statique (par exemple `python3 -m http.server 8000`).
+Jeu mobile-first d'ouverture de boosters. Les comptes et les sauvegardes sont stockés dans **Firebase Authentication + Cloud Firestore** : il ne s'agit pas de données liées au serveur local ou à un appareil. Le même compte retrouve ses cartes et son argent sur n'importe quel appareil connecté à Internet. Le navigateur ne contient que la configuration publique du projet et le jeton de connexion Firebase ; les sauvegardes sont isolées par identifiant de compte par les règles Firestore.
 
-Le premier booster est offert ; chaque booster suivant coûte 100 pièces, déduites au moment de l'achat. Le solde et les cartes ne sont conservés que pendant la session : il n'y a pas encore de boutique ni d'album.
+## Configuration cloud (à faire une fois)
+
+Il faut un projet Firebase partagé par toutes les versions du jeu. Le plan Spark gratuit suffit pour commencer, dans ses limites d'utilisation.
+
+1. Crée un projet sur [Firebase Console](https://console.firebase.google.com/).
+2. Dans **Authentication → Sign-in method**, active **E-mail/Password**.
+3. Dans **Firestore Database**, crée la base (choisis la région proche de tes joueurs) et ouvre **Rules**. Publie ces règles pour que chaque personne puisse lire et modifier uniquement sa sauvegarde :
+
+```text
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /playerSaves/{userId} {
+      function ownsSave() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      allow read: if ownsSave();
+      allow create, update: if ownsSave()
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'updatedAt'])
+        && request.resource.data.coins is int
+        && request.resource.data.coins >= 0
+        && request.resource.data.coins <= 1000000000
+        && request.resource.data.firstPack is bool
+        && request.resource.data.collection is list
+        && request.resource.data.collection.size() <= 10000
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if false;
+    }
+  }
+}
+```
+
+4. Dans **Project settings → Your apps**, crée une application Web et copie sa configuration dans `firebase-config.js` à la place des valeurs `REMPLACE_PAR_…`. Ces paramètres Firebase pour le navigateur sont publics (ce ne sont pas des mots de passe) ; **les règles Firestore ci-dessus sont la protection des données**.
+5. Les règles équivalentes sont aussi dans `firestore.rules`. Pour les publier avec le CLI et mettre le jeu en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains**, installe `firebase-tools`, puis lance `firebase login`, `firebase use --add` et `firebase deploy --only hosting,firestore:rules`. `firebase.json` est déjà configuré pour Firebase Hosting. N'importe quel hébergeur statique HTTPS convient aussi, tant qu'il utilise le même projet Firebase et que les règles sont publiées.
+
+## Lancer en local
+
+Après avoir renseigné `firebase-config.js`, `npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. Sans config Firebase, la connexion est volontairement bloquée.
+
+Le premier booster est offert ; chaque booster suivant coûte 100 pièces, déduites au moment de l'achat.
 
 ## Déroulé d'une ouverture
 
