@@ -87,12 +87,7 @@
           </div>
         </div>
 
-        <div class="pack-odds" aria-hidden="true">
-          <span><i class="dot-common"></i>Commune 60 %</span>
-          <span><i class="dot-rare"></i>Rare 25 %</span>
-          <span><i class="dot-epic"></i>Épique 12 %</span>
-          <span><i class="dot-legendary"></i>Légendaire 3 %</span>
-        </div>
+        <div class="pack-odds" id="pack-odds" aria-hidden="true"></div>
       </section>
 
       <!-- ============================== RÉVÉLATION ============================== -->
@@ -127,7 +122,7 @@
           </button>
           <span class="recap-count" id="recap-count">0 / 5</span>
         </div>
-        <div class="recap-slots" id="recap-slots" aria-hidden="true">
+        <div class="recap-slots" id="recap-slots">
           <span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span>
         </div>
         <div class="recap-actions">
@@ -143,6 +138,15 @@
           <p class="recap-msg" id="recap-msg" role="status"></p>
         </div>
       </footer>
+
+      <!-- ============================ INSPECTION =========================== -->
+      <div class="inspect" id="inspect" hidden role="dialog" aria-modal="true" aria-label="Carte en grand">
+        <div class="inspect-backdrop" id="inspect-backdrop"></div>
+        <div class="inspect-dialog">
+          <button class="inspect-x" id="inspect-x" type="button" aria-label="Fermer l'inspection">✕</button>
+          <div class="inspect-card" id="inspect-card"></div>
+        </div>
+      </div>
 
       <!-- ============================== FUSION ============================== -->
       <div class="fusion" id="fusion" hidden>

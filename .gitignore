@@ -1,0 +1,4 @@
+
+# Dépendances locales éventuelles
+node_modules/
+package-lock.json

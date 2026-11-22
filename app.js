@@ -10,12 +10,24 @@
   const CARD_COUNT = 5;
   const TEAR_THRESHOLD = 0.75;
 
+  /* Dix raretés, du plus courant au plus rare. `weight` est la probabilité de
+     tirage (en %), `fx` le niveau de mise en scène (calm | rare | epic | gold)
+     et `next` la rareté obtenue par fusion. Les couleurs servent au cadre, au
+     badge, au titre et aux lueurs de la carte. */
   const RARITIES = {
-    common: { label: 'Commune', rank: 0, color: '#dfe4dc', glow: '#ffffff', reward: 22, next: 'rare' },
-    rare: { label: 'Rare', rank: 1, color: '#5fb8ff', glow: '#4aa8ff', reward: 40, next: 'epic' },
-    epic: { label: 'Épique', rank: 2, color: '#b47bff', glow: '#a457ff', reward: 100, next: 'legendary' },
-    legendary: { label: 'Légendaire', rank: 3, color: '#ffd45e', glow: '#ffb347', reward: 300, next: null }
+    common:     { label: 'Commune',      rank: 0, weight: 30,  color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
+    uncommon:   { label: 'Inhabituelle', rank: 1, weight: 22,  color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 35,  fx: 'calm', next: 'rare' },
+    rare:       { label: 'Rare',         rank: 2, weight: 16,  color: '#5fb8ff', ink: '#06243a', glow: '#4aa8ff', reward: 55,  fx: 'rare', next: 'superrare' },
+    superrare:  { label: 'Super Rare',   rank: 3, weight: 11,  color: '#67e0d0', ink: '#032a26', glow: '#3fd8c8', reward: 80,  fx: 'rare', next: 'epic' },
+    epic:       { label: 'Épique',       rank: 4, weight: 8,   color: '#b47bff', ink: '#24093c', glow: '#a457ff', reward: 120, fx: 'epic', next: 'ultraepic' },
+    ultraepic:  { label: 'Ultra épique', rank: 5, weight: 5,   color: '#ff8ccb', ink: '#3a0524', glow: '#ff5cb8', reward: 175, fx: 'epic', next: 'mythic' },
+    mythic:     { label: 'Mythique',     rank: 6, weight: 3.5, color: '#ffa469', ink: '#331204', glow: '#ff8a3d', reward: 240, fx: 'gold', next: 'legendary' },
+    legendary:  { label: 'Légendaire',   rank: 7, weight: 2.5, color: '#ffd45e', ink: '#3a2600', glow: '#ffb347', reward: 340, fx: 'gold', next: 'divine' },
+    divine:     { label: 'Divine',       rank: 8, weight: 1.5, color: '#a7f3ff', ink: '#032830', glow: '#7ce8ff', reward: 520, fx: 'gold', next: 'secret' },
+    secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: null }
   };
+
+  const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
 
   const $ = (id) => document.getElementById(id);
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -73,6 +85,11 @@
   const revealSub = $('reveal-sub');
   const revealKicker = $('reveal-kicker');
   const soundBtn = $('sound-btn');
+  const packOdds = $('pack-odds');
+  const inspect = $('inspect');
+  const inspectCard = $('inspect-card');
+  const inspectX = $('inspect-x');
+  const inspectBackdrop = $('inspect-backdrop');
 
   /* ----------------------------------------------------------------- state */
 
@@ -125,9 +142,17 @@
     if (!available.length) return null;
     let rarity = forcedRarity;
     if (!rarity || !available.includes(rarity)) {
-      const total = available.reduce((sum, r) => sum + ({ common: 60, rare: 25, epic: 12, legendary: 3 })[r], 0);
+      // Tirage pondéré : chaque rareté garde exactement son pourcentage annoncé,
+      // puis la carte est tirée au hasard à l'intérieur de la rareté.
+      const total = available.reduce((sum, r) => sum + RARITIES[r].weight, 0);
       let roll = Math.random() * total;
-      rarity = available.find((r) => (roll -= { common: 60, rare: 25, epic: 12, legendary: 3 }[r]) < 0) || available[available.length - 1];
+      rarity = available[available.length - 1];
+      for (const r of available) {
+        if ((roll -= RARITIES[r].weight) < 0) {
+          rarity = r;
+          break;
+        }
+      }
     }
     const pool = cardsDatabase.filter((c) => c.rarity === rarity);
     return pool[Math.floor(Math.random() * pool.length)];
@@ -673,10 +698,79 @@
 
   /* ============================================================ LES CARTES */
 
-  function powerOf(card) {
-    let h = 0;
-    for (let i = 0; i < card.id.length; i++) h = (h * 31 + card.id.charCodeAt(i)) % 997;
-    return 120 + (h % 780);
+  /* Résout le visuel d'une carte : le premier fichier existant parmi les
+     candidats (assets/Cartes/<nom>.png, .jpg, ...). Renvoie une Promise qui
+     résout sur l'URL chargée, ou null si aucun visuel n'est disponible. */
+  const imageCache = new Map();
+  function resolveCardImage(card) {
+    const srcs = typeof cardImageSources === 'function' ? cardImageSources(card) : card.image ? [card.image] : [];
+    if (!srcs.length) return Promise.resolve(null);
+    const key = srcs.join('|');
+    if (imageCache.has(key)) return imageCache.get(key);
+    const tried = [];
+    const load = (i) => {
+      if (i >= srcs.length) return Promise.resolve(null);
+      tried.push(srcs[i]);
+      return new Promise((resolve) => {
+        const probe = new Image();
+        probe.onload = () => resolve(srcs[i]);
+        probe.onerror = () => resolve(load(i + 1));
+        probe.src = srcs[i];
+      });
+    };
+    const promise = load(0);
+    imageCache.set(key, promise);
+    return promise;
+  }
+
+  /* Cadre d'une carte : image plein cadre (5:7), titre en haut sur dégradé,
+     description en bas sur dégradé, ID discret. Le tout réutilisable dans la
+     révélation, le récap miniature et l'inspection en grand. */
+  function cardFrame(card, opts = {}) {
+    const info = RARITIES[card.rarity] || RARITIES.common;
+    const frame = el('span', 'cf');
+    frame.style.setProperty('--r-color', info.color);
+    frame.style.setProperty('--r-ink', info.ink);
+    frame.style.setProperty('--r-glow', info.glow);
+    frame.dataset.rarity = card.rarity;
+    if (opts.mini) frame.classList.add('cf-mini');
+
+    const img = el('img', 'cf-img');
+    img.alt = opts.alt || '';
+    img.draggable = false;
+    img.decoding = 'async';
+    img.loading = opts.eager ? 'eager' : 'lazy';
+
+    const fallback = el('span', 'cf-fallback');
+    fallback.style.setProperty('--art', card.color || '#cfd7c5');
+    fallback.append(el('span', 'card-emoji', card.emoji || '✦'));
+
+    const top = el('span', 'cf-top');
+    const badge = el('span', 'cf-badge', info.label);
+    const name = el('span', 'cf-name', card.name);
+    top.append(badge, name);
+    if (opts.mini) top.classList.add('cf-top-mini');
+
+    const bottom = el('span', 'cf-bottom');
+    bottom.append(el('span', 'cf-desc', card.description || ''));
+    const meta = el('span', 'cf-meta');
+    meta.append(el('span', 'cf-id', `#${card.id}`));
+    if (opts.index != null) meta.append(el('span', 'cf-num', `S01·${String(opts.index + 1).padStart(2, '0')}`));
+    bottom.append(meta);
+
+    frame.append(fallback, img, top, bottom);
+    if (!opts.mini) {
+      frame.append(el('span', 'cf-holo'), el('span', 'cf-shine'));
+    }
+
+    resolveCardImage(card).then((src) => {
+      if (!src) return;
+      img.src = src;
+      img.addEventListener('load', () => frame.classList.add('has-img'), { once: true });
+      frame.classList.add('has-src');
+    });
+
+    return frame;
   }
 
   function buildCard(card, index) {
@@ -684,8 +778,11 @@
     const btn = el('button', `card card-${card.rarity}`);
     btn.type = 'button';
     btn.dataset.id = card.id;
+    btn.dataset.fx = info.fx;
     btn.style.setProperty('--depth', index);
-    btn.style.setProperty('--art', card.color || '#cfd7c5');
+    btn.style.setProperty('--r-color', info.color);
+    btn.style.setProperty('--r-ink', info.ink);
+    btn.style.setProperty('--r-glow', info.glow);
     btn.setAttribute('aria-label', `Carte ${index + 1} sur ${CARD_COUNT}. Retourner la carte.`);
 
     const inner = el('span', 'card-inner');
@@ -702,32 +799,9 @@
     const backNum = el('span', 'back-num', `0${index + 1}`);
     back.append(backTop, emblem, backBottom, backNum);
 
-    /* face */
+    /* face : le visuel plein cadre + les surcouches titre / description / id */
     const front = el('span', 'card-face card-front');
-    const band = el('span', 'front-band');
-    band.append(el('span', 'front-rarity', info.label), el('span', 'front-code', `S01·0${index + 1}`));
-    const art = el('span', 'card-art');
-    const emoji = el('span', 'card-emoji', card.emoji || '✦');
-    art.append(emoji);
-    if (card.image) {
-      const img = new Image();
-      img.src = card.image;
-      img.alt = '';
-      img.draggable = false;
-      img.addEventListener('error', () => img.remove());
-      img.addEventListener('load', () => { emoji.hidden = true; });
-      art.append(img);
-    }
-    const infoWrap = el('span', 'card-info');
-    infoWrap.append(el('span', 'card-name', card.name), el('span', 'card-desc', card.description || ''));
-    const foot = el('span', 'card-foot');
-    const power = el('span', 'power');
-    power.append(el('span', null, '✦'));
-    power.append(el('b', null, String(powerOf(card))));
-    foot.append(el('span', null, 'REFS CARDS · S01'), power);
-    const holo = el('span', 'holo');
-    const shine = el('span', 'card-shine');
-    front.append(band, art, infoWrap, foot, holo, shine);
+    front.append(cardFrame(card, { index, eager: true }));
 
     tilt.append(back, front);
     inner.append(tilt);
@@ -756,6 +830,21 @@
       if (!btn.dataset.hovered && btn.classList.contains('is-flipped')) {
         btn.dataset.hovered = '1';
         Sound.tick();
+      }
+    });
+
+    btn.addEventListener('dblclick', (event) => {
+      if (!btn.classList.contains('is-flipped')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openInspect(card);
+    });
+
+    btn.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && btn.classList.contains('is-flipped') && event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        openInspect(card);
       }
     });
 
@@ -824,51 +913,96 @@
 
     clearEffects();
 
-    if (card.rarity === 'common') {
-      tableGlow.setAttribute('data-rarity', 'common');
+    const fx = info.fx || 'calm';
+    tableGlow.setAttribute('data-rarity', card.rarity);
+    app.dataset.rarity = card.rarity;
+
+    if (fx === 'calm') {
       if (!quiet) {
-        for (let i = 0; i < 10; i++) FX.dot(cx, cy, '#ffffff', { speedMax: 150, g: -20, size: 3, life: 0.7 });
+        const n = card.rarity === 'common' ? 10 : 18;
+        for (let i = 0; i < n; i++) FX.dot(cx, cy, info.glow, { speedMax: 170, g: -20, size: 3, life: 0.8 });
       }
-    } else if (card.rarity === 'rare') {
-      tableGlow.setAttribute('data-rarity', 'rare');
+    } else if (fx === 'rare') {
       if (!quiet) {
-        FX.ring(cx, cy, '#5fb8ff', 190);
-        for (let i = 0; i < 26; i++) FX.spark(cx, cy, i % 2 ? '#b7e4ff' : '#5fb8ff', { speedMax: 380, g: 180, size: 2.4 });
-        for (let i = 0; i < 12; i++) FX.dot(cx, cy, '#7cc8ff', { speedMax: 220, g: -40, size: 4, life: 1 });
+        FX.ring(cx, cy, info.glow, 190);
+        for (let i = 0; i < 26; i++) FX.spark(cx, cy, i % 2 ? '#ffffff' : info.glow, { speedMax: 380, g: 180, size: 2.4 });
+        for (let i = 0; i < 12; i++) FX.dot(cx, cy, info.glow, { speedMax: 220, g: -40, size: 4, life: 1 });
       }
-      stage.classList.remove('shake');
-    } else if (card.rarity === 'epic') {
-      tableGlow.setAttribute('data-rarity', 'epic');
+    } else if (fx === 'epic') {
       app.classList.add('slow-mo');
       window.setTimeout(() => app.classList.remove('slow-mo'), 1600);
       window.setTimeout(() => {
         shakeStage();
         flashScreen();
         if (!quiet) {
-          FX.ring(cx, cy, '#c58aff', 260);
-          for (let i = 0; i < 46; i++) FX.spark(cx, cy, i % 3 ? '#b47bff' : '#e6d1ff', { speedMax: 560, g: 320, size: 2.8, life: 0.9 });
-          for (let i = 0; i < 18; i++) FX.dot(cx, cy, '#a457ff', { speedMax: 300, g: -60, size: 5, life: 1.4 });
+          FX.ring(cx, cy, info.glow, 260);
+          for (let i = 0; i < 46; i++) FX.spark(cx, cy, i % 3 ? info.glow : '#ffffff', { speedMax: 560, g: 320, size: 2.8, life: 0.9 });
+          for (let i = 0; i < 18; i++) FX.dot(cx, cy, info.glow, { speedMax: 300, g: -60, size: 5, life: 1.4 });
         }
       }, quiet ? 0 : 420);
     } else {
-      tableGlow.setAttribute('data-rarity', 'legendary');
       rays.classList.add('on');
       if (!quiet) {
-        FX.ring(cx, cy, '#ffe9a3', 300);
-        FX.rain(['#ffd45e', '#ff9bd2', '#8ff4ff', '#d6ff3f', '#ffffff'], 90);
-        for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? '#ffd45e' : '#fff6cf', { speedMax: 620, g: 260, size: 3, life: 1.1 });
-        FX.confetti(cx, cy, ['#ffd45e', '#ff8bd6', '#8ff4ff', '#ffffff', '#d6ff3f'], 40);
+        FX.ring(cx, cy, '#ffffff', 300);
+        FX.rain([info.color, info.glow, '#ffffff', '#ffe9a3'], 90);
+        for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? info.glow : '#ffffff', { speedMax: 620, g: 260, size: 3, life: 1.1 });
+        FX.confetti(cx, cy, [info.color, info.glow, '#ffffff', '#ffe9a3'], 40);
       }
       window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
     }
 
-    window.setTimeout(() => Sound.rarity(card.rarity), quiet ? 0 : card.rarity === 'epic' ? 460 : 150);
+    window.setTimeout(() => Sound.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
 
     addCoins(info.reward);
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${CARD_COUNT} · RÉVÉLÉE`;
-    revealSub.textContent = card.rarity === 'legendary' ? 'LÉGENDAIRE. Clique à côté de la carte pour continuer.' : 'Clique à côté de la carte pour passer à la suivante.';
+    revealSub.textContent = info.rank >= RARITIES.legendary.rank
+      ? `${info.label.toUpperCase()} ! Clique à côté de la carte pour continuer.`
+      : 'Clique à côté de la carte pour passer à la suivante.';
   }
+
+  /* ------------------------------------------------------- inspection grand */
+
+  let inspectReturnFocus = null;
+
+  function cardById(id) {
+    return (
+      state.collection.find((c) => c.id === id) ||
+      cardsDatabase.find((c) => c.id === id) ||
+      null
+    );
+  }
+
+  function openInspect(card) {
+    if (!card) return;
+    const info = RARITIES[card.rarity] || RARITIES.common;
+    inspectCard.replaceChildren(cardFrame(card, { eager: true, alt: `${card.name} — ${info.label}` }));
+    inspectCard.style.setProperty('--r-color', info.color);
+    inspectCard.style.setProperty('--r-glow', info.glow);
+    inspectCard.dataset.rarity = card.rarity;
+    inspectReturnFocus = document.activeElement;
+    inspect.hidden = false;
+    void inspect.offsetWidth;
+    inspect.classList.add('is-open');
+    Sound.tick();
+    inspectX.focus({ preventScroll: true });
+  }
+
+  function closeInspect() {
+    if (inspect.hidden) return;
+    inspect.classList.remove('is-open');
+    window.setTimeout(() => {
+      if (!inspect.classList.contains('is-open')) {
+        inspect.hidden = true;
+        inspectCard.replaceChildren();
+      }
+    }, 260);
+    if (inspectReturnFocus && inspectReturnFocus.focus) inspectReturnFocus.focus({ preventScroll: true });
+    inspectReturnFocus = null;
+  }
+
+  inspectX.addEventListener('click', closeInspect);
+  inspectBackdrop.addEventListener('click', closeInspect);
 
   /* ----------------------------------------------------------- vers le butin */
 
@@ -914,12 +1048,10 @@
     }, reduceMotion.matches ? 120 : 640);
   }
 
-  const RARITY_BG = {
-    common: 'linear-gradient(165deg,#f3f6ec,#cfd8c5)',
-    rare: 'linear-gradient(165deg,#e8f6ff,#bcdcf3)',
-    epic: 'linear-gradient(165deg,#f6e9ff,#dcc4f5)',
-    legendary: 'linear-gradient(165deg,#fff8dc,#ffe08a)'
-  };
+  /* Fond de secours par rareté (utilisé quand la carte n'a pas d'image). */
+  const RARITY_BG = Object.fromEntries(
+    Object.entries(RARITIES).map(([key, r]) => [key, `linear-gradient(165deg, ${r.color}, ${r.glow})`])
+  );
 
   function setRecapCollapsed(collapsed) {
     recap.classList.toggle('is-collapsed', collapsed);
@@ -943,28 +1075,19 @@
   function fillSlot(index, card) {
     const slot = recapSlots.children[index];
     if (!slot) return;
-    const info = RARITIES[card.rarity];
+    const info = RARITIES[card.rarity] || RARITIES.common;
     slot.classList.add('is-filled', 'is-new');
     slot.style.setProperty('--slot-color', info.glow);
+    slot.dataset.rarity = card.rarity;
     slot.replaceChildren();
     const mini = el('span', 'slot-mini');
     mini.style.setProperty('--slot-bg', RARITY_BG[card.rarity] || RARITY_BG.common);
-    if (card.image) {
-      const img = new Image();
-      img.src = card.image;
-      img.alt = '';
-      img.className = 'mini-emoji';
-      img.style.fontSize = '0';
-      img.addEventListener('error', () => {
-        img.remove();
-        mini.prepend(el('span', 'mini-emoji', card.emoji || '✦'));
-      });
-      mini.append(img);
-    } else {
-      mini.append(el('span', 'mini-emoji', card.emoji || '✦'));
-    }
-    mini.append(el('span', 'mini-name', card.name), el('span', 'mini-rarity', info.label));
+    mini.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
     slot.append(mini);
+    slot.dataset.cardId = card.id;
+    slot.tabIndex = 0;
+    slot.setAttribute('role', 'button');
+    slot.setAttribute('aria-label', `Voir ${card.name} (${info.label}) en grand`);
     window.setTimeout(() => slot.classList.remove('is-new'), 1000);
   }
 
@@ -994,6 +1117,11 @@
     [...recapSlots.children].forEach((s) => {
       s.className = 'slot';
       s.style.removeProperty('--slot-color');
+      delete s.dataset.rarity;
+      delete s.dataset.cardId;
+      s.removeAttribute('role');
+      s.removeAttribute('aria-label');
+      s.removeAttribute('tabindex');
       s.replaceChildren();
     });
     revealKicker.innerHTML = '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
@@ -1243,7 +1371,8 @@
       row.type = 'button';
       row.dataset.id = entry.card.id;
       row.style.setProperty('--fr-bg', RARITY_BG[entry.card.rarity] || RARITY_BG.common);
-      const emoji = el('span', 'fr-emoji', entry.card.emoji || '✦');
+      const emoji = el('span', 'fr-emoji');
+      emoji.append(cardFrame(entry.card, { mini: true }));
       const main = el('span', 'fr-main');
       main.append(
         el('span', 'fr-name', entry.card.name),
@@ -1275,11 +1404,15 @@
     const pool = cardsDatabase.filter((c) => c.rarity === info.next);
     const preview = pool[Math.floor(Math.random() * pool.length)];
 
-    const a = el('span', 'fs-card', entry.card.emoji || '✦');
-    const b = el('span', 'fs-card', entry.card.emoji || '✦');
+    const a = el('span', 'fs-card');
+    const b = el('span', 'fs-card');
+    a.append(cardFrame(entry.card, { mini: true }));
+    b.append(cardFrame(entry.card, { mini: true }));
     const plus = el('span', 'fs-plus', '+');
     const arrow = el('span', 'fs-arrow', '→');
-    const result = el('span', 'fs-card result', preview ? preview.emoji || '✦' : '✦');
+    const result = el('span', 'fs-card result');
+    if (preview) result.append(cardFrame(preview, { mini: true }));
+    else result.append(el('span', null, '✦'));
     result.style.setProperty('--fs-color', nextInfo.glow);
     fusionStage.append(a, plus, b, arrow, result);
     result.title = preview ? `${preview.name} (${nextInfo.label})` : '';
@@ -1346,15 +1479,25 @@
     [...recapSlots.children].forEach((s, i) => {
       s.className = 'slot';
       s.style.removeProperty('--slot-color');
+      delete s.dataset.rarity;
+      delete s.dataset.cardId;
+      s.removeAttribute('role');
+      s.removeAttribute('aria-label');
+      s.removeAttribute('tabindex');
       s.replaceChildren();
       if (last[i]) {
         s.classList.add('is-filled');
         const card = last[i];
         const info = RARITIES[card.rarity];
         s.style.setProperty('--slot-color', info.glow);
+        s.dataset.rarity = card.rarity;
+        s.dataset.cardId = card.id;
+        s.tabIndex = 0;
+        s.setAttribute('role', 'button');
+        s.setAttribute('aria-label', `Voir ${card.name} (${info.label}) en grand`);
         const mini = el('span', 'slot-mini');
         mini.style.setProperty('--slot-bg', RARITY_BG[card.rarity] || RARITY_BG.common);
-        mini.append(el('span', 'mini-emoji', card.emoji || '✦'), el('span', 'mini-name', card.name), el('span', 'mini-rarity', info.label));
+        mini.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
         s.append(mini);
       }
     });
@@ -1371,6 +1514,10 @@
   fusionChip.addEventListener('click', () => openFusion(false));
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !inspect.hidden) {
+      closeInspect();
+      return;
+    }
     if (e.key === 'Escape' && state.fusionOpen) {
       closeFusion();
       return;
@@ -1433,7 +1580,7 @@
       const tw = tableEl.clientWidth;
       const th = tableEl.clientHeight;
       if (tw > 0 && th > 0) {
-        const h = Math.min(th - 10, (tw * 0.9) / 0.665, 470);
+        const h = Math.min(th - 10, (tw * 0.9) / (5 / 7), 470);
         stack.style.height = `${Math.max(150, h).toFixed(0)}px`;
       }
     }
@@ -1467,10 +1614,40 @@
   });
   window.addEventListener('orientationchange', handleResize);
 
+  /* Un clic sur une vignette du butin ouvre la carte en grand. */
+  recapSlots.addEventListener('click', (event) => {
+    const slot = event.target.closest('.slot');
+    if (!slot || !slot.dataset.cardId) return;
+    openInspect(cardById(slot.dataset.cardId));
+  });
+
+  recapSlots.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const slot = event.target.closest('.slot');
+    if (!slot || !slot.dataset.cardId) return;
+    event.preventDefault();
+    openInspect(cardById(slot.dataset.cardId));
+  });
+
+  /* Probabilités : générées depuis RARITIES pour rester toujours justes. */
+  function renderOdds() {
+    if (!packOdds) return;
+    packOdds.replaceChildren();
+    Object.entries(RARITIES).forEach(([key, r]) => {
+      const row = el('span', `odds odds-${key}`);
+      const dot = el('i');
+      dot.style.background = r.color;
+      dot.style.boxShadow = `0 0 6px ${r.glow}`;
+      row.append(dot, document.createTextNode(`${r.label} ${String(r.weight).replace('.', ',')} %`));
+      packOdds.append(row);
+    });
+  }
+
   /* ---------------------------------------------------------------- début */
 
   function boot() {
     updateCoins();
+    renderOdds();
     FX.resize();
     Dust.resize();
     Dust.start();
@@ -1480,7 +1657,7 @@
     scheduleSizing(6);
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
       sessionStorage.setItem('refs-demo', '1');
-      showToast('Mode démo : une carte de chaque rareté.', 2600);
+      showToast('Mode démo : un aperçu des raretés.', 2600);
     }
     if (!cardsDatabase.length) {
       showToast('Ajoute des cartes dans cards.js pour commencer.');
