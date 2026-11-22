@@ -812,8 +812,8 @@
       if (!btn.classList.contains('is-top') || btn.classList.contains('is-flying')) return;
       // La carte reste manipulable après sa révélation (tilt/parallaxe) ;
       // son rangement se fait en cliquant à côté, dans la zone de la table.
-      if (!btn.classList.contains('is-flipped')) revealCard(btn, card);
-      else if (event.detail === 0) sendToRecap(btn, card); // activation clavier
+      if (!btn.classList.contains('is-revealed')) revealCard(btn, card);
+      else if (btn.classList.contains('is-flipped') && event.detail === 0) sendToRecap(btn, card); // activation clavier
     });
 
     btn.addEventListener('pointermove', (e) => {
@@ -890,7 +890,11 @@
   }
 
   function revealCard(btn, card) {
+    if (btn.classList.contains('is-revealed')) return;
     Sound.unlock();
+    // L'animation d'arrivée anime aussi card-inner : elle ne doit pas
+    // écraser le retournement si l'utilisateur clique immédiatement.
+    btn.classList.remove('is-incoming');
     btn.classList.add('is-revealed');
     if (card.rarity === 'epic') {
       // Petit suspense : la carte marque un temps d'arrêt avant de se retourner.
@@ -1029,7 +1033,8 @@
     nextCard.hidden = true;
     const restoreFocus = document.activeElement === nextCard || document.activeElement === btn;
     Sound.whoosh();
-    btn.classList.remove('is-flipped', 'is-revealed', 'is-incoming');
+    // Garder la face visible pendant son trajet vers le récapitulatif.
+    btn.classList.remove('is-incoming');
     const target = recapSlots.children[state.loot.length] || recapSlots.lastElementChild;
     const from = btn.getBoundingClientRect();
     const to = target.getBoundingClientRect();
@@ -1536,7 +1541,7 @@
       closeFusion();
       return;
     }
-    if (state.phase !== 'reveal' || state.fusionOpen || !current) return;
+    if (state.phase !== 'reveal' || state.fusionOpen || !current || flying || !current.node.classList.contains('is-top')) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
     if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle) return;
     e.preventDefault();

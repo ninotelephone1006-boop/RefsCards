@@ -715,6 +715,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   transform: rotateY(var(--flip, 0deg));
   transition: transform var(--flip-dur, 0.85s) cubic-bezier(0.3, 1.08, 0.3, 1);
 }
+.card.is-flipped .card-inner { --flip: 180deg; }
 
 /* Enveloppe dédiée à la parallaxe : elle réagit vite sans ralentir le flip. */
 .card-tilt {
