@@ -2033,3 +2033,8 @@ html,body{background:var(--bg)}
 @keyframes badge-pop{0%{transform:scale(.5);opacity:0}100%{transform:none;opacity:1}}
 @keyframes star-pulse{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.14);opacity:1}}
 @media (hover:none){.card.is-top:hover{filter:none}}
+
+/* CORRECTIF : chaque carte a sa propre 3D ; la pile est aplatie, l'ordre suit z-index
+   (sinon la carte inclinée traverse les dos des cartes du dessous) */
+.stack{transform-style:flat}
+.card{isolation:isolate}
