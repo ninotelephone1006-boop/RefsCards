@@ -2,56 +2,170 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#10110f">
-  <meta name="description" content="Ouvre un booster et découvre tes nouvelles cartes.">
-  <title>Refs Cards — Ouvre ton booster</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#08090a">
+  <meta name="description" content="Déchire ton booster Refs Cards, révèle cinq cartes et collectionne les légendaires.">
+  <title>Refs Cards — Déchire. Révèle. Collectionne.</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script src="cards.js" defer></script>
+  <script src="audio.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="./" aria-label="Refs Cards, accueil"><span class="brand-mark">✳</span><span>REFS<span class="brand-muted">CARDS</span><small>LE JEU DE CARTES</small></span></a>
-      <div class="header-right"><span class="collection-label"><span class="status-dot"></span> SAISON 01</span><div class="wallet" aria-label="Solde de pièces"><span class="coin">✦</span><strong id="coins">1 000</strong><span class="wallet-label">PIÈCES</span></div></div>
+  <div class="app" id="app">
+    <canvas class="dust" id="dust" aria-hidden="true"></canvas>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-glow" aria-hidden="true"></div>
+
+    <header class="hud">
+      <a class="brand" href="./" aria-label="Refs Cards, accueil">
+        <span class="brand-mark">✳</span>
+        <span class="brand-name">REFS<span>CARDS</span><small>LE JEU DE CARTES</small></span>
+      </a>
+      <div class="hud-right">
+        <span class="season"><i></i>SAISON 01</span>
+        <button class="icon-btn" id="sound-btn" type="button" aria-pressed="false" aria-label="Couper le son">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M3.5 9.5h3.2L11 5.8v12.4l-4.3-3.7H3.5z" fill="currentColor"/>
+            <path class="wave" d="M14.6 8.7a4.7 4.7 0 0 1 0 6.6M17.2 6.2a8.2 8.2 0 0 1 0 11.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            <path class="mute-x" d="M14.2 9.2l5.4 5.6M19.6 9.2l-5.4 5.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <div class="wallet" id="wallet" aria-label="Pièces">
+          <span class="coin-glyph" aria-hidden="true">🪙</span>
+          <strong id="coins">0</strong>
+          <span class="coin-float" id="coin-float" aria-hidden="true"></span>
+        </div>
+      </div>
     </header>
 
-    <main>
-      <div class="section-heading"><span><span class="tiny-diamond">✦</span> &nbsp; ESPACE D'OUVERTURE</span><span class="heading-right">SÉRIE 01 <span class="slash">/</span> 01</span></div>
-      <section class="experience" aria-labelledby="main-title">
-        <div class="intro">
-          <div class="eyebrow"><span class="eyebrow-dot"></span> LE PLAISIR DE LA SURPRISE</div>
-          <h1 id="main-title">La chance<br>est dans <span>le pack.</span></h1>
-          <p class="intro-copy">Un booster, cinq cartes, des possibilités infinies. Prêt à découvrir ce qui se cache à l'intérieur ?</p>
-          <div class="intro-divider"></div>
-          <div class="pack-info"><div class="info-icon">✳</div><div><strong>BOOSTER MYSTÈRE</strong><span>5 cartes à collectionner</span></div><span class="info-number">01 / 01</span></div>
-          <div class="rarities"><span class="rarities-label">À L'INTÉRIEUR</span><div class="rarity-list"><span><i class="common-dot"></i> Commune</span><span><i class="rare-dot"></i> Rare</span><span><i class="epic-dot"></i> Épique</span><span><i class="legendary-dot"></i> Légendaire</span></div></div>
+    <main class="stage" id="stage">
+      <div class="stage-vignette" aria-hidden="true"></div>
+      <canvas class="fx" id="fx" aria-hidden="true"></canvas>
+
+      <!-- ============================== BOOSTER ============================== -->
+      <section class="view pack-view" id="pack-view" aria-label="Ouverture du booster">
+        <div class="pack-head">
+          <p class="kicker"><span>✦</span> SÉRIE 01 · BOOSTER MYSTÈRE <span>✦</span></p>
+          <h1>Déchire. Révèle. <em>Collectionne.</em></h1>
+          <p class="pack-sub">Cinq cartes t'attendent sous le film. À toi de l'ouvrir.</p>
         </div>
-        <div class="stage" id="stage">
-          <div class="stage-grid" aria-hidden="true"></div><div class="stage-glow" aria-hidden="true"></div>
-          <div class="stage-corner corner-top">✳ <span>REFS / DROP 01</span></div><div class="stage-corner corner-right">BONNE CHANCE <span>↗</span></div>
-          <div class="pack-scene" id="pack-scene">
-            <div class="pack-label"><span>✦</span> TON BOOSTER T'ATTEND <span>✦</span></div>
-            <button class="pack-button" id="pack-button" aria-label="Ouvrir le booster mystère"><img src="assets/packet.png" alt="Booster mystère Refs Cards" draggable="false"><span class="pack-shine"></span></button>
-            <div class="pack-shadow"></div>
-            <div class="action-hint"><span class="tap-icon">☝</span><div><strong>À TOI DE JOUER</strong><span>Touche le booster pour l'ouvrir</span></div></div>
+
+        <div class="pack-area" id="pack-area">
+          <div class="pack-halo" aria-hidden="true"></div>
+          <div class="pack-float" id="pack-float">
+            <div class="pack" id="pack" role="button" tabindex="0" aria-label="Booster mystère. Fais glisser vers la droite pour le déchirer.">
+              <img class="pack-img" src="assets/packet.png" alt="Booster Refs Cards" draggable="false">
+              <div class="pack-gap" aria-hidden="true">
+                <span class="gap-glow"></span>
+                <span class="gap-cards"><i></i><i></i><i></i><i></i><i></i></span>
+              </div>
+              <div class="pack-flap" id="pack-flap" aria-hidden="true">
+                <img class="pack-img" src="assets/packet.png" alt="" draggable="false">
+              </div>
+              <div class="cut" id="cut" aria-hidden="true">
+                <span class="cut-track"></span>
+                <span class="cut-fill"></span>
+                <span class="cut-head"></span>
+                <span class="cut-arrow">➜</span>
+              </div>
+              <span class="pack-and-save" aria-hidden="true">GLISSE POUR DÉCHIRER</span>
+            </div>
+            <div class="pack-shadow" aria-hidden="true"></div>
           </div>
-          <div class="reveal-scene" id="reveal-scene" hidden>
-            <div class="reveal-heading"><span class="reveal-kicker">✦ &nbsp; C'EST LE MOMENT</span><h2>À toi de jouer<span>.</span></h2><p id="reveal-instruction">Touche chaque carte pour la révéler.</p></div>
-            <div class="cards" id="cards" aria-label="Les cartes du booster"></div>
-            <div class="reveal-bottom"><div class="progress"><span id="progress-text">0 / 5 CARTES RÉVÉLÉES</span><div class="progress-track"><div id="progress-bar"></div></div></div><button class="again-button" id="again-button" hidden>Ouvrir un autre booster <span>100 ✦ &nbsp; ↗</span></button><p class="balance-message" id="balance-message" role="status"></p></div>
+
+          <div class="pack-hint" id="pack-hint">
+            <span class="finger" aria-hidden="true">☝</span>
+            <div>
+              <strong>GLISSE VERS LA DROITE</strong>
+              <span id="hint-text">Trace la ligne de découpe d'un doigt ou à la souris</span>
+            </div>
+            <span class="hint-pct" id="hint-pct">0 %</span>
           </div>
-          <div class="particles" id="particles" aria-hidden="true"></div><div class="flash" id="flash" aria-hidden="true"></div>
-          <div class="stage-bottom"><span>OUVRE. DÉCOUVRE. COLLECTIONNE.</span><span>✳</span></div>
+        </div>
+
+        <div class="pack-odds" aria-hidden="true">
+          <span><i class="dot-common"></i>Commune 60 %</span>
+          <span><i class="dot-rare"></i>Rare 25 %</span>
+          <span><i class="dot-epic"></i>Épique 12 %</span>
+          <span><i class="dot-legendary"></i>Légendaire 3 %</span>
         </div>
       </section>
-      <div class="underbar"><span><span class="under-star">✳</span> UNE SURPRISE À CHAQUE OUVERTURE</span><span>FAIT POUR LES COLLECTIONNEURS <span class="heart">♥</span></span></div>
+
+      <!-- ============================== RÉVÉLATION ============================== -->
+      <section class="view reveal-view" id="reveal-view" hidden aria-label="Révélation des cartes">
+        <div class="reveal-head">
+          <p class="kicker" id="reveal-kicker"><span>✦</span> BOOSTER OUVERT <span>✦</span></p>
+          <h2 id="reveal-title">La pile est prête<em>.</em></h2>
+          <p id="reveal-sub">Clique sur la carte du dessus pour la retourner.</p>
+        </div>
+
+        <div class="table" id="table">
+          <div class="rays" id="rays" aria-hidden="true"></div>
+          <div class="table-glow" id="table-glow" aria-hidden="true"></div>
+          <div class="stack" id="stack"></div>
+        </div>
+
+        <div class="reveal-foot">
+          <span class="foot-left"><i></i><span id="pile-label">CARTE 1 / 5</span></span>
+          <span class="foot-right" id="foot-right">← LA PLUS RARE EST AU FOND</span>
+        </div>
+      </section>
+
+      <div class="flash" id="flash" aria-hidden="true"></div>
+
+      <!-- ============================== RECAP ============================== -->
+      <footer class="recap" id="recap" aria-label="Butin de la session">
+        <div class="recap-head">
+          <span class="recap-kicker"><i></i>TON BUTIN</span>
+          <button class="recap-toggle" id="recap-toggle" type="button" aria-expanded="true" aria-controls="recap-body">
+            <span id="recap-toggle-label">MASQUER</span>
+            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M2 4.5 6 8.5l4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </button>
+          <span class="recap-count" id="recap-count">0 / 5</span>
+        </div>
+        <div class="recap-slots" id="recap-slots" aria-hidden="true">
+          <span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span>
+        </div>
+        <div class="recap-actions">
+          <button class="fusion-chip" id="fusion-chip" type="button" hidden>
+            <span class="chip-icon" aria-hidden="true">⚗</span>
+            <span class="chip-label">FUSIONNER DES DOUBLONS</span>
+            <span class="chip-arrow" aria-hidden="true">↗</span>
+          </button>
+          <button class="buy-btn" id="buy-btn" type="button" hidden>
+            <span class="buy-label">OUVRIR UN BOOSTER</span>
+            <span class="buy-price"><span class="coin-glyph" aria-hidden="true">🪙</span>100</span>
+          </button>
+          <p class="recap-msg" id="recap-msg" role="status"></p>
+        </div>
+      </footer>
+
+      <!-- ============================== FUSION ============================== -->
+      <div class="fusion" id="fusion" hidden>
+        <div class="fusion-backdrop" id="fusion-backdrop"></div>
+        <div class="fusion-dialog" role="dialog" aria-modal="true" aria-labelledby="fusion-title" aria-describedby="fusion-desc">
+          <div class="fusion-glow" aria-hidden="true"></div>
+          <button class="fusion-x" id="fusion-x" type="button" aria-label="Fermer la demande de fusion">✕</button>
+          <p class="kicker"><span>✦</span> DEMANDE DE FUSION <span>✦</span></p>
+          <h3 id="fusion-title">Deux fois la même carte,<br>une rareté au-dessus.</h3>
+          <p id="fusion-desc" class="fusion-desc">Choisis un doublon : deux exemplaires identiques fusionnent pour donner une carte de la rareté supérieure.</p>
+          <div class="fusion-stage" id="fusion-stage"></div>
+          <div class="fusion-grid" id="fusion-grid"></div>
+          <div class="fusion-actions">
+            <button class="ghost-btn" id="fusion-later" type="button">Plus tard</button>
+            <button class="ghost-btn primary" id="fusion-go" type="button" hidden>FUSIONNER</button>
+            <button class="ghost-btn primary" id="fusion-buy" type="button" hidden>OUVRIR UN BOOSTER</button>
+          </div>
+          <p class="fusion-hint" id="fusion-hint">Sans risque · une fusion consomme deux exemplaires identiques</p>
+        </div>
+      </div>
     </main>
-    <footer><span>© 2025 REFS CARDS</span><span>TA COLLECTION COMMENCE ICI. <b>✦</b></span></footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
 </body>
 </html>
