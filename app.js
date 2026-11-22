@@ -46,6 +46,7 @@
   const wallet = $('wallet');
   const coinFloat = $('coin-float');
   const stack = $('stack');
+  const tableEl = $('table');
   const rays = $('rays');
   const tableGlow = $('table-glow');
   const flash = $('flash');
@@ -540,7 +541,9 @@
     const wasDrag = drag;
     drag = null;
     pack.classList.remove('is-dragging');
-    try { pack.releasePointerCapture(wasDrag.id); } catch (err) {}
+    if (wasDrag.id !== 'kbd') {
+      try { pack.releasePointerCapture(wasDrag.id); } catch (err) {}
+    }
     Sound.tearStop();
 
     if (tearP >= TEAR_THRESHOLD) {
@@ -551,11 +554,8 @@
         hintText.textContent = `Il faut dépasser 75 % — tu es à ${Math.round(tearP * 100)} %`;
         hintPct.classList.remove('hot');
       }
-      pack.classList.add('is-snapping');
-      pack.style.setProperty('--snap-x', `${(tearP * 14).toFixed(1)}px`);
       const from = tearP;
-      tween(from, 0, 720, easeOutElastic, (v) => setTear(v, Math.max(0, v * wasDrag.travel * 0.08)), () => {
-        pack.classList.remove('is-snapping');
+      tween(from, Math.max(from * 0.9, 0.02), 760, easeOutElastic, (v) => setTear(v, Math.max(0, v * wasDrag.travel * 0.1)), () => {
         pack.style.transform = '';
         packFlap.style.transform = '';
       });
@@ -916,8 +916,13 @@
   function setRecapCollapsed(collapsed) {
     recap.classList.toggle('is-collapsed', collapsed);
     // La scène de révélation lui laisse la place : plus de chevauchement.
-    const apply = () => stage.style.setProperty('--recap-h', collapsed ? '0px' : `${recap.offsetHeight}px`);
+    const apply = () => {
+      const hidden = collapsed || recap.classList.contains('is-idle');
+      stage.style.setProperty('--recap-h', hidden ? '0px' : `${Math.max(72, recap.offsetHeight)}px`);
+      sizeStage();
+    };
     requestAnimationFrame(apply);
+    scheduleSizing(24);
     window.setTimeout(apply, 420);
     recapToggle.setAttribute('aria-expanded', String(!collapsed));
     recapToggleLabel.textContent = collapsed ? 'VOIR' : 'MASQUER';
@@ -1006,6 +1011,8 @@
     });
 
     remaining = state.deck.map((data, i) => ({ data, node: stack.children[i] }));
+    sizeStage();
+    scheduleSizing(10);
     current = remaining[0];
     window.setTimeout(() => current && current.node.classList.add('is-top'), reduceMotion.matches ? 10 : 420);
     state.phase = 'reveal';
@@ -1111,7 +1118,7 @@
     void packView.offsetWidth;
     packView.classList.add('view-in');
 
-    pack.classList.remove('is-ripped', 'is-snapping', 'is-dragging');
+    pack.classList.remove('is-ripped', 'is-dragging');
     pack.style.transform = '';
     packFlap.classList.remove('is-gone');
     packFlap.style.transform = '';
@@ -1134,6 +1141,7 @@
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
     revealSub.textContent = 'Clique sur la carte du dessus pour la retourner.';
     Sound.deal();
+    scheduleSizing(10);
     showToast('Nouveau booster ! Glisse vers la droite pour déchirer.', 2800);
   }
 
@@ -1396,6 +1404,40 @@
   window.addEventListener('pointerdown', unlockOnce, { passive: true });
   window.addEventListener('keydown', unlockOnce);
 
+  /* ---------------------------------------------------- dimensionnement */
+
+  let sizeFrame = 0;
+  function scheduleSizing(frames = 8) {
+    if (sizeFrame) return;
+    const step = () => {
+      sizeStage();
+      sizeFrame++;
+      if (sizeFrame >= frames) sizeFrame = 0;
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  function sizeStage() {
+    // La pile : on prend la plus petite des contraintes largeur / hauteur pour
+    // que les cinq cartes restent toujours entièrement visibles.
+    if (!revealView.hidden) {
+      const tw = tableEl.clientWidth;
+      const th = tableEl.clientHeight;
+      if (tw > 0 && th > 0) {
+        const h = Math.min(th - 10, (tw * 0.9) / 0.665, 470);
+        stack.style.height = `${Math.max(150, h).toFixed(0)}px`;
+      }
+    }
+    // Le paquet : il doit tenir sous le titre, au-dessus des probabilités.
+    const areaH = packArea.clientHeight;
+    const areaW = packArea.clientWidth;
+    if (areaH > 0 && areaW > 0) {
+      const w = Math.min(areaW * 0.62, areaH * 0.56, 286);
+      pack.style.width = `${Math.max(132, w).toFixed(0)}px`;
+    }
+  }
+
   /* --------------------------------------------------------------- resize */
 
   let resizeTimer = null;
@@ -1404,6 +1446,11 @@
     resizeTimer = window.setTimeout(() => {
       FX.resize();
       Dust.resize();
+      sizeStage();
+      stage.style.setProperty(
+        '--recap-h',
+        recap.classList.contains('is-idle') || recap.classList.contains('is-collapsed') ? '0px' : `${Math.max(72, recap.offsetHeight)}px`
+      );
     }, 140);
   }
   window.addEventListener('resize', handleResize);
@@ -1421,6 +1468,8 @@
     Dust.start();
     resetTear();
     recap.classList.add('is-idle');
+    sizeStage();
+    scheduleSizing(6);
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
       sessionStorage.setItem('refs-demo', '1');
       showToast('Mode démo : une carte de chaque rareté.', 2600);
