@@ -1,12 +1,8 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+// Refs Cards — configuration Web publique du projet Firebase « refscard ».
+// (Console Firebase → Paramètres du projet → Vos applications → application Web « RefsCards ».)
+// Ces valeurs identifient le projet côté navigateur : ce ne sont pas des mots de passe.
+// La protection des données repose sur les règles Firestore (voir firestore.rules).
+window.REFS_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBRrEogwpZm02d7rKFkJJQditxD6Q24JbU",
   authDomain: "refscard.firebaseapp.com",
   projectId: "refscard",
@@ -15,7 +11,3 @@ const firebaseConfig = {
   appId: "1:679046308034:web:47db91f2f69c671ef41b5b",
   measurementId: "G-1S25XMWZFG"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);

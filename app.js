@@ -105,12 +105,9 @@
   const inspectX = $('inspect-x');
   const inspectBackdrop = $('inspect-backdrop');
   const authScreen = $('auth-screen');
-  const authForm = $('auth-form');
-  const authEmail = $('auth-email');
-  const authPassword = $('auth-password');
   const authError = $('auth-error');
-  const authSubmit = $('auth-submit');
-  const authSwitch = $('auth-switch');
+  const googleSignIn = $('google-signin');
+  const accountAvatar = $('account-avatar');
   const accountEmail = $('account-email');
   const logoutBtn = $('logout-btn');
   const gameRegions = document.querySelectorAll('.hud, #stage, #tabbar, .toast');
@@ -1568,7 +1565,7 @@
   fusionChip.addEventListener('click', () => openFusion(false));
 
   document.addEventListener('keydown', (e) => {
-    if (!currentUser || !currentEmail) return;
+    if (!currentUser) return;
     if (e.key === 'Escape' && !inspect.hidden) {
       closeInspect();
       return;
@@ -1718,35 +1715,23 @@
   let currentUser = null;
   let currentEmail = '';
   let saveTimer = 0;
-  let authIsRegistering = false;
 
   function setAuthError(message) {
     authError.textContent = message || '';
     authError.hidden = !message;
   }
 
-  function updateAuthMode() {
-    authSubmit.textContent = authIsRegistering ? 'CRÉER MON COMPTE GRATUIT' : 'SE CONNECTER';
-    authPassword.autocomplete = authIsRegistering ? 'new-password' : 'current-password';
-    authSwitch.innerHTML = authIsRegistering
-      ? 'Déjà un compte ? <strong>Se connecter</strong>'
-      : 'Pas encore de compte ? <strong>Créer un compte gratuit</strong>';
-    setAuthError('');
-  }
-
   function authErrorMessage(error) {
     const messages = {
-      'auth/email-already-in-use': 'Un compte existe déjà avec cette adresse e-mail.',
-      'auth/invalid-email': 'Entre une adresse e-mail valide.',
-      'auth/invalid-credential': 'Adresse e-mail ou mot de passe incorrect.',
-      'auth/user-not-found': 'Adresse e-mail ou mot de passe incorrect.',
-      'auth/wrong-password': 'Adresse e-mail ou mot de passe incorrect.',
-      'auth/weak-password': 'Le mot de passe doit contenir au moins 8 caractères.',
-      'auth/too-many-requests': 'Trop de tentatives. Réessaie un peu plus tard.',
+      'auth/popup-closed-by-user': 'Connexion annulée : la fenêtre Google a été fermée avant la fin.',
+      'auth/cancelled-popup-request': 'Une autre fenêtre de connexion est déjà ouverte.',
+      'auth/popup-blocked': 'Le navigateur a bloqué la fenêtre de connexion. Autorise les pop-ups pour ce site, puis réessaie.',
       'auth/network-request-failed': 'Connexion impossible. Vérifie ta connexion internet.',
-      'permission-denied': 'Accès cloud refusé. Vérifie les règles Firestore indiquées dans le README.'
+      'auth/unauthorized-domain': 'Ce domaine n’est pas autorisé. Ajoute-le dans Firebase → Authentication → Settings → Authorized domains.',
+      'auth/operation-not-allowed': 'La connexion Google n’est pas activée dans Firebase Authentication (Sign-in method → Google).',
+      'permission-denied': 'Accès cloud refusé. Vérifie les règles Firestore publiées (playerSaves/{userId}).'
     };
-    return messages[error && error.code] || error.message || 'Une erreur est survenue. Réessaie.';
+    return messages[error && error.code] || (error && error.message) || 'Une erreur est survenue. Réessaie.';
   }
 
   function applySave(d) {
@@ -1791,13 +1776,22 @@
   function showGame(user, saveData) {
     currentUser = user;
     currentEmail = user.email || '';
-    accountEmail.textContent = currentEmail;
+    const displayName = user.displayName || currentEmail || 'Joueur';
+    accountEmail.textContent = displayName;
+    accountEmail.title = currentEmail || displayName;
+    if (user.photoURL) {
+      accountAvatar.src = user.photoURL;
+      accountAvatar.alt = `Photo de profil de ${displayName}`;
+      accountAvatar.hidden = false;
+    } else {
+      accountAvatar.removeAttribute('src');
+      accountAvatar.hidden = true;
+    }
     applySave(saveData);
     authScreen.hidden = true;
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
     setAuthError('');
-    authPassword.value = '';
     setTab('pack');
   }
 
@@ -1806,40 +1800,32 @@
     currentUser = null;
     currentEmail = '';
     accountEmail.textContent = '';
+    accountEmail.removeAttribute('title');
+    accountAvatar.removeAttribute('src');
+    accountAvatar.hidden = true;
     app.classList.remove('is-authenticated');
     gameRegions.forEach((region) => region.setAttribute('inert', ''));
     authScreen.hidden = false;
-    authPassword.value = '';
+    googleSignIn.disabled = !firebaseAuth;
   }
 
-  authSwitch.addEventListener('click', () => {
-    authIsRegistering = !authIsRegistering;
-    updateAuthMode();
-  });
-
-  authForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  googleSignIn.addEventListener('click', async () => {
     if (!firebaseAuth) {
       setAuthError('Le service de comptes cloud n’est pas configuré. Consulte la section Firebase du README.');
       return;
     }
-    const email = authEmail.value.trim();
-    const password = authPassword.value;
-    if (password.length < 8) {
-      setAuthError('Le mot de passe doit contenir au moins 8 caractères.');
-      return;
-    }
-    authSubmit.disabled = true;
-    authSubmit.textContent = authIsRegistering ? 'CRÉATION…' : 'CONNEXION…';
+    googleSignIn.disabled = true;
     setAuthError('');
     try {
-      if (authIsRegistering) await firebaseAuth.createUserWithEmailAndPassword(email, password);
-      else await firebaseAuth.signInWithEmailAndPassword(email, password);
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      // GoogleAuthProvider + signInWithPopup : la connexion se fait dans la fenêtre Google.
+      await firebaseAuth.signInWithPopup(provider);
+      // onAuthStateChanged prend le relais : chargement de la sauvegarde + affichage du jeu.
     } catch (error) {
       setAuthError(authErrorMessage(error));
     } finally {
-      authSubmit.disabled = false;
-      authSubmit.textContent = authIsRegistering ? 'CRÉER MON COMPTE GRATUIT' : 'SE CONNECTER';
+      googleSignIn.disabled = false;
     }
   });
 
@@ -1854,7 +1840,7 @@
     const configured = config && config.apiKey && config.projectId && config.appId &&
       !Object.values(config).some((value) => typeof value === 'string' && value.includes('REMPLACE_PAR'));
     if (!window.firebase || !configured) {
-      authSubmit.disabled = true;
+      googleSignIn.disabled = true;
       setAuthError('Le compte cloud n’est pas encore configuré. Suis les étapes Firebase du README, puis recharge cette page.');
       return;
     }
@@ -1862,7 +1848,7 @@
       if (!firebase.apps.length) firebase.initializeApp(config);
       firebaseAuth = firebase.auth();
       cloudDb = firebase.firestore();
-      authSubmit.disabled = false;
+      googleSignIn.disabled = false;
       firebaseAuth.onAuthStateChanged(async (user) => {
         if (!user) {
           if (currentUser) showAuth();
@@ -1875,6 +1861,7 @@
           showGame(user, snapshot.exists ? snapshot.data() : null);
         } catch (error) {
           currentUser = null;
+          showAuth();
           setAuthError(authErrorMessage(error));
           try { await firebaseAuth.signOut(); } catch (ignored) { /* reste bloqué sur l'écran de compte */ }
         }
@@ -1882,7 +1869,7 @@
         setAuthError(authErrorMessage(error));
       });
     } catch (error) {
-      authSubmit.disabled = true;
+      googleSignIn.disabled = true;
       setAuthError(`Configuration Firebase invalide : ${error.message}`);
     }
   }

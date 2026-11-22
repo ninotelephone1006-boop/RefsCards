@@ -7,7 +7,7 @@ Jeu mobile-first d'ouverture de boosters. Les comptes et les sauvegardes sont st
 Il faut un projet Firebase partagé par toutes les versions du jeu. Le plan Spark gratuit suffit pour commencer, dans ses limites d'utilisation.
 
 1. Crée un projet sur [Firebase Console](https://console.firebase.google.com/).
-2. Dans **Authentication → Sign-in method**, active **E-mail/Password**.
+2. Dans **Authentication → Sign-in method**, active le fournisseur **Google**. Note : `localhost` est autorisé par défaut ; pour la mise en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains** (étape 5).
 3. Dans **Firestore Database**, crée la base (choisis la région proche de tes joueurs) et ouvre **Rules**. Publie ces règles pour que chaque personne puisse lire et modifier uniquement sa sauvegarde :
 
 ```text
@@ -34,12 +34,12 @@ service cloud.firestore {
 }
 ```
 
-4. Dans **Project settings → Your apps**, crée une application Web et copie sa configuration dans `firebase-config.js` à la place des valeurs `REMPLACE_PAR_…`. Ces paramètres Firebase pour le navigateur sont publics (ce ne sont pas des mots de passe) ; **les règles Firestore ci-dessus sont la protection des données**.
+4. Dans **Project settings → Your apps**, crée une application Web. Sa configuration est déjà renseignée dans `firebase-config.js` (exposition via `window.REFS_FIREBASE_CONFIG`) ; si tu recrées le projet, remplace simplement les valeurs de ce fichier par celles de ta nouvelle application. Ces paramètres Firebase pour le navigateur sont publics (ce ne sont pas des mots de passe) ; **les règles Firestore ci-dessus sont la protection des données**.
 5. Les règles équivalentes sont aussi dans `firestore.rules`. Pour les publier avec le CLI et mettre le jeu en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains**, installe `firebase-tools`, puis lance `firebase login`, `firebase use --add` et `firebase deploy --only hosting,firestore:rules`. `firebase.json` est déjà configuré pour Firebase Hosting. N'importe quel hébergeur statique HTTPS convient aussi, tant qu'il utilise le même projet Firebase et que les règles sont publiées.
 
 ## Lancer en local
 
-Après avoir renseigné `firebase-config.js`, `npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. Sans config Firebase, la connexion est volontairement bloquée.
+`npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, la connexion est volontairement bloquée.
 
 Le premier booster est offert ; chaque booster suivant coûte 100 pièces, déduites au moment de l'achat.
 
