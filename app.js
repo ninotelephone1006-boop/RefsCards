@@ -34,6 +34,16 @@
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n);
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
+  /* Son : si audio.js plante ou manque, le jeu continue sans bruitage. */
+  const SFX = new Proxy({}, {
+    get(_, key) {
+      const s = typeof Sound !== 'undefined' ? Sound : null;
+      const v = s && s[key];
+      if (typeof v === 'function') return (...a) => { try { return v.apply(s, a); } catch (e) { /* silencieux */ } };
+      return v;
+    }
+  });
+
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -51,6 +61,9 @@
   const pack = $('pack');
   const packFlap = $('pack-flap');
   const packFloat = $('pack-float');
+  const gapGlow = gapGlow;
+  const gapCards = gapCards;
+  const packSave = packSave;
   const cut = $('cut');
   const hintPct = $('hint-pct');
   const hintText = $('hint-text');
@@ -203,7 +216,7 @@
     }
 
     function add(p) {
-      if (parts.length > 900) parts.shift();
+      if (parts.length > 420) parts.shift();
       p.age = 0;
       parts.push(p);
       if (!raf) {
@@ -226,7 +239,7 @@
         g: opts.g != null ? opts.g : 620,
         life: rand(0.3, opts.life || 0.75),
         size: rand(1.2, opts.size || 3),
-        color: color || '#d6ff3f',
+        color: color || '#b388ff',
         drag: 0.985
       });
     }
@@ -330,20 +343,22 @@
         const alpha = k < 0.15 ? k / 0.15 : 1 - Math.pow((k - 0.15) / 0.85, 1.7);
         ctx.save();
         ctx.globalAlpha = Math.max(0, alpha);
+        if (p.type !== 'rect') ctx.globalCompositeOperation = 'lighter';
         if (p.type === 'spark') {
           ctx.strokeStyle = p.color;
           ctx.lineWidth = p.size;
           ctx.lineCap = 'round';
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = p.color;
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * 0.014, p.y - p.vy * 0.014);
           ctx.stroke();
         } else if (p.type === 'dot') {
           ctx.fillStyle = p.color;
-          ctx.shadowBlur = 14;
-          ctx.shadowColor = p.color;
+          ctx.globalAlpha = Math.max(0, alpha) * 0.28;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * 2.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = Math.max(0, alpha);
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
           ctx.fill();
@@ -394,7 +409,7 @@
 
     function seed() {
       dots.length = 0;
-      const count = Math.round(clamp((w * h) / 22000, 24, 70));
+      const count = Math.round(clamp((w * h) / 30000, 18, 44));
       for (let i = 0; i < count; i++) {
         dots.push({
           x: Math.random() * w,
@@ -418,7 +433,7 @@
         if (d.x > w + 8) d.x = -8;
         const tw = 0.6 + Math.sin(now / 900 + d.ph) * 0.4;
         ctx.globalAlpha = d.a * tw;
-        ctx.fillStyle = '#d9ff8a';
+        ctx.fillStyle = '#cdb0ff';
         ctx.beginPath();
         ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
         ctx.fill();
@@ -473,11 +488,11 @@
     packFlap.style.transform = `translateY(${(-tearP * 8).toFixed(2)}px) rotateX(${(-tearP * 10).toFixed(2)}deg) translateZ(${(tearP * 6).toFixed(2)}px)`;
     hintPct.textContent = `${Math.round(tearP * 100)} %`;
     hintPct.classList.toggle('hot', tearP >= TEAR_THRESHOLD);
-    pack.querySelector('.gap-glow').style.opacity = tearP > 0.02 ? String(Math.min(1, tearP * 1.8)) : '0';
-    pack.querySelector('.gap-glow').style.transform = `scaleX(${tearP})`;
-    pack.querySelector('.gap-cards').style.opacity = tearP > 0.32 ? '1' : '0';
-    pack.querySelector('.gap-cards').style.transform = `translateY(${(6 - tearP * 14).toFixed(1)}px)`;
-    pack.querySelector('.pack-and-save').style.opacity = String(clamp(1 - tearP * 2.4, 0, 1));
+    gapGlow.style.opacity = tearP > 0.02 ? String(Math.min(1, tearP * 1.8)) : '0';
+    gapGlow.style.transform = `scaleX(${tearP})`;
+    gapCards.style.opacity = tearP > 0.32 ? '1' : '0';
+    gapCards.style.transform = `translateY(${(6 - tearP * 14).toFixed(1)}px)`;
+    packSave.style.opacity = String(clamp(1 - tearP * 2.4, 0, 1));
   }
 
   function resetTear() {
@@ -493,7 +508,7 @@
     const y = r.top - s.top;
     if (reduceMotion.matches) return;
     for (let i = 0; i < 2; i++) {
-      FX.spark(x + (Math.random() - 0.5) * 6, y, i ? '#ffffff' : '#d6ff3f', {
+      FX.spark(x + (Math.random() - 0.5) * 6, y, i ? '#ffffff' : '#b388ff', {
         angle: (Math.random() - 0.5) * 0.9 + (Math.random() < 0.5 ? 0 : Math.PI),
         speedMin: 60,
         speedMax: 260,
@@ -505,7 +520,7 @@
 
   function onDragStart(e) {
     if (state.phase !== 'pack' || drag) return;
-    Sound.unlock();
+    SFX.unlock();
     if (e.button != null && e.button !== 0) return;
     const rect = pack.getBoundingClientRect();
     drag = {
@@ -542,13 +557,13 @@
 
     if (!drag.started && dx > 3) {
       drag.started = true;
-      Sound.tearStart();
+      SFX.tearStart();
     }
     if (drag.started) {
       const intensity = clamp(0.18 + p * 0.62 + drag.speed * 1.1, 0, 1);
       const r = pack.getBoundingClientRect();
       const pan = clamp(((e.clientX - (r.left + r.width / 2)) / r.width) * 1.6, -0.9, 0.9);
-      Sound.tearUpdate(intensity, pan);
+      SFX.tearUpdate(intensity, pan);
       if (now - drag.lastSpark > 26) {
         drag.lastSpark = now;
         emitCutSparks();
@@ -570,13 +585,13 @@
     if (wasDrag.id !== 'kbd') {
       try { pack.releasePointerCapture(wasDrag.id); } catch (err) {}
     }
-    Sound.tearStop();
+    SFX.tearStop();
 
     if (tearP >= TEAR_THRESHOLD) {
       completeTear();
     } else {
       if (started) {
-        Sound.snap();
+        SFX.snap();
         hintText.textContent = `Il faut dépasser 75 % — tu es à ${Math.round(tearP * 100)} %`;
         hintPct.classList.remove('hot');
       }
@@ -591,20 +606,20 @@
   function completeTear() {
     if (state.phase !== 'pack') return;
     state.phase = 'tearing';
-    Sound.tearStop();
+    SFX.tearStop();
     tween(tearP, 1, 140, easeOutCubic, (v) => setTear(v, v * 160), openPack);
   }
 
   function autoTear() {
     if (state.phase !== 'pack') return;
     state.phase = 'tearing';
-    Sound.unlock();
-    Sound.tearStart();
+    SFX.unlock();
+    SFX.tearStart();
     const start = performance.now();
     function step(now) {
       const k = clamp((now - start) / 620, 0, 1);
       setTear(k, k * 150);
-      Sound.tearUpdate(clamp(k * 0.9, 0, 1), 0);
+      SFX.tearUpdate(clamp(k * 0.9, 0, 1), 0);
       if (k < 1) requestAnimationFrame(step);
       else openPack();
     }
@@ -612,8 +627,8 @@
   }
 
   function openPack() {
-    Sound.tearStop();
-    Sound.rip();
+    SFX.tearStop();
+    SFX.rip();
     pack.classList.add('is-ripped');
     packFlap.classList.add('is-gone');
     packFlap.style.transform = '';
@@ -624,7 +639,7 @@
     const x0 = r.left - s.left;
     if (!reduceMotion.matches) {
       for (let i = 0; i < 26; i++) {
-        FX.spark(x0 + (r.width * i) / 26, lineY + (Math.random() - 0.5) * 6, i % 3 ? '#ffffff' : '#d6ff3f', {
+        FX.spark(x0 + (r.width * i) / 26, lineY + (Math.random() - 0.5) * 6, i % 3 ? '#ffffff' : '#b388ff', {
           speedMin: 120,
           speedMax: 520,
           g: 520,
@@ -634,17 +649,17 @@
     }
 
     window.setTimeout(() => {
-      Sound.pop();
+      SFX.pop();
       flash.classList.remove('run');
       void flash.offsetWidth;
       flash.classList.add('run');
       if (!reduceMotion.matches) {
-        FX.ring(x0 + r.width * 0.5, lineY, '#eaffb0', 320);
+        FX.ring(x0 + r.width * 0.5, lineY, '#e6d9ff', 320);
         for (let i = 0; i < 40; i++) {
-          FX.dot(x0 + r.width * 0.5, lineY, i % 2 ? '#ffffff' : '#d6ff3f', { speedMax: 420, g: -60, size: 4, life: 1.2 });
+          FX.dot(x0 + r.width * 0.5, lineY, i % 2 ? '#ffffff' : '#b388ff', { speedMax: 420, g: -60, size: 4, life: 1.2 });
         }
         const glow = pack.getBoundingClientRect();
-        FX.confetti(glow.left - s.left + glow.width / 2, glow.top - s.top + glow.height * 0.4, ['#d6ff3f', '#ffffff', '#9be8ff'], 26);
+        FX.confetti(glow.left - s.left + glow.width / 2, glow.top - s.top + glow.height * 0.4, ['#b388ff', '#ffffff', '#f0abfc'], 26);
       }
       stage.classList.remove('shake');
       void stage.offsetWidth;
@@ -675,20 +690,20 @@
       autoTear();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      Sound.unlock();
+      SFX.unlock();
       if (!drag) {
         drag = { id: 'kbd', startX: 0, lastX: 0, lastT: 0, travel: 100, speed: 0, started: true, lastSpark: 0 };
-        Sound.tearStart();
+        SFX.tearStart();
       }
       setTear(tearP + 0.09, (tearP + 0.09) * 60);
-      Sound.tearUpdate(clamp(tearP, 0, 1), 0);
+      SFX.tearUpdate(clamp(tearP, 0, 1), 0);
       emitCutSparks();
     }
   });
   pack.addEventListener('keyup', (e) => {
     if (e.key === 'ArrowRight' && drag && drag.id === 'kbd') {
       drag = null;
-      Sound.tearStop();
+      SFX.tearStop();
       if (tearP >= TEAR_THRESHOLD) completeTear();
       else {
         const from = tearP;
@@ -776,8 +791,9 @@
 
   function buildCard(card, index) {
     const info = RARITIES[card.rarity] || RARITIES.common;
-    const btn = el('button', `card card-${card.rarity}`);
-    btn.type = 'button';
+    const btn = el('div', `card card-${card.rarity}`);
+    btn.tabIndex = 0;
+    btn.setAttribute('role', 'button');
     btn.dataset.id = card.id;
     btn.dataset.fx = info.fx;
     btn.style.setProperty('--depth', index);
@@ -808,37 +824,40 @@
     inner.append(tilt);
     btn.append(inner);
 
-    btn.addEventListener('click', (event) => {
+    // 1er clic : retourne. 2e clic (après 650 ms, pour éviter le double-clic) : carte suivante.
+    btn.addEventListener('click', () => {
       if (!btn.classList.contains('is-top') || btn.classList.contains('is-flying')) return;
-      // La carte reste manipulable après sa révélation (tilt/parallaxe) ;
-      // son rangement se fait en cliquant à côté, dans la zone de la table.
-      if (!btn.classList.contains('is-flipped')) revealCard(btn, card);
-      else if (event.detail === 0) sendToRecap(btn, card); // activation clavier
-    });
-
-    btn.addEventListener('pointermove', (e) => {
-      if (reduceMotion.matches || !btn.classList.contains('is-top')) return;
-      const r = btn.getBoundingClientRect();
-      const x = clamp((e.clientX - r.left) / r.width, 0, 1);
-      const y = clamp((e.clientY - r.top) / r.height, 0, 1);
-      btn.style.setProperty('--rx', `${((0.5 - y) * 16).toFixed(2)}deg`);
-      btn.style.setProperty('--ry', `${((x - 0.5) * 18).toFixed(2)}deg`);
-      btn.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
-      btn.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
-      btn.style.setProperty('--sx', `${(x * 100).toFixed(1)}%`);
-      btn.style.setProperty('--sy', `${(y * 100).toFixed(1)}%`);
-      btn.style.setProperty('--ma', `${(100 + x * 160).toFixed(0)}deg`);
-      if (!btn.dataset.hovered && btn.classList.contains('is-flipped')) {
-        btn.dataset.hovered = '1';
-        Sound.tick();
+      if (!btn.classList.contains('is-revealed')) revealCard(btn, card);
+      else if (btn.classList.contains('is-flipped') && performance.now() - Number(btn.dataset.flipAt || 0) > 650) {
+        sendToRecap(btn, card);
       }
     });
 
-    btn.addEventListener('dblclick', (event) => {
-      if (!btn.classList.contains('is-flipped')) return;
-      event.preventDefault();
-      event.stopPropagation();
-      openInspect(card);
+    // Parallaxe : une seule mise à jour de style par frame.
+    let tiltRaf = 0;
+    let tiltEv = null;
+    btn.addEventListener('pointermove', (e) => {
+      if (reduceMotion.matches || e.pointerType === 'touch' || !btn.classList.contains('is-top')) return;
+      tiltEv = e;
+      if (tiltRaf) return;
+      tiltRaf = requestAnimationFrame(() => {
+        tiltRaf = 0;
+        if (!tiltEv) return;
+        const r = stack.getBoundingClientRect(); // la pile ne s'incline pas : mesure stable
+        const x = clamp((tiltEv.clientX - r.left) / r.width, 0, 1);
+        const y = clamp((tiltEv.clientY - r.top) / r.height, 0, 1);
+        btn.style.setProperty('--rx', `${((0.5 - y) * 14).toFixed(1)}deg`);
+        btn.style.setProperty('--ry', `${((x - 0.5) * 16).toFixed(1)}deg`);
+        btn.style.setProperty('--mx', `${(x * 100).toFixed(0)}%`);
+        btn.style.setProperty('--my', `${(y * 100).toFixed(0)}%`);
+        btn.style.setProperty('--sx', `${(x * 100).toFixed(0)}%`);
+        btn.style.setProperty('--sy', `${(y * 100).toFixed(0)}%`);
+        btn.style.setProperty('--ma', `${(100 + x * 160).toFixed(0)}deg`);
+        if (!btn.dataset.hovered && btn.classList.contains('is-flipped')) {
+          btn.dataset.hovered = '1';
+          SFX.tick();
+        }
+      });
     });
 
     btn.addEventListener('keydown', (event) => {
@@ -856,7 +875,7 @@
     });
 
     btn.addEventListener('pointerenter', () => {
-      if (btn.classList.contains('is-top') && !btn.classList.contains('is-flipped')) Sound.tick();
+      if (btn.classList.contains('is-top') && !btn.classList.contains('is-flipped')) SFX.tick();
     });
 
     return btn;
@@ -890,7 +909,9 @@
   }
 
   function revealCard(btn, card) {
-    Sound.unlock();
+    if (btn.classList.contains('is-revealed')) return;
+    SFX.unlock();
+    btn.dataset.flipAt = String(performance.now());
     btn.classList.add('is-revealed');
     if (card.rarity === 'epic') {
       // Petit suspense : la carte marque un temps d'arrêt avant de se retourner.
@@ -954,14 +975,14 @@
       window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
     }
 
-    window.setTimeout(() => Sound.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
+    window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
 
     addCoins(info.reward);
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${CARD_COUNT} · RÉVÉLÉE`;
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
-      ? `${info.label.toUpperCase()} ! Appuie sur le bouton ci-dessous pour continuer.`
-      : 'Appuie sur Carte suivante pour continuer.';
+      ? `${info.label.toUpperCase()} ! Touche la carte ou le bouton pour continuer.`
+      : 'Touche la carte ou le bouton pour continuer.';
   }
 
   /* ------------------------------------------------------- inspection grand */
@@ -987,7 +1008,7 @@
     inspect.hidden = false;
     void inspect.offsetWidth;
     inspect.classList.add('is-open');
-    Sound.tick();
+    SFX.tick();
     inspectX.focus({ preventScroll: true });
   }
 
@@ -1028,8 +1049,8 @@
     flying = true;
     nextCard.hidden = true;
     const restoreFocus = document.activeElement === nextCard || document.activeElement === btn;
-    Sound.whoosh();
-    btn.classList.remove('is-flipped', 'is-revealed', 'is-incoming');
+    SFX.whoosh();
+    btn.classList.remove('is-incoming');
     const target = recapSlots.children[state.loot.length] || recapSlots.lastElementChild;
     const from = btn.getBoundingClientRect();
     const to = target.getBoundingClientRect();
@@ -1041,10 +1062,10 @@
     btn.style.setProperty('--fly-x', `${dx.toFixed(1)}px`);
     btn.style.setProperty('--fly-y', `${dy.toFixed(1)}px`);
     btn.style.setProperty('--fly-s', s.toFixed(3));
-    btn.style.opacity = '0.35';
 
     window.setTimeout(() => {
-      btn.style.opacity = '0';
+      flying = false; // libéré d'abord : une erreur plus bas ne peut plus bloquer le jeu
+      try {
       setRecapCollapsed(false);
       fillSlot(state.loot.length, card);
       state.loot.push(card);
@@ -1052,11 +1073,11 @@
       recapCount.textContent = `${state.loot.length} / ${CARD_COUNT}`;
       btn.remove();
       remaining.shift();
-      flying = false;
       advanceStack();
       if (restoreFocus && current) current.node.focus({ preventScroll: true });
       if (!remaining.length) finishPack();
       else updateHintForNext();
+      } catch (err) { console.error(err); }
     }, reduceMotion.matches ? 120 : 640);
   }
 
@@ -1139,7 +1160,7 @@
     });
     revealKicker.innerHTML = '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
-    revealSub.textContent = 'Clique sur la carte du dessus pour la retourner.';
+    revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
     pileLabel.textContent = `CARTE 1 / ${CARD_COUNT}`;
     buyBtn.hidden = true;
@@ -1155,7 +1176,7 @@
       node.style.setProperty('--eject-delay', `${reduceMotion.matches ? 0 : i * 80}ms`);
       stack.append(node);
       if (!reduceMotion.matches) {
-        window.setTimeout(() => Sound.deal(), 260 + i * 80);
+        window.setTimeout(() => SFX.deal(), 260 + i * 80);
       }
     });
 
@@ -1180,9 +1201,9 @@
   function updateHintForNext() {
     if (!current) return;
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
-    revealSub.textContent = 'Clique sur la carte du dessus pour la retourner.';
+    revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     clearEffects();
-    revealSub.textContent = 'Clique sur la carte du dessus pour la retourner.';
+    revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
     revealKicker.innerHTML = '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
     pileLabel.textContent = `CARTE ${CARD_COUNT - remaining.length + 1} / ${CARD_COUNT}`;
@@ -1199,7 +1220,7 @@
     recapCount.textContent = `${state.loot.length} / ${CARD_COUNT}`;
 
     window.setTimeout(() => {
-      Sound.coin();
+      SFX.coin();
       buyBtn.hidden = false;
       buyBtn.disabled = false;
       buyBtn.classList.remove('is-denied');
@@ -1223,30 +1244,30 @@
           { duration: 500, easing: 'cubic-bezier(.22,1,.36,1)', delay: 120, fill: 'backwards' }
         );
       }
-      window.setTimeout(() => openFusion(true), reduceMotion.matches ? 260 : 1250);
+      if (fusionCount() > 0) window.setTimeout(() => openFusion(true), reduceMotion.matches ? 260 : 1250);
     }, reduceMotion.matches ? 120 : 480);
   }
 
   /* --------------------------------------------------------------- achat */
 
   function buyPack() {
-    Sound.unlock();
+    SFX.unlock();
     if (state.phase !== 'done') return;
     if (state.firstPack) {
-      Sound.chaChing();
+      SFX.chaChing();
       state.firstPack = false;
       resetToPack();
       return;
     }
     if (state.coins < PACK_PRICE) {
-      Sound.snap();
+      SFX.snap();
       recapMsg.textContent = `Pas assez de pièces : il te manque ${fmt(PACK_PRICE - state.coins)} 🪙.`;
       buyBtn.classList.remove('is-denied');
       void buyBtn.offsetWidth;
       buyBtn.classList.add('is-denied');
       return;
     }
-    Sound.chaChing();
+    SFX.chaChing();
     addCoins(-PACK_PRICE);
     state.firstPack = false;
     resetToPack();
@@ -1289,8 +1310,8 @@
     }, 420);
 
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
-    revealSub.textContent = 'Clique sur la carte du dessus pour la retourner.';
-    Sound.deal();
+    revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
+    SFX.deal();
     scheduleSizing(10);
     showToast('Nouveau booster ! Glisse vers la droite pour déchirer.', 2800);
   }
@@ -1335,14 +1356,14 @@
 
   function openFusion(auto = false) {
     if (state.fusionOpen || state.phase !== 'done') return;
-    Sound.unlock();
+    SFX.unlock();
     state.fusionOpen = true;
     state.fusionSelection = null;
     fusion.hidden = false;
     document.body.style.overflow = 'hidden';
     renderFusion();
     window.setTimeout(() => fusionLater.focus({ preventScroll: true }), 60);
-    Sound.whoosh();
+    SFX.whoosh();
   }
 
   function closeFusion() {
@@ -1351,7 +1372,7 @@
     fusion.hidden = true;
     document.body.style.overflow = '';
     state.fusionSelection = null;
-    Sound.snap();
+    SFX.snap();
     updateFusionChip();
   }
 
@@ -1395,7 +1416,7 @@
       row.append(emoji, main, el('span', 'fr-count', `×${entry.count}`));
       row.addEventListener('click', () => {
         state.fusionSelection = entry.card.id;
-        Sound.tick();
+        SFX.tick();
         [...fusionGrid.querySelectorAll('.fusion-row')].forEach((r) => r.classList.toggle('is-selected', r === row));
         renderFusionPreview(entry);
         fusionGo.hidden = false;
@@ -1460,8 +1481,8 @@
     dlg.classList.remove('is-fusing');
     void dlg.offsetWidth;
     dlg.classList.add('is-fusing');
-    Sound.pop();
-    window.setTimeout(() => Sound.rarity(result.rarity), 120);
+    SFX.pop();
+    window.setTimeout(() => SFX.rarity(result.rarity), 120);
 
     if (!reduceMotion.matches) {
       const r = fusionStage.getBoundingClientRect();
@@ -1540,9 +1561,9 @@
     if (e.key !== 'Enter' && e.key !== ' ') return;
     if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle) return;
     e.preventDefault();
-    Sound.unlock();
-    if (!current.node.classList.contains('is-flipped')) revealCard(current.node, current.data);
-    else sendToRecap(current.node, current.data);
+    SFX.unlock();
+    if (!current.node.classList.contains('is-revealed')) revealCard(current.node, current.data);
+    else if (current.node.classList.contains('is-flipped')) sendToRecap(current.node, current.data);
   });
 
   /* --------------------------------------------------------------- boutons */
@@ -1551,22 +1572,22 @@
   recapToggle.addEventListener('click', () => {
     const collapsed = !recap.classList.contains('is-collapsed');
     setRecapCollapsed(collapsed);
-    Sound.tick();
+    SFX.tick();
   });
-  buyBtn.addEventListener('pointerenter', () => Sound.tick());
+  buyBtn.addEventListener('pointerenter', () => SFX.tick());
 
   soundBtn.addEventListener('click', () => {
-    Sound.unlock();
-    const muted = !Sound.muted;
-    Sound.setMuted(muted);
+    SFX.unlock();
+    const muted = !SFX.muted;
+    SFX.setMuted(muted);
     soundBtn.setAttribute('aria-pressed', String(muted));
     soundBtn.setAttribute('aria-label', muted ? 'Activer le son' : 'Couper le son');
-    if (!muted) Sound.tick();
+    if (!muted) SFX.tick();
   });
 
   function unlockOnce(e) {
-    Sound.unlock();
-    if (!Sound.muted && e.type === 'pointerdown') Sound.tick();
+    SFX.unlock();
+    if (!SFX.muted && e.type === 'pointerdown') SFX.tick();
     window.removeEventListener('pointerdown', unlockOnce);
     window.removeEventListener('keydown', unlockOnce);
   }
