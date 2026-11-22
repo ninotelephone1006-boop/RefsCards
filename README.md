@@ -39,9 +39,30 @@ service cloud.firestore {
 
 ## Lancer en local
 
-`npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, la connexion est volontairement bloquée.
+`npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, le bouton reste cliquable mais explique ce qui manque (voir le dépannage ci-dessous).
 
 Le premier booster est offert ; chaque booster suivant coûte 100 pièces, déduites au moment de l'achat.
+
+## Dépannage : « je clique sur Se connecter avec Google et rien ne se passe »
+
+L'écran de compte affiche désormais toujours la cause d'un échec (message d'erreur, code technique `auth/…`). Correspondances utiles :
+
+- **Rien ne s'ouvre, aucun message** → les scripts Firebase n'ont pas pu être chargés (hors ligne, bloqueur de publicités, réseau filtré). Recharge la page et vérifie l'accès à `www.gstatic.com`. Le bouton reste cliquable : un nouveau clic réaffiche le diagnostic.
+- **« La fenêtre Google ne répond pas »** → le navigateur bloque les pop-ups, ou les cookies tiers sont bloqués (fréquent en navigation privée et dans un aperçu intégré). Autorise les pop-ups pour le site, ou ouvre le jeu dans un onglet dédié. Un garde-fou de 25 s réactive le bouton.
+- **« Le navigateur a bloqué la fenêtre Google dans cet aperçu intégré »** → tu utilises l'aperçu dans une iframe (Arena, panneau de prévisualisation…). Google refuse d'afficher sa page de connexion encadrée : clique sur **Ouvrir dans un nouvel onglet**, puis connecte-toi depuis l'onglet. Sur un site publié (Firebase Hosting, domaine HTTPS), le problème disparaît.
+- **« Ce domaine (mon-domaine) n'est pas autorisé »** → ajoute exactement ce domaine (sans chemin, sans `https://`) dans **Firebase → Authentication → Settings → Authorized domains**. `localhost` y est déjà par défaut ; un domaine d'aperçu changeant doit être ajouté à chaque nouveau nom.
+- **« La connexion Google n'est pas activée »** → active le fournisseur **Google** dans **Authentication → Sign-in method**.
+- **« Accès cloud refusé »** → republie les règles Firestore (`firebase deploy --only firestore:rules`).
+
+Quand c'est possible, le jeu retente automatiquement la connexion par redirection complète (`signInWithRedirect`) si la fenêtre Google est bloquée ; une redirection réussie ramène directement sur la collection du joueur.
+
+### Tests
+
+```bash
+npm install --no-save jsdom          # uniquement pour les tests
+node tests/card-flow.cjs             # ouverture de booster + chemins d'images
+node tests/auth-flow.cjs             # états du bouton de connexion Google
+```
 
 ## Déroulé d'une ouverture
 
