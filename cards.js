@@ -12,3 +12,7 @@ const cardsDatabase = [
   { id: 'roi', name: 'Le boss final', description: 'La légende raconte qu’il répond aux messages.', rarity: 'legendary', emoji: '👑', image: '', color: '#f5d979' },
   { id: 'chance', name: 'Chance ultime', description: 'Tu peux maintenant te vanter un peu.', rarity: 'legendary', emoji: '✨', image: '', color: '#f5d979' }
 ];
+
+/* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
+   demo=1 dans l'URL) pour montrer les quatre raretés d'un seul booster. */
+const demoDraw = ['chat', 'cerveau', 'cosmique', 'roi', 'magique'];
