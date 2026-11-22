@@ -733,10 +733,12 @@
     inner.append(tilt);
     btn.append(inner);
 
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (event) => {
       if (!btn.classList.contains('is-top') || btn.classList.contains('is-flying')) return;
+      // La carte reste manipulable après sa révélation (tilt/parallaxe) ;
+      // son rangement se fait en cliquant à côté, dans la zone de la table.
       if (!btn.classList.contains('is-flipped')) revealCard(btn, card);
-      else sendToRecap(btn, card);
+      else if (event.detail === 0) sendToRecap(btn, card); // activation clavier
     });
 
     btn.addEventListener('pointermove', (e) => {
@@ -816,9 +818,9 @@
     const cy = c.y;
     const quiet = reduceMotion.matches;
 
-    btn.setAttribute('aria-label', `Carte ${state.deck.indexOf(card) + 1}. ${card.name}, ${info.label}. ${card.description}. Cliquer pour la ranger.`);
+    btn.setAttribute('aria-label', `Carte ${state.deck.indexOf(card) + 1}. ${card.name}, ${info.label}. ${card.description}. Cliquez à côté de la carte pour continuer.`);
     revealKicker.innerHTML = `<span>✦</span> ${info.label.toUpperCase()} <span>✦</span>`;
-    footRight.textContent = 'CLIQUE ENCORE POUR LA RANGER →';
+    footRight.textContent = 'CLIQUE À CÔTÉ POUR CONTINUER →';
 
     clearEffects();
 
@@ -865,12 +867,18 @@
     addCoins(info.reward);
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${CARD_COUNT} · RÉVÉLÉE`;
-    revealSub.textContent = card.rarity === 'legendary' ? 'LÉGENDAIRE. Range-la pour continuer.' : 'Clique encore sur la carte pour la ranger.';
+    revealSub.textContent = card.rarity === 'legendary' ? 'LÉGENDAIRE. Clique à côté de la carte pour continuer.' : 'Clique à côté de la carte pour passer à la suivante.';
   }
 
   /* ----------------------------------------------------------- vers le butin */
 
   let flying = false;
+
+  tableEl.addEventListener('click', (event) => {
+    if (event.target.closest('.card') || !current || flying || state.phase !== 'reveal') return;
+    if (!current.node.classList.contains('is-top') || !current.node.classList.contains('is-flipped')) return;
+    sendToRecap(current.node, current.data);
+  });
 
   function sendToRecap(btn, card) {
     if (flying) return;
