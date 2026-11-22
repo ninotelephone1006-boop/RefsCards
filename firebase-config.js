@@ -1,11 +1,21 @@
-// Firebase web-app configuration. These values identify your project; they are
-// public by design. Protect player data with the Firestore rules in README.md.
-// Replace every placeholder with the Firebase console's Web app configuration.
-window.REFS_FIREBASE_CONFIG = {
-  apiKey: 'REMPLACE_PAR_TON_API_KEY',
-  authDomain: 'REMPLACE_PAR_TON_PROJECT_ID.firebaseapp.com',
-  projectId: 'REMPLACE_PAR_TON_PROJECT_ID',
-  storageBucket: 'REMPLACE_PAR_TON_PROJECT_ID.appspot.com',
-  messagingSenderId: 'REMPLACE_PAR_TON_SENDER_ID',
-  appId: 'REMPLACE_PAR_TON_APP_ID'
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBRrEogwpZm02d7rKFkJJQditxD6Q24JbU",
+  authDomain: "refscard.firebaseapp.com",
+  projectId: "refscard",
+  storageBucket: "refscard.firebasestorage.app",
+  messagingSenderId: "679046308034",
+  appId: "1:679046308034:web:47db91f2f69c671ef41b5b",
+  measurementId: "G-1S25XMWZFG"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
