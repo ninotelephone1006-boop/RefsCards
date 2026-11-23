@@ -4165,6 +4165,78 @@
     submitFriendCode();
   });
 
+  /* Sous-onglets de la page En ligne : un seul panneau visible à la fois, donc
+     plus besoin de faire défiler tout le marché, le formulaire de vente, les
+     cadeaux et les amis pour trouver ce qu'on cherche. `onlinePanel` garde
+     l'onglet courant pour le rouvrir tel quel à la prochaine visite. */
+  let onlinePanel = 'market';
+  const onlineTabs = [...document.querySelectorAll('[data-online-tab]')];
+  const onlineTabCounts = {
+    market: $('online-tab-count-market'),
+    sell: $('online-tab-count-sell'),
+    inbox: $('online-tab-count-inbox'),
+    friends: $('online-tab-count-friends')
+  };
+
+  function setOnlineTab(panel, { scroll = false } = {}) {
+    if (!onlineView) return;
+    const panels = [...onlineView.querySelectorAll('[data-online-panel]')];
+    const known = panels.some((p) => p.dataset.onlinePanel === panel);
+    onlinePanel = known ? panel : 'market';
+    panels.forEach((p) => {
+      const active = p.dataset.onlinePanel === onlinePanel;
+      p.hidden = !active;
+      p.classList.toggle('is-active', active);
+    });
+    onlineTabs.forEach((tab) => {
+      const active = tab.dataset.onlineTab === onlinePanel;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+    });
+    if (scroll) {
+      const scroller = onlineView.querySelector('.page-scroll');
+      if (scroller) scroller.scrollTop = 0;
+    }
+  }
+
+  function setTabCount(node, value) {
+    if (!node) return;
+    const n = Number(value) || 0;
+    node.textContent = n > 0 ? String(n) : '';
+    node.hidden = n <= 0;
+  }
+
+  function updateOnlineTabCounts() {
+    const myOpen = marketListings.filter((l) => l.status === 'open').length;
+    const income = marketListings.filter((l) => l.status === 'sold').length
+      + marketGifts.filter((g) => g.status === 'pending').length;
+    const requests = friendRequests.length + sentRequests.length;
+    setTabCount(onlineTabCounts.market, globalMarketCount ? globalMarketCount.textContent : 0);
+    setTabCount(onlineTabCounts.sell, myOpen);
+    setTabCount(onlineTabCounts.inbox, income);
+    setTabCount(onlineTabCounts.friends, requests);
+    setTabCount($('my-listings-count'), myOpen);
+  }
+
+  onlineTabs.forEach((tab) => {
+    on(tab, 'click', () => {
+      if (onlinePanel === tab.dataset.onlineTab) return;
+      setOnlineTab(tab.dataset.onlineTab, { scroll: true });
+      SFX.tick();
+    });
+  });
+  onlineTabs.forEach((tab) => on(tab, 'keydown', (e) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const index = onlineTabs.indexOf(tab);
+    const next = onlineTabs[(index + step + onlineTabs.length) % onlineTabs.length];
+    if (!next) return;
+    setOnlineTab(next.dataset.onlineTab, { scroll: true });
+    next.focus();
+  }));
+  setOnlineTab(onlinePanel);
+
   function renderOnline() {
     if (!onlineView) return;
     renderMarket();
@@ -4208,6 +4280,7 @@
     }
     renderFriendRequests();
     if (selectedFriendUid) renderFriendDetail(selectedFriendUid);
+    updateOnlineTabCounts();
   }
 
   /* Mémorise une suppression explicite sur toutes les demandes acceptées
@@ -4313,6 +4386,9 @@
 
   async function openFriendDetail(uid) {
     selectedFriendUid = uid;
+    // La fiche détaillée vit dans le sous-onglet « Amis » : on y bascule, sinon
+    // le joueur cliquerait « Voir » sans rien voir apparaître.
+    setOnlineTab('friends', { scroll: true });
     if (friendDetail) friendDetail.hidden = false;
     // Toujours relire la fiche : le solde affiché doit refléter les pièces
     // reçues (sinon on croit que le transfert n'a rien changé).
@@ -4666,6 +4742,7 @@
 
   function renderMarket() {
     if (!currentUser) return;
+    updateOnlineTabCounts();
     syncPackMarketQty({ clampValue: true });
     if (marketCard) {
       const old = marketCard.value;
@@ -4928,6 +5005,7 @@
     }
     const openCount = sellers.reduce((total, seller) => total + seller.groups.reduce((sum, g) => sum + g.ids.length, 0), 0);
     if (globalMarketCount) globalMarketCount.textContent = String(openCount);
+    setTabCount(onlineTabCounts.market, openCount);
     if (!globalMarketList) return;
     if (!sellers.length) {
       globalMarketList.replaceChildren(el('p', 'online-empty', globalListingsLoaded
