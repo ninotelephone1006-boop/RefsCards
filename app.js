@@ -82,6 +82,10 @@
     secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: null }
   };
 
+  /* Une fusion ne peut jamais produire mieux qu'Ultra épique. */
+  const FUSION_MAX_RANK = RARITIES.ultraepic.rank;
+  const canFuseInto = (info) => Boolean(info && info.next && RARITIES[info.next] && RARITIES[info.next].rank <= FUSION_MAX_RANK);
+
   const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
 
   const $ = (id) => document.getElementById(id);
@@ -1756,8 +1760,10 @@
     );
   }
 
-  function openInspect(card) {
+  function openInspect(card, stat) {
     if (!card) return;
+    const oldCount = qs(inspectCard.parentElement, '.insp-count');
+    if (oldCount) oldCount.remove();
     const info = RARITIES[card.rarity] || RARITIES.common;
     inspectCard.replaceChildren(cardFrame(card, { eager: true, alt: `${card.name} — ${info.label}` }));
     inspectCard.style.setProperty('--r-color', info.color);
@@ -1771,6 +1777,15 @@
     void inspect.offsetWidth;
     inspect.classList.add('is-open');
     SFX.tick();
+    if (stat) {
+      const box = el('div', 'insp-count');
+      const a = el('span', 'ic-cell');
+      a.append(el('b', null, String(stat.normal)), el('small', null, 'Normale' + (stat.normal > 1 ? 's' : '')));
+      const b = el('span', 'ic-cell ic-shiny');
+      b.append(el('b', null, String(stat.shiny)), el('small', null, '✦ Shiny'));
+      box.append(a, b);
+      inspectCard.parentElement.append(box);
+    }
     inspectX.focus({ preventScroll: true });
   }
 
@@ -2104,7 +2119,7 @@
       seen.add(card.id);
       const count = map.get(card.id);
       const info = RARITIES[card.rarity];
-      if (count >= 2 && info && info.next && cardsDatabase.some((c) => c.rarity === info.next)) {
+      if (count >= 2 && canFuseInto(info) && cardsDatabase.some((c) => c.rarity === info.next)) {
         list.push({ card, count });
       }
     }
@@ -2178,7 +2193,7 @@
       empty.innerHTML =
         state.collection.length < 2
           ? 'Pas encore de doublon. <b>Ouvre un booster</b> : deux cartes identiques suffisent pour lancer une fusion.'
-          : 'Aucun doublon fusionnable pour l\'instant. Les <b>légendaires</b> sont au sommet : impossible de les fusionner.';
+          : 'Aucun doublon fusionnable pour l\'instant. Les cartes <b>Ultra épiques</b> sont le sommet de la fusion : impossible d\'aller plus haut.';
       fusionGrid.append(empty);
       renderFusionPreview(null);
       if (state.phase === 'done') {
@@ -2248,6 +2263,7 @@
     const entry = fusableEntries().find((e) => e.card.id === id);
     if (!entry) return;
     const info = RARITIES[entry.card.rarity];
+    if (!canFuseInto(info)) return;
     const pool = cardsDatabase.filter((c) => c.rarity === info.next);
     if (!pool.length) {
       showToast('Aucune carte de rareté supérieure disponible dans cards.js.');
@@ -3063,12 +3079,18 @@
 
     const frag = document.createDocumentFragment();
     let shown = 0;
-    const variants = CardMutations.owned(collectionIds()).filter((c) => c.mutation);
-    const baseOwned = new Set(state.collection.map((c) => c.baseId || c.id));
-    [...cardsDatabase.filter((c) => owned.has(c.id) || !baseOwned.has(c.id)), ...variants].forEach((card, i) => {
-      const n = owned.get(card.id) || 0;
-      // Filtre de rareté / possédées : jamais de carte verrouillée, pour ne rien dévoiler.
-      if (collFilter !== 'all' && (!n || (collFilter !== 'owned' && card.rarity !== collFilter && card.mutation !== collFilter))) return;
+    /* Une seule case par carte de base : normales + shiny comptent ensemble. */
+    const stats = new Map(cardsDatabase.map((c) => [c.id, { card: c, normal: owned.get(c.id) || 0, shiny: 0, shinyCard: null }]));
+    for (const v of CardMutations.owned(collectionIds())) {
+      if (!v.mutation) continue;
+      const st = stats.get(v.baseId || v.id);
+      const n = owned.get(v.id) || 0;
+      if (st && n) { st.shiny += n; st.shinyCard = v; }
+    }
+    [...stats.values()].forEach((st, i) => {
+      const card = st.card;
+      const n = st.normal + st.shiny;
+      if (collFilter !== 'all' && (!n || (collFilter === 'shiny' ? !st.shiny : collFilter !== 'owned' && card.rarity !== collFilter))) return;
       shown++;
       if (!n) {
         const t = el('div', 'coll-tile is-locked');
@@ -3078,6 +3100,7 @@
         frag.append(t);
         return;
       }
+      const shown_card = st.normal ? card : st.shinyCard;
       const info = RARITIES[card.rarity] || RARITIES.common;
       const t = el('button', 'coll-tile');
       t.type = 'button';
@@ -3085,11 +3108,20 @@
       t.style.setProperty('--i', i);
       t.style.setProperty('--r-color', info.color);
       t.style.setProperty('--r-glow', info.glow);
-      t.setAttribute('aria-label', `${CardMutations.label(card)}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}. Voir en grand.`);
-      t.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
+      t.setAttribute('aria-label', `${card.name}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}${st.shiny ? `, dont ${st.shiny} shiny` : ''}. Clic : voir en grand. Double-clic : détail normal / shiny.`);
+      t.append(cardFrame(shown_card, { mini: true, alt: `${card.name} — ${info.label}` }));
       if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
-      if (fresh.has(card.id)) t.classList.add('is-fresh');
-      on(t, 'click', () => openInspect(card));
+      if (st.shiny) t.append(el('span', 'coll-shiny-dot', '✦'));
+      if (fresh.has(card.id) || (st.shinyCard && fresh.has(st.shinyCard.id))) t.classList.add('is-fresh');
+      let clickTimer = 0;
+      on(t, 'click', () => {
+        window.clearTimeout(clickTimer);
+        clickTimer = window.setTimeout(() => openInspect(shown_card), 230);
+      });
+      on(t, 'dblclick', () => {
+        window.clearTimeout(clickTimer);
+        openInspect(shown_card, st);
+      });
       frag.append(t);
     });
     collGrid.replaceChildren(frag);
