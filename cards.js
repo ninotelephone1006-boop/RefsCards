@@ -210,14 +210,14 @@ const cardsDatabase = [
     description: 'pas de bourré',
     rarity: 'divine',
     emoji: '🕺',
-    image: 'assets/Cartes/babaultdancing.png',
+    image: 'babaultdancing',
     color: '#bff3ff'
   }
 ];
 
 /* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */
-const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-fagar', 'babault-musique'];
+const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-fagar', 'babault-musique', 'babault-dancing'];
 
 /* Tirage de démonstration « fusion » : utilisé par ?demo=fusion (ou le bouton
    Démo) pour montrer la demande de fusion sans devoir farmer un doublon.
