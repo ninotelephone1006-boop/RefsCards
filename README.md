@@ -127,7 +127,7 @@ Tout est synthétisé en direct avec la Web Audio API (aucun fichier audio) : d�
 
 - `?demo=1` : force un tirage de démonstration (aperçu de plusieurs raretés).
 - `?demo=fusion` : pack de démonstration contenant deux paires identiques ; la **demande de fusion** s'ouvre toute seule après les cinq cartes (aucun pack consommé).
-- `?demo=video` : sélectionne le **Pack Vidéo** et ouvre une démo de trois cartes animées (fps 24 / 30 / 60, avec ou sans son, en boucle ou non).
+- `?demo=video` : sélectionne le **Pack Vidéo** et ouvre une démo des trois premières cartes vidéo configurées dans `cards.js` (quelles qu'elles soient).
 - Clavier : `Entrée`/`Espace` sur le booster ouvre la déchirure, `→` fait progresser la coupe, `Maj+Entrée` sur une carte révélée l'ouvre en grand, `Échap` ferme l'inspection ou la fusion.
 - Inspection : double-clic (ou double-tap) sur une carte révélée, ou clic sur une vignette du butin, pour l'afficher en grand.
 
@@ -156,7 +156,7 @@ Chaque carte possède un identifiant, un nom, une description, une rareté, un e
 
 ### Cartes vidéo (Pack Vidéo)
 
-Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle conserve donc sa rareté, sa récompense, ses effets, la fusion, la collection et le marché. Le Pack Vidéo ne tire que les cartes qui possèdent un bloc `video` valide. Tant que le pack est en avant-première, ces cartes ne sortent pas non plus des autres boosters (elles restent visibles, verrouillées, dans la collection) ; une fois publié, tout le catalogue redevient tirable normalement. Une carte vidéo peut aussi être **Shiny** : la mutation conserve le lecteur et les réglages `fps` / `sound` / `loop`.
+Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle conserve donc sa rareté, sa récompense, ses effets, la fusion, la collection et le marché. Aucune carte vidéo n'est fournie par défaut : dépose tes fichiers `.mp4` (ou `.webm`) dans `assets/Cartes/videos/` et configure les cartes avec **tes** vidéos. Le Pack Vidéo ne tire que les cartes qui possèdent un bloc `video` valide. Tant que le pack est en avant-première, ces cartes ne sortent pas non plus des autres boosters (elles restent visibles, verrouillées, dans la collection) ; une fois publié, tout le catalogue redevient tirable normalement. Une carte vidéo peut aussi être **Shiny** : la mutation conserve le lecteur et les réglages `fps` / `sound` / `loop`.
 
 ```js
 {
@@ -188,7 +188,9 @@ Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle c
 | `autoplay` | Lecture automatique (muette) dès que la carte est visible. | `true` |
 | `preload` | `metadata`, `auto` ou `none`, transmis au `<video>`. | `metadata` |
 
-Le lecteur est utilisé partout : révélation, récap miniature, collection, inspection en grand. Les miniatures ne décodent la vidéo que lorsqu'elles sont visibles, et le son ne se cumule jamais : il faut un clic sur la carte ou sur 🔊. Les fichiers d'exemple vivent dans `assets/Cartes/videos/` et les quatre cartes de démonstration dans `cardsDatabase` (`babault-dancing-live`, `karate-fagar-film`, `royer-rizz-cam`, `chasseur-royer-slowmo`).
+**Raccourcis** : `video: 'mon-clip'` équivaut à `video: { src: 'mon-clip' }` ; `video: true` cherche automatiquement `assets/Cartes/videos/<id de la carte>.mp4` (pratique quand le fichier porte le même nom que la carte).
+
+Le lecteur est utilisé partout : révélation, récap miniature, collection, inspection en grand. Les miniatures ne décodent la vidéo que lorsqu'elles sont visibles, et le son ne se cumule jamais : il faut un clic sur la carte ou sur 🔊. Les vidéos vivent dans `assets/Cartes/videos/` : toutes les cartes dotées d'un bloc `video` valide entrent automatiquement dans le Pack Vidéo, et `?demo=video` ouvre les trois premières. Voir aussi `assets/Cartes/videos/LISEZ-MOI.txt`.
 
 > **Règles Firestore** : `packStock` accepte maintenant la clé `video`. Republie `firestore.rules` (`firebase deploy --only firestore:rules`) avant de sauvegarder un Pack Vidéo, sinon le cloud refusera l'écriture.
 

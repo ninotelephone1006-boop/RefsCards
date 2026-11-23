@@ -1,8 +1,10 @@
 // Run with NODE_PATH pointing to a local jsdom installation:
 // node tests/video-pack.cjs
 //
-// Vérifie le Pack Vidéo de bout en bout (structure des données, tirage,
-// lecteur <video>, fps / son / boucle par carte, stock sauvegardable).
+// Vérifie le Pack Vidéo de bout en bout. Aucune carte vidéo n'est livrée avec
+// le projet : on injecte ici des cartes de test dans cardsDatabase pour
+// contrôler structure des données, tirage, lecteur <video>, réglages par
+// carte et stock sauvegardable.
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -10,7 +12,63 @@ const assert = require('node:assert/strict');
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function bootApp(url = 'https://refs-cards.test/') {
+/* Cartes vidéo de test : elles simulent celles que l'utilisateur ajoute dans
+   cards.js avec ses propres fichiers .mp4 déposés dans assets/Cartes/videos/. */
+const SAMPLE_VIDEO_CARDS = [
+  {
+    id: 'test-babault-live',
+    name: 'Babault Live (test)',
+    description: '24 images par seconde.',
+    rarity: 'divine',
+    emoji: '🕺',
+    image: 'assets/Cartes/babaultdancing.png',
+    color: '#bff3ff',
+    video: { src: 'clip-babault', fps: 24, sound: false, loop: true }
+  },
+  {
+    id: 'test-karate-film',
+    name: 'Karate Film (test)',
+    description: 'Avec le son.',
+    rarity: 'legendary',
+    emoji: '🎬',
+    image: 'assets/Cartes/karate-fagar.jpg',
+    color: '#f5d979',
+    video: { src: 'clip-karate', fps: 30, sound: true, loop: true }
+  },
+  {
+    id: 'test-royer-cam',
+    name: 'Royer Cam (test)',
+    description: '60 images par seconde.',
+    rarity: 'ultraepic',
+    emoji: '📹',
+    image: 'assets/Cartes/royer-rizz.jpg',
+    color: '#ff8fd1',
+    video: {
+      src: 'clip-royer',
+      srcByFps: { 24: 'clip-royer-24', 60: 'clip-royer' },
+      fps: 60,
+      sound: false,
+      loop: true
+    }
+  },
+  {
+    id: 'test-chasseur-slowmo',
+    name: 'Chasseur Slowmo (test)',
+    description: 'Ralenti ×0,4.',
+    rarity: 'mythic',
+    emoji: '🎞️',
+    image: 'assets/Cartes/chasseur-royer.jpg',
+    color: '#ffa469',
+    video: { src: 'clip-slowmo', fps: 24, sourceFps: 60, sound: false, loop: false }
+  }
+];
+
+function injectCards(context, cards) {
+  if (!cards || !cards.length) return;
+  vm.runInContext(`cardsDatabase.push(...${JSON.stringify(cards)});`, context);
+}
+
+function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url,
     runScripts: 'outside-only',
@@ -25,6 +83,7 @@ function bootApp(url = 'https://refs-cards.test/') {
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
+  injectCards(context, extraCards);
   /* Expose les fonctions internes à la fin du module, sans changer le code
      exécuté au démarrage. */
   const appSrc = fs.readFileSync('app.js', 'utf8').replace(
@@ -33,8 +92,10 @@ function bootApp(url = 'https://refs-cards.test/') {
       state, drawPack, packPool, cardFrame, buildCard, selectPackType,
       packStockFrom, packTotal, cardVideoPlaybackRate, cardVideoInfo,
       showReveal, applySave, packComingSoon, isPackAvailable,
-      PACK_COMING_SOON, PACK_TYPES
-    };\n})();\n`
+      PACK_COMING_SOON, PACK_TYPES, cardsDatabase
+    };
+})();
+`
   );
   vm.runInContext(appSrc, context);
   return { w, doc: w.document, context };
@@ -43,10 +104,10 @@ function bootApp(url = 'https://refs-cards.test/') {
 (async () => {
   /* 0. Fichiers et intégration de la boutique. */
   assert.ok(fs.existsSync('assets/packetvideo.png'), 'packetvideo.png doit exister');
-  ['babault-dancing-live', 'karate-fagar-le-film', 'royer-rizz-cam', 'royer-rizz-cam-24', 'chasseur-royer-slowmo']
-    .forEach((name) => {
-      assert.ok(fs.existsSync(`assets/Cartes/videos/${name}.mp4`), `${name}.mp4 doit exister`);
-    });
+  assert.ok(
+    fs.existsSync('assets/Cartes/videos/LISEZ-MOI.txt'),
+    'le dossier des vidéos utilisateur est conservé (LISEZ-MOI.txt)'
+  );
   const html = fs.readFileSync('index.html', 'utf8');
   assert.match(html, /data-pack="video"/, 'carte Pack Vidéo dans le Shop');
   assert.match(html, /id="buy-video"/, 'bouton d’achat vidéo');
@@ -61,11 +122,13 @@ function bootApp(url = 'https://refs-cards.test/') {
   assert.match(server, /'\.webm':'video\/webm'/, 'le serveur local sert les .webm en video/webm');
   console.log('PASS fichiers Pack Vidéo + boutique + règles Firestore');
 
-  /* 1. Structure de données : normalisation, alias hasAudio, défauts. */
+  /* 1. Structure de données : normalisation, alias, raccourcis, défauts. */
   const cardsContext = vm.createContext({});
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), cardsContext);
+  injectCards(cardsContext, SAMPLE_VIDEO_CARDS);
   const normalize = vm.runInContext('normalizeVideoConfig', cardsContext);
   const cardVideoSources = vm.runInContext('cardVideoSources', cardsContext);
+  const cardVideoConfig = vm.runInContext('cardVideoConfig', cardsContext);
   assert.equal(normalize({}), null, 'pas de source = pas de carte vidéo');
   assert.equal(normalize({ src: '' }), null, 'source vide refusée');
   const defaults = normalize({ src: 'clip' });
@@ -87,15 +150,21 @@ function bootApp(url = 'https://refs-cards.test/') {
     'assets/Cartes/videos/clip.mp4',
     'source sans extension → .mp4 dans assets/Cartes/videos/'
   );
-  console.log('PASS config vidéo par carte (fps / sound / loop / srcByFps)');
+  /* Raccourcis de configuration directement sur la carte. */
+  assert.equal(cardVideoConfig({ id: 'clip', video: 'clip' }).src, 'clip',
+    'video: "clip" est accepté comme source');
+  assert.equal(cardVideoConfig({ id: 'mon-clip', video: true }).src, 'mon-clip',
+    'video: true utilise l’id de la carte comme nom de fichier');
+  assert.equal(cardVideoConfig({ video: '  ' }), null, 'chaîne vide ignorée');
+  console.log('PASS config vidéo par carte (raccourcis, fps / sound / loop / srcByFps)');
 
   /* 2. Catalogue + tirage : le Pack Vidéo ne contient que des cartes vidéo. */
-  const { w, doc, context } = bootApp();
+  const { w, doc, context } = bootApp('https://refs-cards.test/', SAMPLE_VIDEO_CARDS);
   await wait(40);
   const test = w.__videoTest;
   assert.ok(test, 'helpers exposés');
   const videoPool = test.packPool('video');
-  assert.equal(videoPool.length, 4, '4 cartes vidéo dans le catalogue');
+  assert.equal(videoPool.length, SAMPLE_VIDEO_CARDS.length, 'toutes les cartes vidéo configurées sont dans le pool');
   assert.ok(videoPool.every((card) => test.cardVideoInfo(card)), 'toutes les cartes du pool vidéo ont une vidéo');
   for (let i = 0; i < 30; i++) {
     const pack = test.drawPack(false, test.packPool('video'), 'video');
@@ -112,7 +181,7 @@ function bootApp(url = 'https://refs-cards.test/') {
   const byId = (id) => vm.runInContext('cardsDatabase', cardsContext).find((card) => card.id === id);
   const build = (id, opts = {}) => test.cardFrame(byId(id), opts);
 
-  const babault = build('babault-dancing-live');
+  const babault = build('test-babault-live');
   let video = babault.querySelector('video.cf-video');
   assert.ok(video, 'la carte vidéo utilise un <video>');
   assert.equal(video.dataset.fps, '24');
@@ -123,35 +192,35 @@ function bootApp(url = 'https://refs-cards.test/') {
   assert.equal(babault.querySelector('.cf-audio'), null, 'pas de bouton son sans sound:true');
   assert.match(babault.querySelector('.cf-video-tags').textContent, /24 i\/s/);
 
-  const karate = build('karate-fagar-film');
+  const karate = build('test-karate-film');
   video = karate.querySelector('video.cf-video');
   assert.equal(video.dataset.sound, 'on');
   assert.equal(video.dataset.loop, 'on');
   assert.ok(karate.querySelector('.cf-audio'), 'bouton 🔊 présent quand sound:true');
 
-  const slowmo = build('chasseur-royer-slowmo');
+  const slowmo = build('test-chasseur-slowmo');
   video = slowmo.querySelector('video.cf-video');
   assert.equal(video.dataset.loop, 'off');
   assert.equal(video.loop, false, 'loop:false respecté');
   assert.equal(video.dataset.fps, '24');
   assert.equal(video.dataset.sourceFps, '60');
-  assert.equal(test.cardVideoPlaybackRate(test.cardVideoInfo(byId('chasseur-royer-slowmo'))), 0.4,
+  assert.equal(test.cardVideoPlaybackRate(test.cardVideoInfo(byId('test-chasseur-slowmo'))), 0.4,
     'fps 24 sur source 60 → vitesse ×0,4');
 
-  const royer = build('royer-rizz-cam');
+  const royer = build('test-royer-cam');
   video = royer.querySelector('video.cf-video');
   assert.equal(video.dataset.fps, '60');
   const firstSource = video.querySelector('source');
-  assert.match(firstSource.getAttribute('src'), /royer-rizz-cam\.mp4$/, 'variante 60 i/s choisie');
+  assert.match(firstSource.getAttribute('src'), /clip-royer\.mp4$/, 'variante 60 i/s choisie');
 
   /* Miniature : pas de bouton son, vidéo montée quand même (muette). */
-  const mini = build('karate-fagar-film', { mini: true });
+  const mini = build('test-karate-film', { mini: true });
   assert.ok(mini.querySelector('video.cf-video'), 'vidéo aussi dans les miniatures');
   assert.equal(mini.querySelector('.cf-audio'), null, 'pas de bouton son en miniature');
 
   /* Compatibilité mutation : une carte vidéo Shiny garde sa vidéo et ses réglages. */
   const shinyVideo = vm.runInContext(
-    "CardMutations.roll(cardsDatabase.find((c) => c.id === 'karate-fagar-film'), () => 0)",
+    "CardMutations.roll(cardsDatabase.find((c) => c.id === 'test-karate-film'), () => 0)",
     cardsContext
   );
   const shinyFrame = test.cardFrame(shinyVideo);
@@ -222,11 +291,10 @@ function bootApp(url = 'https://refs-cards.test/') {
     assert.ok(node.querySelector('video.cf-video'), 'chaque carte de la pile a un lecteur vidéo');
   });
   assert.match(doc.getElementById('pack-odds').textContent, /PACK VIDÉO/, 'note vidéo dans les probabilités');
-
   w.close();
 
-  /* 6. La démo reste disponible malgré l'avant-première (sans achat). */
-  const demo = bootApp('https://refs-cards.test/?demo=video');
+  /* 6. La démo suit les cartes vidéo configurées (?demo=video). */
+  const demo = bootApp('https://refs-cards.test/?demo=video', SAMPLE_VIDEO_CARDS);
   await wait(40);
   assert.equal(demo.w.__videoTest.state.currentPackType, 'video', '?demo=video sélectionne le pack');
   assert.equal(demo.w.__videoTest.isPackAvailable('video'), true, 'la démo autorise la prévisualisation');
@@ -234,8 +302,23 @@ function bootApp(url = 'https://refs-cards.test/') {
   assert.match(demo.doc.getElementById('pack-img-main').getAttribute('src'), /packetvideo\.png/);
   assert.equal(demo.doc.querySelectorAll('.gap-cards i').length, 3);
   demo.w.__videoTest.showReveal();
-  assert.equal(demo.doc.querySelectorAll('#stack .card').length, 3, 'la démo affiche les 3 cartes animées');
+  const demoCards = [...demo.doc.querySelectorAll('#stack .card')];
+  assert.equal(demoCards.length, 3, 'la démo affiche 3 cartes animées');
+  demoCards.forEach((node) => {
+    assert.ok(node.querySelector('video.cf-video'), 'la démo n’affiche que des cartes vidéo');
+  });
   demo.w.close();
-  console.log('PASS Pack Vidéo : visible mais non achetable, démo ?demo=video conservée');
+
+  /* 7. Sans aucune carte vidéo configurée : garde-fou, pas de pile vide. */
+  const empty = bootApp('https://refs-cards.test/', []);
+  await wait(40);
+  assert.equal(empty.w.__videoTest.packPool('video').length, 0, 'pool vidéo vide sans carte configurée');
+  empty.w.__videoTest.selectPackType('video');
+  empty.w.__videoTest.showReveal();
+  assert.equal(empty.w.__videoTest.state.phase, 'pack', 'on reste sur l’écran du booster');
+  assert.equal(empty.doc.getElementById('toast').textContent, 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).');
+  empty.w.close();
+
+  console.log('PASS Pack Vidéo : configurable, non achetable, démo dynamique, garde-fou vide');
   console.log('PASS video pack flow');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
