@@ -194,6 +194,15 @@ const cardsDatabase = [
     emoji: '🚗',
     image: 'assets/Cartes/fordbierry.JPEG',
     color: '#c6a0eb'
+  },
+  {
+    id: 'chiki-fagar',
+    name: 'Chiki Fagar',
+    description: 'Fagar en mode chiki',
+    rarity: 'epic',
+    emoji: '😎',
+    image: 'assets/Cartes/chikifagar.png',
+    color: '#c6a0eb'
   }
 ];
 
