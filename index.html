@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-14">
+  <meta name="app-version" content="2026.11.23-1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-13">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-1">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-13" defer></script>
+  <script src="app.js?v=2026.11.23-1" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -402,122 +402,173 @@
       </section>
 
       <!-- ============================== EN LIGNE ============================== -->
+      <!-- Quatre sous-onglets pour se repérer : Marché (acheter), Vendre,
+           Récupérer (ventes + cadeaux), Amis. L'ancienne page empilait tout :
+           il fallait faire défiler plusieurs écrans pour trouver une section. -->
       <section class="view online-view" id="online-view" aria-label="En ligne">
-        <div class="page-scroll">
-          <div class="online-head">
-            <p class="kicker"><span>✦</span> EN LIGNE · MARCHÉ <span>✦</span></p>
-            <h2>Crée ton marché,<br><em>achète partout.</em></h2>
-            <p class="online-sub">Crée ton marché ici : mets en vente les cartes (et les packs) que tu veux, avec le nombre et le prix que tu choisis. Le <strong>marché global</strong> rassemble les annonces de tous les joueurs — même ceux qui ne sont pas tes amis — avec le nom du vendeur et un bouton pour l’ajouter. Ajoute aussi des amis avec un code ami : il devra accepter, et son marché s’affichera sur son profil.</p>
+        <div class="online-head">
+          <div class="online-head-top">
+            <p class="kicker"><span>✦</span> EN LIGNE <span>✦</span></p>
+            <h2>Le marché <em>du jeu</em></h2>
           </div>
+          <nav class="online-tabs" role="tablist" aria-label="Sections de la page En ligne">
+            <button class="online-tab is-active" type="button" role="tab" data-online-tab="market" aria-selected="true" aria-controls="online-market">
+              🌍 Marché <span class="online-tab-count" id="online-tab-count-market" hidden></span>
+            </button>
+            <button class="online-tab" type="button" role="tab" data-online-tab="sell" aria-selected="false" aria-controls="online-sell">
+              🏪 Vendre <span class="online-tab-count" id="online-tab-count-sell" hidden></span>
+            </button>
+            <button class="online-tab" type="button" role="tab" data-online-tab="inbox" aria-selected="false" aria-controls="online-inbox">
+              💰 Récupérer <span class="online-tab-count" id="online-tab-count-inbox" hidden></span>
+            </button>
+            <button class="online-tab" type="button" role="tab" data-online-tab="friends" aria-selected="false" aria-controls="online-friends">
+              👥 Amis <span class="online-tab-count" id="online-tab-count-friends" hidden></span>
+            </button>
+          </nav>
+        </div>
 
-          <form id="add-friend-form" class="add-friend">
-            <label for="friend-code-input">Ajouter un ami (demande à accepter)</label>
-            <div class="add-friend-row">
-              <input id="friend-code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="REFS-XXXXXX" aria-describedby="add-friend-msg">
-              <button class="mini-btn primary" type="submit">Demander</button>
-            </div>
-            <div class="add-friend-preview" id="add-friend-preview" hidden></div>
-            <p class="online-msg" id="add-friend-msg" role="status"></p>
-          </form>
-
-          <section class="requests-block" aria-label="Demandes d'ami">
-            <h3>Demandes reçues <span class="friends-count" id="friend-requests-count">0</span></h3>
-            <div id="friend-requests-in" class="requests-list"></div>
-            <p class="online-empty" id="friend-requests-empty">Aucune demande reçue. Quand un joueur t’ajoute avec ton code ami, sa demande apparaît ici : accepte-la pour devenir amis.</p>
-            <h3>Demandes envoyées</h3>
-            <div id="friend-requests-out" class="requests-list"></div>
-          </section>
-
-          <section class="market-block" aria-label="Mon marché">
-            <h3>🏪 Mon marché — créer une annonce</h3>
-            <p class="online-empty">Mets en vente les cartes que tu veux : choisis la carte, le nombre d'exemplaires à vendre et le prix par carte, comme tu veux. Seule la quantité choisie est réservée jusqu’à la vente ou l’annulation. Tes amis verront ton marché sur ton profil.</p>
-            <form id="market-list-form" class="market-form">
-              <label for="market-card">Carte à vendre</label><select id="market-card" required></select>
-              <label for="market-qty">Nombre à vendre (exemplaires)</label>
-              <div class="market-qty-wrap">
-                <button class="qty-btn" id="market-qty-minus" type="button" aria-label="Vendre une carte de moins">−</button>
-                <input id="market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
-                <button class="qty-btn" id="market-qty-plus" type="button" aria-label="Vendre une carte de plus">+</button>
-                <span class="market-qty-hint" id="market-qty-hint" aria-live="polite"></span>
+        <div class="page-scroll">
+          <!-- ---------------------------- MARCHÉ ---------------------------- -->
+          <section class="online-panel is-active" id="online-market" role="tabpanel" aria-label="Marché global" data-online-panel="market">
+            <section class="market-block global-market-block" aria-label="Marché global">
+              <div class="block-head">
+                <h3>🌍 Marché global <span class="friends-count" id="global-market-count">0</span></h3>
+                <p class="block-sub">Toutes les annonces du jeu, même celles des joueurs qui ne sont pas tes amis. Achète directement, ou ajoute le vendeur en ami.</p>
               </div>
-              <label for="market-price">Prix par carte (en pièces, libre)</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
-              <button class="mini-btn primary" id="market-submit" type="submit">Mettre en vente</button>
-            </form>
-            <h4 class="market-sub">📦 Vendre des packs (boosters)</h4>
-            <p class="online-empty">Tu peux aussi vendre des packs de ton inventaire : choisis le type de pack, le nombre de packs et le prix par pack, comme tu veux.</p>
-            <form id="pack-market-form" class="market-form">
-              <label for="pack-market-type">Pack à vendre</label>
-              <select id="pack-market-type" required>
-                <option value="classic">Pack Classique</option>
-                <option value="rare">Pack Rare doré</option>
-              </select>
-              <label for="pack-market-qty">Nombre de packs à vendre</label>
-              <div class="market-qty-wrap">
-                <button class="qty-btn" id="pack-market-qty-minus" type="button" aria-label="Vendre un pack de moins">−</button>
-                <input id="pack-market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
-                <button class="qty-btn" id="pack-market-qty-plus" type="button" aria-label="Vendre un pack de plus">+</button>
-                <span class="market-qty-hint" id="pack-market-qty-hint" aria-live="polite"></span>
+              <div class="global-market-tools">
+                <input id="global-market-search" type="search" autocomplete="off" placeholder="Filtrer par carte, pack ou pseudo" aria-label="Filtrer les annonces du marché global">
+                <label class="global-market-filter" for="global-market-sort">Trier</label>
+                <select id="global-market-sort" aria-label="Trier les annonces du marché global">
+                  <option value="recent">Plus récentes</option>
+                  <option value="cheap">Prix croissant</option>
+                  <option value="expensive">Prix décroissant</option>
+                </select>
+                <button id="global-market-refresh" class="mini-btn" type="button">Actualiser</button>
               </div>
-              <label for="pack-market-price">Prix par pack (en pièces, libre)</label><input id="pack-market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
-              <button class="mini-btn primary" id="pack-market-submit" type="submit">Mettre les packs en vente</button>
-            </form>
-            <h4 class="market-sub">Mes annonces en cours</h4>
-            <div id="my-listings" class="trades-list"></div>
-            <h3>Pièces à récupérer <span class="friends-count" id="market-inbox-count">0</span></h3>
-            <p class="online-empty">Les ventes et cadeaux reçus restent ici, même si tu étais hors ligne. Ils arrivent aussi tout seuls : la page se met à jour dès qu’un ami t’envoie des pièces.</p>
-            <div id="market-inbox" class="trades-list"></div>
-            <h3>Cadeaux envoyés</h3>
-            <p class="online-empty">Les pièces envoyées restent réservées jusqu’à ce que ton ami les récupère. Tu peux annuler un cadeau encore en attente : les pièces te sont alors rendues.</p>
-            <div id="market-sent" class="trades-list"></div>
-            <button id="market-refresh" class="mini-btn" type="button">Actualiser les ventes et cadeaux</button>
-            <p id="market-message" class="online-msg" role="status"></p>
+              <div id="global-market-list" class="trades-list"></div>
+              <p id="global-market-message" class="online-msg" role="status"></p>
+            </section>
           </section>
 
-          <section class="market-block global-market-block" aria-label="Marché global">
-            <h3>🌍 Marché global <span class="friends-count" id="global-market-count">0</span></h3>
-            <p class="online-empty">Toutes les annonces du jeu, même celles des joueurs qui ne sont pas tes amis. Le nom du vendeur est affiché : tu peux acheter directement, ou l’ajouter en ami s’il ne l’est pas déjà.</p>
-            <div class="global-market-tools">
-              <input id="global-market-search" type="search" autocomplete="off" placeholder="Filtrer par carte, pack ou pseudo" aria-label="Filtrer les annonces du marché global">
-              <label class="global-market-filter" for="global-market-sort">Trier</label>
-              <select id="global-market-sort" aria-label="Trier les annonces du marché global">
-                <option value="recent">Plus récentes</option>
-                <option value="cheap">Prix croissant</option>
-                <option value="expensive">Prix décroissant</option>
-              </select>
-              <button id="global-market-refresh" class="mini-btn" type="button">Actualiser</button>
-            </div>
-            <div id="global-market-list" class="trades-list"></div>
-            <p id="global-market-message" class="online-msg" role="status"></p>
-          </section>
-
-          <section class="friends-block" aria-label="Mes amis">
-            <h3>Mes amis <span class="friends-count" id="friends-count">0</span></h3>
-            <div id="friends-list" class="friends-list"></div>
-            <p class="online-empty" id="friends-empty">Aucun ami pour l'instant. Partage ton code ami (page Compte) ou envoie une demande avec le code d'un ami ci-dessus : il devra l'accepter.</p>
-          </section>
-
-          <section class="friend-detail" id="friend-detail" hidden aria-label="Profil d'un ami">
-            <div class="friend-detail-head">
-              <img id="friend-avatar" class="friend-avatar" alt="" hidden>
-              <span id="friend-avatar-fallback" class="friend-avatar-fallback" aria-hidden="true">✦</span>
-              <div class="friend-detail-id">
-                <h3 id="friend-pseudo">Ami</h3>
-                <p id="friend-code-label"></p>
+          <!-- ---------------------------- VENDRE ---------------------------- -->
+          <section class="online-panel" id="online-sell" role="tabpanel" aria-label="Vendre" data-online-panel="sell" hidden>
+            <section class="market-block" aria-label="Créer une annonce">
+              <div class="block-head">
+                <h3>🏪 Créer une annonce</h3>
+                <p class="block-sub">Vends ce que tu veux, au prix que tu veux. Seule la quantité choisie est réservée jusqu’à la vente ou l’annulation. Tes amis voient ton marché sur ton profil.</p>
               </div>
-              <button id="friend-close" class="mini-btn" type="button">Fermer</button>
-            </div>
-            <div class="friend-stats" id="friend-stats"></div>
-            <form id="gift-form" class="market-form">
-              <label for="gift-amount">Donner des pièces à cet ami</label>
-              <input id="gift-amount" type="number" min="1" max="1000000000" step="1" required placeholder="Montant">
-              <button class="mini-btn primary" type="submit">Donner</button>
-            </form>
-            <h4>🏪 Son marché</h4>
-            <p class="online-empty">Les cartes et packs que cet ami met en vente, avec le nombre disponible et son prix. Choisis combien en acheter, puis confirme.</p>
-            <div id="friend-listings" class="trades-list"></div>
-            <h4>Sa collection</h4>
-            <div class="friend-cards" id="friend-cards"></div>
-            <p class="online-empty" id="friend-cards-empty" hidden>Cet ami n'a pas encore de cartes.</p>
+              <div class="market-cols">
+                <div class="market-col">
+                  <h4 class="market-sub">🃏 Vendre des cartes</h4>
+                  <form id="market-list-form" class="market-form">
+                    <label for="market-card">Carte à vendre</label><select id="market-card" required></select>
+                    <label for="market-qty">Nombre à vendre (exemplaires)</label>
+                    <div class="market-qty-wrap">
+                      <button class="qty-btn" id="market-qty-minus" type="button" aria-label="Vendre une carte de moins">−</button>
+                      <input id="market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
+                      <button class="qty-btn" id="market-qty-plus" type="button" aria-label="Vendre une carte de plus">+</button>
+                      <span class="market-qty-hint" id="market-qty-hint" aria-live="polite"></span>
+                    </div>
+                    <label for="market-price">Prix par carte (en pièces, libre)</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+                    <button class="mini-btn primary" id="market-submit" type="submit">Mettre en vente</button>
+                  </form>
+                </div>
+                <div class="market-col">
+                  <h4 class="market-sub">📦 Vendre des packs</h4>
+                  <form id="pack-market-form" class="market-form">
+                    <label for="pack-market-type">Pack à vendre</label>
+                    <select id="pack-market-type" required>
+                      <option value="classic">Pack Classique</option>
+                      <option value="rare">Pack Rare doré</option>
+                    </select>
+                    <label for="pack-market-qty">Nombre de packs à vendre</label>
+                    <div class="market-qty-wrap">
+                      <button class="qty-btn" id="pack-market-qty-minus" type="button" aria-label="Vendre un pack de moins">−</button>
+                      <input id="pack-market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
+                      <button class="qty-btn" id="pack-market-qty-plus" type="button" aria-label="Vendre un pack de plus">+</button>
+                      <span class="market-qty-hint" id="pack-market-qty-hint" aria-live="polite"></span>
+                    </div>
+                    <label for="pack-market-price">Prix par pack (en pièces, libre)</label><input id="pack-market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+                    <button class="mini-btn primary" id="pack-market-submit" type="submit">Mettre les packs en vente</button>
+                  </form>
+                </div>
+              </div>
+              <h4 class="market-sub">📋 Mes annonces en cours <span class="friends-count" id="my-listings-count" hidden>0</span></h4>
+              <div id="my-listings" class="trades-list"></div>
+              <button id="market-refresh" class="mini-btn" type="button">Actualiser mes annonces</button>
+              <p id="market-message" class="online-msg" role="status"></p>
+            </section>
+          </section>
+
+          <!-- --------------------------- RÉCUPÉRER --------------------------- -->
+          <section class="online-panel" id="online-inbox" role="tabpanel" aria-label="Pièces à récupérer" data-online-panel="inbox" hidden>
+            <section class="market-block" aria-label="Pièces à récupérer">
+              <div class="block-head">
+                <h3>💰 Pièces à récupérer <span class="friends-count" id="market-inbox-count">0</span></h3>
+                <p class="block-sub">Les ventes et cadeaux reçus restent ici, même si tu étais hors ligne. Ils arrivent aussi tout seuls : la page se met à jour dès qu’un ami t’envoie des pièces.</p>
+              </div>
+              <div id="market-inbox" class="trades-list"></div>
+              <h4 class="market-sub">📤 Cadeaux envoyés</h4>
+              <p class="block-sub">Les pièces envoyées restent réservées jusqu’à ce que ton ami les récupère. Tu peux annuler un cadeau encore en attente : les pièces te sont alors rendues.</p>
+              <div id="market-sent" class="trades-list"></div>
+            </section>
+          </section>
+
+          <!-- ----------------------------- AMIS ----------------------------- -->
+          <section class="online-panel" id="online-friends" role="tabpanel" aria-label="Amis" data-online-panel="friends" hidden>
+            <section class="friends-block" aria-label="Mes amis">
+              <div class="block-head">
+                <h3>👥 Mes amis <span class="friends-count" id="friends-count">0</span></h3>
+                <p class="block-sub">Ton code ami est sur la page Compte. Un ami doit accepter ta demande avant d’apparaître ici ; son marché s’affiche alors sur son profil.</p>
+              </div>
+              <form id="add-friend-form" class="add-friend">
+                <label for="friend-code-input">Ajouter un ami (demande à accepter)</label>
+                <div class="add-friend-row">
+                  <input id="friend-code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="REFS-XXXXXX" aria-describedby="add-friend-msg">
+                  <button class="mini-btn primary" type="submit">Demander</button>
+                </div>
+                <div class="add-friend-preview" id="add-friend-preview" hidden></div>
+                <p class="online-msg" id="add-friend-msg" role="status"></p>
+              </form>
+              <div id="friends-list" class="friends-list"></div>
+              <p class="online-empty" id="friends-empty">Aucun ami pour l'instant. Partage ton code ami (page Compte) ou envoie une demande avec le code d'un ami ci-dessus : il devra l'accepter.</p>
+            </section>
+
+            <section class="friend-detail" id="friend-detail" hidden aria-label="Profil d'un ami">
+              <div class="friend-detail-head">
+                <img id="friend-avatar" class="friend-avatar" alt="" hidden>
+                <span id="friend-avatar-fallback" class="friend-avatar-fallback" aria-hidden="true">✦</span>
+                <div class="friend-detail-id">
+                  <h3 id="friend-pseudo">Ami</h3>
+                  <p id="friend-code-label"></p>
+                </div>
+                <button id="friend-close" class="mini-btn" type="button">Fermer</button>
+              </div>
+              <div class="friend-stats" id="friend-stats"></div>
+              <form id="gift-form" class="market-form">
+                <label for="gift-amount">Donner des pièces à cet ami</label>
+                <input id="gift-amount" type="number" min="1" max="1000000000" step="1" required placeholder="Montant">
+                <button class="mini-btn primary" type="submit">Donner</button>
+              </form>
+              <h4>🏪 Son marché</h4>
+              <p class="online-empty">Les cartes et packs que cet ami met en vente, avec le nombre disponible et son prix. Choisis combien en acheter, puis confirme.</p>
+              <div id="friend-listings" class="trades-list"></div>
+              <h4>Sa collection</h4>
+              <div class="friend-cards" id="friend-cards"></div>
+              <p class="online-empty" id="friend-cards-empty" hidden>Cet ami n'a pas encore de cartes.</p>
+            </section>
+
+            <section class="requests-block" aria-label="Demandes d'ami">
+              <div class="block-head">
+                <h3>Demandes d’ami <span class="friends-count" id="friend-requests-count">0</span></h3>
+                <p class="block-sub">Accepte une demande reçue pour devenir ami. Les demandes envoyées attendent la réponse du joueur.</p>
+              </div>
+              <h4 class="market-sub">Reçues</h4>
+              <div id="friend-requests-in" class="requests-list"></div>
+              <p class="online-empty" id="friend-requests-empty">Aucune demande reçue. Quand un joueur t’ajoute avec ton code ami, sa demande apparaît ici : accepte-la pour devenir amis.</p>
+              <h4 class="market-sub">Envoyées</h4>
+              <div id="friend-requests-out" class="requests-list"></div>
+            </section>
           </section>
         </div>
       </section>
