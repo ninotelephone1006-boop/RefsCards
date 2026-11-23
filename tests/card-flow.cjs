@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
     const sources = vm.runInContext('cardsDatabase.flatMap(cardImageSources)', context);
-    assert.equal(sources.length, 13);
+    assert.equal(sources.length, 14);
     for (const src of sources) assert.ok(fs.existsSync(src), src);
     // Start the reveal directly; the pack tear is unrelated to this regression.
     vm.runInContext(fs.readFileSync('app.js', 'utf8').replace('  boot();', '  boot(); showReveal();'), context);

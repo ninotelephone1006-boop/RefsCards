@@ -1876,8 +1876,9 @@
       }, { merge: true });
       return true;
     } catch (error) {
-      console.warn('Sauvegarde cloud impossible:', error);
-      showToast('Sauvegarde impossible pour le moment. Vérifie ta connexion.');
+      if (!noteCloudError('Sauvegarde cloud impossible', error)) {
+        showToast('Sauvegarde impossible pour le moment. Vérifie ta connexion.');
+      }
       return false;
     }
   }
@@ -1933,6 +1934,7 @@
     friendProfiles.clear();
     trades = [];
     selectedFriendUid = null;
+    rulesHelpShown = false;
     if (tradesUnsub) {
       try { tradesUnsub(); } catch (error) { /* déjà fermé */ }
       tradesUnsub = null;
@@ -2258,6 +2260,7 @@
   let tradeTarget = null;            // {uid, cardId} : carte visée par l'échange en cours
   let confirmAction = null;
   let profileTimer = 0;
+  let rulesHelpShown = false;       // un seul toast « règles » par session
 
   function serverTimestamp() {
     try {
@@ -2270,6 +2273,38 @@
 
   function cloudReady() {
     return Boolean(currentUser && cloudDb && typeof cloudDb.collection === 'function');
+  }
+
+  /* Les refus « permission-denied » de Firestore ne sont PAS un problème de
+     connexion : ils signalent des règles non publiées (ou trop strictes) sur
+     le projet. On les détecte pour afficher un message actionnable au lieu
+     de « vérifie ta connexion », qui envoyait les joueurs sur une mauvaise
+     piste (ex. « Recherche impossible pour le moment » alors que le réseau
+     fonctionnait). */
+  function isPermissionDenied(error) {
+    if (!error) return false;
+    const code = String(error.code || '').toLowerCase().replace(/_/g, '-');
+    const message = String(error.message || '');
+    return code === 'permission-denied'
+      || /missing or insufficient permissions/i.test(message);
+  }
+
+  const RULES_HELP = 'Règles Firestore refusent l’accès (permission-denied). Republie-les avec « firebase deploy --only firestore:rules » (ou Firebase Console → Firestore Database → Rules → Publier), puis recharge la page.';
+
+  /* Journalise l'erreur cloud et, la première fois qu'un refus de règles
+     survient durant la session, affiche un toast explicite. Renvoie true
+     quand il s'agissait d'un refus de règles (pour adapter le message). */
+  function noteCloudError(context, error) {
+    if (isPermissionDenied(error)) {
+      console.warn(`${context}: règles Firestore insuffisantes (permission-denied).`, error);
+      if (!rulesHelpShown) {
+        rulesHelpShown = true;
+        showToast('Accès cloud refusé par les règles Firestore : republie firestore.rules (voir le README).');
+      }
+      return true;
+    }
+    console.warn(`${context}:`, error);
+    return false;
   }
 
   function collectionIds() {
@@ -2344,11 +2379,11 @@
       try {
         const snap = await cloudDb.collection('friendCodes').doc(code).get();
         free = !snap.exists || (snap.data() && snap.data().uid === currentUser.uid);
-      } catch (error) { free = true; }
+      } catch (error) { free = true; noteCloudError('Annuaire des codes ami illisible', error); }
       if (free) {
         try {
           await cloudDb.collection('friendCodes').doc(code).set({ uid: currentUser.uid });
-        } catch (error) { /* l'annuaire n'est qu'un index de recherche */ }
+        } catch (error) { noteCloudError('Annuaire des codes ami non créé', error); }
         return code;
       }
       const body = code.slice(5).split('');
@@ -2369,7 +2404,7 @@
         profile.friendCode = typeof d.friendCode === 'string' ? d.friendCode : '';
       }
     } catch (error) {
-      console.warn('Profil illisible:', error);
+      noteCloudError('Profil illisible', error);
     }
     if (!profile.pseudo) profile.pseudo = defaultPseudo();
     if (!profile.friendCode) profile.friendCode = await ensureFriendCode();
@@ -2395,7 +2430,7 @@
         updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (error) {
-      console.warn('Profil non sauvegardé:', error);
+      noteCloudError('Profil non sauvegardé', error);
     }
   }
 
@@ -2585,7 +2620,7 @@
         return data;
       }
     } catch (error) {
-      console.warn('Profil ami illisible:', error);
+      noteCloudError('Profil ami illisible', error);
     }
     friendProfiles.set(uid, fallback);
     return fallback;
@@ -2634,7 +2669,8 @@
       friendCodeInput.value = '';
       renderOnline();
     } catch (error) {
-      setAddFriendMsg('Recherche impossible pour le moment. Vérifie ta connexion.');
+      if (isPermissionDenied(error)) setAddFriendMsg(RULES_HELP);
+      else setAddFriendMsg('Recherche impossible pour le moment. Vérifie ta connexion.');
     }
   });
 
@@ -2877,7 +2913,8 @@
       await loadTrades();
       renderOnline();
     } catch (error) {
-      showToast('Impossible d’envoyer la proposition. Réessaie.');
+      if (isPermissionDenied(error)) showToast(RULES_HELP);
+      else showToast('Impossible d’envoyer la proposition. Réessaie.');
     }
   }
 
@@ -2886,7 +2923,7 @@
     try {
       await cloudDb.collection('trades').doc(id).update(patch);
     } catch (error) {
-      console.warn('Échange non mis à jour:', error);
+      noteCloudError('Échange non mis à jour', error);
     }
   }
 
@@ -2912,7 +2949,7 @@
         found.set(t.id, { id: t.id, ...t.data });
       }
     } catch (error) {
-      console.warn('Échanges illisibles:', error);
+      noteCloudError('Échanges illisibles', error);
       return;
     }
     trades = [...found.values()];
@@ -2937,8 +2974,9 @@
       const q1 = cloudDb.collection('trades').where('fromUid', '==', uid);
       const q2 = cloudDb.collection('trades').where('toUid', '==', uid);
       if (typeof q1.onSnapshot === 'function') {
-        const un1 = q1.onSnapshot(onSnap, () => {});
-        const un2 = typeof q2.onSnapshot === 'function' ? q2.onSnapshot(onSnap, () => {}) : null;
+        const onSnapError = (error) => noteCloudError('Échanges illisibles (temps réel)', error);
+        const un1 = q1.onSnapshot(onSnap, onSnapError);
+        const un2 = typeof q2.onSnapshot === 'function' ? q2.onSnapshot(onSnap, onSnapError) : null;
         tradesUnsub = () => {
           try { if (un1) un1(); } catch (error) { /* déjà fermé */ }
           try { if (un2) un2(); } catch (error) { /* déjà fermé */ }
