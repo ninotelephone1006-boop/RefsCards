@@ -169,6 +169,7 @@ node tests/friend-requests.cjs       # demandes d'ami : acceptation/refus, fiche
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
 node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare +20 %
+node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
 ```
 
 ## Page Shop (boutique + inventaire)
@@ -207,7 +208,7 @@ Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends`, `packs
 2. **Seuil** : relâché avant 75 %, le paquet revient en place avec un rebond élastique (et un léger craquement). À partir de 75 %, la déchirure s'achève : le haut s'envole en tournoyant dans un flash, éjecte la pile de cinq cartes et déclenche le *pop* d'ouverture.
 3. **Pile de cartes** : les cinq cartes sont triées de la moins rare à la plus rare, la plus rare au fond. Un clic retourne la carte du dessus (`rotateY`), avec parallaxe/tilt et reflet holographique qui suit le curseur. Les dix raretés ont leur mise en scène, regroupée en trois paliers d'effets : halo coloré (Commune, Inhabituelle), anneau + étincelles (Rare, Super Rare), ralenti + tremblement d'écran (Épique, Ultra épique), rayons rotatifs + pluie + hologramme (Mythique, Légendaire, Divine, Secrète).
 4. **Rangement** : après l'avoir révélée, touche la carte pour la manipuler (tilt/parallaxe), puis appuie sur **Carte suivante** (ou clique à côté dans la table) pour la faire glisser vers le récapitulatif (whoosh) et dévoiler la suivante. Au clavier, Entrée/Espace range la carte révélée. Une fois les cinq cartes rangées, le bouton **Aller au Shop** apparaît (les packs s'achètent dans la boutique et vont dans l'inventaire).
-5. **Fusion** : à la fin du booster, une **demande de fusion** s'ouvre : chaque paire de cartes identiques peut être échangée contre une carte de la rareté supérieure (la fusion est sans risque, les légendaires étant au sommet).
+5. **Demande de fusion** : à la fin du booster (ou dès qu'un doublon existe), une **demande de fusion** s'ouvre : chaque paire de cartes identiques peut être échangée contre une carte de la rareté supérieure (la fusion est sans risque, les légendaires étant au sommet). Elle est aussi accessible à tout moment depuis l'onglet **Collection**, via le bouton `DEMANDE DE FUSION · N DOUBLON(S)` affiché au-dessus de la grille.
 
 ## Son
 
@@ -216,6 +217,7 @@ Tout est synthétisé en direct avec la Web Audio API (aucun fichier audio) : d�
 ## Paramètres utiles
 
 - `?demo=1` : force un tirage de démonstration (aperçu de plusieurs raretés).
+- `?demo=fusion` : pack de démonstration contenant deux paires identiques ; la **demande de fusion** s'ouvre toute seule après les cinq cartes (aucun pack consommé).
 - Clavier : `Entrée`/`Espace` sur le booster ouvre la déchirure, `→` fait progresser la coupe, `Maj+Entrée` sur une carte révélée l'ouvre en grand, `Échap` ferme l'inspection ou la fusion.
 - Inspection : double-clic (ou double-tap) sur une carte révélée, ou clic sur une vignette du butin, pour l'afficher en grand.
 

@@ -120,6 +120,8 @@
   const buyPrice = qs(buyBtn, '.buy-price');
   const fusionLater = $('fusion-later');
   const fusionDesc = $('fusion-desc');
+  const collFusion = $('coll-fusion');
+  const collFusionLabel = $('coll-fusion-label');
   const toast = $('toast');
   const pileLabel = $('pile-label');
   const footRight = $('foot-right');
@@ -1644,11 +1646,28 @@
     fusionChip.title = n
       ? `${n} doublon${n > 1 ? 's' : ''} prêt${n > 1 ? 's' : ''} à fusionner`
       : 'Aucun doublon fusionnable pour le moment';
+    // La demande de fusion reste accessible depuis la Collection, même après
+    // avoir refermé le récap d'un pack : c'est là que vivent les doublons.
+    if (collFusion) {
+      collFusion.hidden = n === 0;
+      if (collFusionLabel) {
+        collFusionLabel.textContent = n
+          ? `DEMANDE DE FUSION · ${n} DOUBLON${n > 1 ? 'S' : ''}`
+          : 'DEMANDE DE FUSION';
+      }
+    }
   }
 
   function openFusion(auto = false) {
-    if (state.fusionOpen || state.phase !== 'done') return;
-    if (auto && app.dataset.tab !== 'pack') return;
+    if (state.fusionOpen) return;
+    /* Auto (fin de pack) : uniquement depuis l'onglet Pack, une fois les cinq
+       cartes rangées. Manuel (récap ou Collection) : dès qu'un doublon existe,
+       même hors de la phase de révélation. */
+    if (auto) {
+      if (state.phase !== 'done' || app.dataset.tab !== 'pack') return;
+    } else if (state.phase !== 'done' && !fusionCount()) {
+      return;
+    }
     SFX.unlock();
     state.fusionOpen = true;
     state.fusionSelection = null;
@@ -1843,6 +1862,7 @@
   });
   on($('fusion-backdrop'), 'click', closeFusion);
   on(fusionChip, 'click', () => openFusion(false));
+  if (collFusion) on(collFusion, 'click', () => openFusion(false));
 
   document.addEventListener('keydown', (e) => {
     if (!currentUser) return;
@@ -2454,6 +2474,7 @@
     const got = cardsDatabase.filter((c) => owned.has(c.id)).length;
     collCount.textContent = `${got} / ${total}`;
     collFill.style.transform = `scaleX(${total ? got / total : 0})`;
+    updateFusionChip();
 
     const frag = document.createDocumentFragment();
     let shown = 0;
@@ -3940,9 +3961,13 @@
     recap.classList.add('is-idle');
     sizeStage();
     scheduleSizing(6);
-    if (new URLSearchParams(window.location.search).get('demo') === '1') {
+    const demoParam = new URLSearchParams(window.location.search).get('demo');
+    if (demoParam === '1') {
       sessionStorage.setItem('refs-demo', '1');
       showToast('Mode démo : un aperçu des raretés.', 2600);
+    } else if (demoParam === 'fusion') {
+      sessionStorage.setItem('refs-demo', 'fusion');
+      showToast('Mode démo fusion : ouvre le pack, un doublon prêt à fusionner t’attend.', 3600);
     }
     if (!cardsDatabase.length) {
       showToast('Ajoute des cartes dans cards.js pour commencer.');
