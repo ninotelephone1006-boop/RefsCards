@@ -205,10 +205,14 @@
   function drawPack() {
     const drawn = [];
     const params = new URLSearchParams(window.location.search);
-    const wantsDemo = params.get('demo') === '1' || sessionStorage.getItem('refs-demo') === '1';
-    if (wantsDemo && typeof demoDraw !== 'undefined') {
-      sessionStorage.setItem('refs-demo', '1');
-      demoDraw.slice(0, CARD_COUNT).forEach((id) => {
+    const demoMode = params.get('demo') || sessionStorage.getItem('refs-demo');
+    const wantsDemo = demoMode === '1' || demoMode === 'fusion';
+    if (wantsDemo) {
+      sessionStorage.setItem('refs-demo', demoMode === 'fusion' ? 'fusion' : '1');
+      const demoList = demoMode === 'fusion' && typeof fusionDemoDraw !== 'undefined'
+        ? fusionDemoDraw
+        : (typeof demoDraw !== 'undefined' ? demoDraw : []);
+      demoList.slice(0, CARD_COUNT).forEach((id) => {
         const found = cardsDatabase.find((c) => c.id === id);
         if (found) drawn.push(found);
       });
@@ -1604,6 +1608,15 @@
       closeFusion();
       return;
     }
+    if (e.key === 'Escape' && tradeSheet && !tradeSheet.hidden) {
+      closeSheet(tradeSheet);
+      return;
+    }
+    if (e.key === 'Escape' && confirmSheet && !confirmSheet.hidden) {
+      confirmAction = null;
+      closeSheet(confirmSheet);
+      return;
+    }
     if (app.dataset.tab !== 'pack' || state.phase !== 'reveal' || state.fusionOpen || !current) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
     if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle) return;
@@ -1835,12 +1848,17 @@
     state.collection = ((d && d.collection) || [])
       .map((id) => cardsDatabase.find((c) => c.id === id))
       .filter(Boolean);
+    friends = Array.isArray(d && d.friends)
+      ? d.friends.filter((u) => typeof u === 'string')
+      : [];
+    state.packsOpened = Math.max(0, Number(d && d.packsOpened) || 0);
     state.phase = 'pack';
     state.deck = [];
     state.loot = [];
     state.packIndex = 0;
     updateCoins();
     renderCollection();
+    renderAccount();
   }
 
   async function saveNow() {
@@ -1852,7 +1870,9 @@
         coins: state.coins,
         firstPack: state.firstPack,
         collection: state.collection.map((c) => c.id),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        friends,
+        packsOpened: state.packsOpened || 0,
+        updatedAt: serverTimestamp()
       }, { merge: true });
       return true;
     } catch (error) {
@@ -1866,6 +1886,8 @@
     if (!currentUser || !cloudDb) return;
     clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => { saveNow(); }, 250);
+    saveProfileSoon();
+    if (app.dataset.tab === 'account') renderAccount();
   }
 
   function showGame(user, saveData) {
@@ -1887,6 +1909,11 @@
       }
     }
     applySave(saveData);
+    syncHudName();
+    // Profil public (pseudo, avatar, code ami) + échanges en attente.
+    loadProfile();
+    loadTrades();
+    subscribeTrades();
     if (authScreen) authScreen.hidden = true;
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
@@ -1899,6 +1926,18 @@
     clearTimeout(saveTimer);
     currentUser = null;
     currentEmail = '';
+    profile.pseudo = '';
+    profile.avatar = '';
+    profile.friendCode = '';
+    friends = [];
+    friendProfiles.clear();
+    trades = [];
+    selectedFriendUid = null;
+    if (tradesUnsub) {
+      try { tradesUnsub(); } catch (error) { /* déjà fermé */ }
+      tradesUnsub = null;
+    }
+    if (friendDetail) friendDetail.hidden = true;
     if (accountEmail) {
       accountEmail.textContent = '';
       accountEmail.removeAttribute('title');
@@ -2163,6 +2202,889 @@
     renderCollection();
     SFX.tick();
   });
+
+  /* ============================ COMPTE · AMIS · ÉCHANGES ============================ */
+
+  const accountView = $('account-view');
+  const onlineView = $('online-view');
+  const profileAvatar = $('profile-avatar');
+  const profileAvatarFallback = $('profile-avatar-fallback');
+  const avatarUploadBtn = $('avatar-upload-btn');
+  const avatarInput = $('avatar-input');
+  const avatarGoogleBtn = $('avatar-google-btn');
+  const profilePseudo = $('profile-pseudo');
+  const profileEmail = $('profile-email');
+  const friendCodeEl = $('friend-code');
+  const friendCodeCopy = $('friend-code-copy');
+  const pseudoForm = $('pseudo-form');
+  const pseudoInput = $('pseudo-input');
+  const profileMsg = $('profile-msg');
+  const statsGrid = $('stats-grid');
+  const rarityBreakdown = $('rarity-breakdown');
+  const addFriendForm = $('add-friend-form');
+  const friendCodeInput = $('friend-code-input');
+  const addFriendMsg = $('add-friend-msg');
+  const tradesIn = $('trades-in');
+  const tradesOut = $('trades-out');
+  const friendsList = $('friends-list');
+  const friendsEmpty = $('friends-empty');
+  const friendsCount = $('friends-count');
+  const friendDetail = $('friend-detail');
+  const friendAvatar = $('friend-avatar');
+  const friendAvatarFallback = $('friend-avatar-fallback');
+  const friendPseudo = $('friend-pseudo');
+  const friendCodeLabel = $('friend-code-label');
+  const friendStats = $('friend-stats');
+  const friendCards = $('friend-cards');
+  const friendCardsEmpty = $('friend-cards-empty');
+  const friendClose = $('friend-close');
+  const tradeSheet = $('trade-sheet');
+  const tradeSheetSub = $('trade-sheet-sub');
+  const tradePicker = $('trade-picker');
+  const confirmSheet = $('confirm-sheet');
+  const confirmTitle = $('confirm-title');
+  const confirmMessage = $('confirm-message');
+  const confirmOk = $('confirm-ok');
+
+  /* Profil public (playerProfiles/{uid}) : pseudo, avatar, code ami, stats et
+     collection — c'est ce que les amis voient. La sauvegarde privée
+     (playerSaves/{uid}) garde en plus la liste d'amis. */
+  const profile = { pseudo: '', avatar: '', friendCode: '' };
+  let friends = [];                  // uids de mes amis
+  const friendProfiles = new Map();  // uid -> profil public d'un ami
+  let trades = [];                   // échanges où je suis partie
+  let tradesUnsub = null;
+  let selectedFriendUid = null;
+  let tradeTarget = null;            // {uid, cardId} : carte visée par l'échange en cours
+  let confirmAction = null;
+  let profileTimer = 0;
+
+  function serverTimestamp() {
+    try {
+      if (window.firebase && firebase.firestore && firebase.firestore.FieldValue) {
+        return firebase.firestore.FieldValue.serverTimestamp();
+      }
+    } catch (error) { /* repli ci-dessous */ }
+    return new Date();
+  }
+
+  function cloudReady() {
+    return Boolean(currentUser && cloudDb && typeof cloudDb.collection === 'function');
+  }
+
+  function collectionIds() {
+    return state.collection.map((c) => c.id);
+  }
+
+  /* Statistiques calculées depuis une liste d'ids de cartes + un solde. */
+  function statsFor(ids, coins) {
+    const owned = new Map();
+    for (const id of ids) owned.set(id, (owned.get(id) || 0) + 1);
+    const total = ids.length;
+    const unique = cardsDatabase.filter((c) => owned.has(c.id)).length;
+    let value = 0;
+    let best = null;
+    for (const card of cardsDatabase) {
+      const n = owned.get(card.id) || 0;
+      if (!n) continue;
+      value += (RARITIES[card.rarity] ? RARITIES[card.rarity].reward : 0) * n;
+      if (!best || RARITIES[card.rarity].rank > RARITIES[best.rarity].rank) best = card;
+    }
+    return {
+      coins: Math.max(0, Number(coins) || 0),
+      total,
+      unique,
+      duplicates: Math.max(0, total - unique),
+      value,
+      best,
+      completion: cardsDatabase.length ? unique / cardsDatabase.length : 0
+    };
+  }
+
+  function myStats() {
+    return statsFor(collectionIds(), state.coins);
+  }
+
+  /* Code ami stable, dérivé de l'uid : REFS-XXXXXX (6 caractères). */
+  function friendCodeFromUid(uid) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let h1 = 2166136261;
+    let h2 = 5381;
+    for (let i = 0; i < uid.length; i++) {
+      const c = uid.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+      h2 = (Math.imul(h2, 33) ^ c) >>> 0;
+    }
+    let out = '';
+    for (let i = 0; i < 6; i++) {
+      out += chars[(h1 + h2 * (i + 1)) % chars.length];
+      h1 = (Math.imul(h1, 31) + h2) >>> 0;
+    }
+    return 'REFS-' + out;
+  }
+
+  function normalizeFriendCode(raw) {
+    let code = String(raw || '').trim().toUpperCase().replace(/[\s-]/g, '');
+    if (code.startsWith('REFS')) code = code.slice(4);
+    return 'REFS-' + code;
+  }
+
+  function defaultPseudo() {
+    const base = (currentUser && (currentUser.displayName || (currentUser.email || '').split('@')[0])) || 'Joueur';
+    const clean = String(base).replace(/\s+/g, ' ').trim().slice(0, 24);
+    return clean || 'Joueur';
+  }
+
+  /* Crée (ou retrouve) l'entrée d'annuaire friendCodes/{code} -> uid. */
+  async function ensureFriendCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = friendCodeFromUid(currentUser.uid);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      let free = true;
+      try {
+        const snap = await cloudDb.collection('friendCodes').doc(code).get();
+        free = !snap.exists || (snap.data() && snap.data().uid === currentUser.uid);
+      } catch (error) { free = true; }
+      if (free) {
+        try {
+          await cloudDb.collection('friendCodes').doc(code).set({ uid: currentUser.uid });
+        } catch (error) { /* l'annuaire n'est qu'un index de recherche */ }
+        return code;
+      }
+      const body = code.slice(5).split('');
+      body[5] = chars[(chars.indexOf(body[5]) + 1) % chars.length];
+      code = 'REFS-' + body.join('');
+    }
+    return code;
+  }
+
+  async function loadProfile() {
+    if (!cloudReady()) return;
+    try {
+      const snap = await cloudDb.collection('playerProfiles').doc(currentUser.uid).get();
+      if (snap.exists) {
+        const d = snap.data() || {};
+        profile.pseudo = typeof d.pseudo === 'string' ? d.pseudo : '';
+        profile.avatar = typeof d.avatar === 'string' ? d.avatar : '';
+        profile.friendCode = typeof d.friendCode === 'string' ? d.friendCode : '';
+      }
+    } catch (error) {
+      console.warn('Profil illisible:', error);
+    }
+    if (!profile.pseudo) profile.pseudo = defaultPseudo();
+    if (!profile.friendCode) profile.friendCode = await ensureFriendCode();
+    await saveProfile();
+    syncHudName();
+    renderAccount();
+    renderOnline();
+  }
+
+  async function saveProfile() {
+    if (!cloudReady()) return;
+    const stats = myStats();
+    try {
+      await cloudDb.collection('playerProfiles').doc(currentUser.uid).set({
+        pseudo: profile.pseudo.slice(0, 24),
+        avatar: profile.avatar || '',
+        friendCode: profile.friendCode,
+        coins: stats.coins,
+        totalCards: stats.total,
+        uniqueCards: stats.unique,
+        bestRarity: stats.best ? stats.best.rarity : null,
+        collection: collectionIds(),
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      console.warn('Profil non sauvegardé:', error);
+    }
+  }
+
+  function saveProfileSoon() {
+    if (!cloudReady()) return;
+    window.clearTimeout(profileTimer);
+    profileTimer = window.setTimeout(() => { saveProfile(); }, 600);
+  }
+
+  function syncHudName() {
+    if (accountEmail) {
+      accountEmail.textContent = profile.pseudo || currentEmail || 'Joueur';
+      accountEmail.title = currentEmail || profile.pseudo || '';
+    }
+  }
+
+  function setProfileMsg(msg) {
+    if (profileMsg) profileMsg.textContent = msg || '';
+  }
+
+  function renderAccount() {
+    if (!accountView) return;
+    const stats = myStats();
+    const googlePhoto = (currentUser && currentUser.photoURL) || '';
+    const avatarSrc = profile.avatar || googlePhoto;
+    if (profileAvatar) {
+      if (avatarSrc) {
+        profileAvatar.src = avatarSrc;
+        profileAvatar.hidden = false;
+        if (profileAvatarFallback) profileAvatarFallback.hidden = true;
+      } else {
+        profileAvatar.removeAttribute('src');
+        profileAvatar.hidden = true;
+        if (profileAvatarFallback) profileAvatarFallback.hidden = false;
+      }
+    }
+    if (profilePseudo) profilePseudo.textContent = profile.pseudo || 'Joueur';
+    if (profileEmail) profileEmail.textContent = currentEmail || '';
+    if (friendCodeEl) friendCodeEl.textContent = profile.friendCode || 'REFS-······';
+    if (pseudoInput && document.activeElement !== pseudoInput) pseudoInput.value = profile.pseudo || '';
+    if (statsGrid) {
+      const defs = [
+        ['🪙 Pièces', fmt(stats.coins)],
+        ['🃏 Cartes', fmt(stats.total)],
+        ['✦ Uniques', `${stats.unique} / ${cardsDatabase.length}`],
+        ['📋 Doublons', fmt(stats.duplicates)],
+        ['💎 Valeur', `${fmt(stats.value)} 🪙`],
+        ['👑 Meilleure', stats.best ? RARITIES[stats.best.rarity].label : '—'],
+        ['📦 Boosters', fmt(state.packsOpened || 0)],
+        ['👥 Amis', fmt(friends.length)]
+      ];
+      statsGrid.replaceChildren(...defs.map(([label, value]) => {
+        const card = el('div', 'stat-card');
+        card.append(el('span', 'stat-label', label), el('span', 'stat-value', value));
+        return card;
+      }));
+    }
+    if (rarityBreakdown) {
+      const owned = countMap();
+      const rows = Object.entries(RARITIES)
+        .filter(([key]) => cardsDatabase.some((c) => c.rarity === key))
+        .sort((a, b) => b[1].rank - a[1].rank)
+        .map(([key, info]) => {
+          const n = cardsDatabase
+            .filter((c) => c.rarity === key)
+            .reduce((sum, c) => sum + (owned.get(c.id) || 0), 0);
+          const row = el('div', 'rarity-row');
+          const dot = el('i');
+          dot.style.setProperty('--c', info.color);
+          row.append(dot, el('span', 'rarity-name', info.label), el('span', 'rarity-n', `x${n}`));
+          return row;
+        });
+      rarityBreakdown.replaceChildren(...rows);
+    }
+  }
+
+  on(pseudoForm, 'submit', async (e) => {
+    e.preventDefault();
+    const value = (pseudoInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+    if (!value) {
+      setProfileMsg('Choisis un pseudo (1 à 24 caractères).');
+      return;
+    }
+    profile.pseudo = value;
+    await saveProfile();
+    syncHudName();
+    renderAccount();
+    setProfileMsg('Pseudo mis à jour !');
+    showToast(`Pseudo : ${value}`);
+  });
+
+  on(friendCodeCopy, 'click', async () => {
+    const code = profile.friendCode || '';
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setProfileMsg('Code ami copié !');
+    } catch (error) {
+      setProfileMsg(`Ton code ami : ${code}`);
+    }
+  });
+
+  /* Photo de profil : l'image est recadrée en carré et réduite (256 px JPEG)
+     avant d'être stockée dans le profil public — pas besoin de Storage. */
+  on(avatarUploadBtn, 'click', () => {
+    if (avatarInput) avatarInput.click();
+  });
+
+  on(avatarInput, 'change', async () => {
+    const file = avatarInput.files && avatarInput.files[0];
+    avatarInput.value = '';
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) {
+      setProfileMsg('Choisis une image (PNG, JPG…).');
+      return;
+    }
+    try {
+      profile.avatar = await resizeAvatar(file, 256);
+      await saveProfile();
+      renderAccount();
+      setProfileMsg('Photo de profil mise à jour !');
+      showToast('Photo de profil mise à jour');
+    } catch (error) {
+      setProfileMsg('Impossible de lire cette image. Réessaie avec un autre fichier.');
+    }
+  });
+
+  function resizeAvatar(file, size) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('lecture'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('image'));
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const side = Math.min(img.naturalWidth, img.naturalHeight);
+            const sx = (img.naturalWidth - side) / 2;
+            const sy = (img.naturalHeight - side) / 2;
+            ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+            resolve(canvas.toDataURL('image/jpeg', 0.82));
+          } catch (error) {
+            reject(error);
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  on(avatarGoogleBtn, 'click', async () => {
+    profile.avatar = '';
+    await saveProfile();
+    renderAccount();
+    setProfileMsg('Ta photo Google est de nouveau utilisée.');
+  });
+
+  /* ------------------------------------------------------------------ amis */
+
+  async function fetchFriendProfile(uid) {
+    if (friendProfiles.has(uid)) return friendProfiles.get(uid);
+    const fallback = {
+      pseudo: 'Joueur', avatar: '', friendCode: '',
+      coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: []
+    };
+    if (!cloudReady()) return fallback;
+    try {
+      const snap = await cloudDb.collection('playerProfiles').doc(uid).get();
+      if (snap.exists) {
+        const d = snap.data() || {};
+        const data = {
+          pseudo: d.pseudo || 'Joueur',
+          avatar: d.avatar || '',
+          friendCode: d.friendCode || '',
+          coins: Number(d.coins) || 0,
+          totalCards: Number(d.totalCards) || 0,
+          uniqueCards: Number(d.uniqueCards) || 0,
+          bestRarity: d.bestRarity || null,
+          collection: Array.isArray(d.collection) ? d.collection : []
+        };
+        friendProfiles.set(uid, data);
+        return data;
+      }
+    } catch (error) {
+      console.warn('Profil ami illisible:', error);
+    }
+    friendProfiles.set(uid, fallback);
+    return fallback;
+  }
+
+  function setAddFriendMsg(msg) {
+    if (addFriendMsg) addFriendMsg.textContent = msg || '';
+  }
+
+  on(addFriendForm, 'submit', async (e) => {
+    e.preventDefault();
+    if (!cloudReady()) {
+      setAddFriendMsg('Connecte-toi pour ajouter des amis.');
+      return;
+    }
+    const code = normalizeFriendCode(friendCodeInput.value);
+    if (!/^REFS-[A-Z0-9]{6}$/.test(code)) {
+      setAddFriendMsg('Code invalide : il ressemble à REFS-XXXXXX.');
+      return;
+    }
+    setAddFriendMsg('Recherche de ton ami…');
+    try {
+      const snap = await cloudDb.collection('friendCodes').doc(code).get();
+      if (!snap.exists) {
+        setAddFriendMsg('Aucun joueur trouvé avec ce code. Vérifie-le et réessaie.');
+        return;
+      }
+      const uid = snap.data() && snap.data().uid;
+      if (!uid) {
+        setAddFriendMsg('Aucun joueur trouvé avec ce code.');
+        return;
+      }
+      if (uid === currentUser.uid) {
+        setAddFriendMsg('C’est ton propre code ami !');
+        return;
+      }
+      if (friends.includes(uid)) {
+        setAddFriendMsg('Cet ami est déjà dans ta liste.');
+        return;
+      }
+      friends.push(uid);
+      save();
+      const data = await fetchFriendProfile(uid);
+      setAddFriendMsg(`${data.pseudo} ajouté à tes amis !`);
+      showToast(`${data.pseudo} ajouté à tes amis`);
+      friendCodeInput.value = '';
+      renderOnline();
+    } catch (error) {
+      setAddFriendMsg('Recherche impossible pour le moment. Vérifie ta connexion.');
+    }
+  });
+
+  function renderOnline() {
+    if (!onlineView) return;
+    if (friendsCount) friendsCount.textContent = String(friends.length);
+    if (friendsEmpty) friendsEmpty.hidden = friends.length > 0;
+    if (friendsList) {
+      const frag = document.createDocumentFragment();
+      friends.forEach((uid) => {
+        const data = friendProfiles.get(uid) || {
+          pseudo: 'Joueur', avatar: '', totalCards: 0, uniqueCards: 0
+        };
+        const row = el('div', 'friend-row');
+        const img = el('img', 'friend-row-avatar');
+        img.alt = '';
+        if (data.avatar) img.src = data.avatar;
+        else img.hidden = true;
+        const fb = el('span', 'friend-row-fallback', (data.pseudo || '?').slice(0, 1).toUpperCase());
+        if (data.avatar) fb.hidden = true;
+        const idBox = el('div', 'friend-row-id');
+        idBox.append(
+          el('strong', 'friend-row-pseudo', data.pseudo || 'Joueur'),
+          el('span', 'friend-row-sub', `${data.uniqueCards || 0} uniques · ${data.totalCards || 0} cartes`)
+        );
+        const view = el('button', 'mini-btn', 'Voir');
+        view.type = 'button';
+        on(view, 'click', () => openFriendDetail(uid));
+        const remove = el('button', 'mini-btn danger', 'Retirer');
+        remove.type = 'button';
+        on(remove, 'click', () => {
+          friends = friends.filter((u) => u !== uid);
+          save();
+          if (selectedFriendUid === uid) closeFriendDetail();
+          renderOnline();
+          showToast('Ami retiré');
+        });
+        row.append(img, fb, idBox, view, remove);
+        frag.append(row);
+      });
+      friendsList.replaceChildren(frag);
+    }
+    renderTrades();
+    if (selectedFriendUid) renderFriendDetail(selectedFriendUid);
+  }
+
+  async function openFriendDetail(uid) {
+    selectedFriendUid = uid;
+    if (friendDetail) friendDetail.hidden = false;
+    await fetchFriendProfile(uid);
+    if (selectedFriendUid !== uid) return;
+    renderFriendDetail(uid);
+    try {
+      if (friendDetail && typeof friendDetail.scrollIntoView === 'function') {
+        friendDetail.scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start' });
+      }
+    } catch (error) { /* défilement indisponible : sans gravité */ }
+  }
+
+  function closeFriendDetail() {
+    selectedFriendUid = null;
+    if (friendDetail) friendDetail.hidden = true;
+  }
+
+  function renderFriendDetail(uid) {
+    const data = friendProfiles.get(uid);
+    if (!data || !friendDetail) return;
+    if (friendAvatar) {
+      if (data.avatar) {
+        friendAvatar.src = data.avatar;
+        friendAvatar.hidden = false;
+        if (friendAvatarFallback) friendAvatarFallback.hidden = true;
+      } else {
+        friendAvatar.removeAttribute('src');
+        friendAvatar.hidden = true;
+        if (friendAvatarFallback) friendAvatarFallback.hidden = false;
+      }
+    }
+    if (friendPseudo) friendPseudo.textContent = data.pseudo || 'Joueur';
+    if (friendCodeLabel) friendCodeLabel.textContent = data.friendCode ? `Code ami · ${data.friendCode}` : '';
+    if (friendStats) {
+      const stats = statsFor(data.collection, data.coins);
+      const defs = [
+        ['🪙 Pièces', fmt(stats.coins)],
+        ['🃏 Cartes', fmt(stats.total)],
+        ['✦ Uniques', `${stats.unique} / ${cardsDatabase.length}`],
+        ['👑 Meilleure', stats.best ? RARITIES[stats.best.rarity].label : '—']
+      ];
+      friendStats.replaceChildren(...defs.map(([label, value]) => {
+        const card = el('div', 'stat-card');
+        card.append(el('span', 'stat-label', label), el('span', 'stat-value', value));
+        return card;
+      }));
+    }
+    if (friendCards) {
+      const owned = new Map();
+      for (const id of data.collection) owned.set(id, (owned.get(id) || 0) + 1);
+      const ownedCards = cardsDatabase.filter((c) => owned.has(c.id));
+      friendCards.replaceChildren(...ownedCards.map((card, i) => {
+        const info = RARITIES[card.rarity] || RARITIES.common;
+        const price = info.reward * 2;
+        const tile = el('div', 'friend-card');
+        tile.style.setProperty('--i', i);
+        tile.style.setProperty('--r-color', info.color);
+        tile.style.setProperty('--r-glow', info.glow);
+        tile.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
+        const n = owned.get(card.id) || 0;
+        if (n > 1) tile.append(el('span', 'coll-pill', `x${n}`));
+        const actions = el('div', 'friend-card-actions');
+        const swap = el('button', 'mini-btn', 'Échanger');
+        swap.type = 'button';
+        on(swap, 'click', () => openTradePicker(uid, card.id));
+        const buy = el('button', 'mini-btn primary', `Acheter · ${fmt(price)} 🪙`);
+        buy.type = 'button';
+        if (state.coins < price) buy.disabled = true;
+        on(buy, 'click', () => askBuy(uid, card.id, price));
+        actions.append(swap, buy);
+        tile.append(actions);
+        return tile;
+      }));
+      if (friendCardsEmpty) friendCardsEmpty.hidden = ownedCards.length > 0;
+    }
+  }
+
+  on(friendClose, 'click', closeFriendDetail);
+
+  /* ------------------------------------------------- fenêtres d'échange/achat */
+
+  function openSheet(sheet) {
+    if (!sheet) return;
+    sheet.hidden = false;
+    void sheet.offsetWidth;
+    sheet.classList.add('is-open');
+  }
+
+  function closeSheet(sheet) {
+    if (!sheet) return;
+    sheet.classList.remove('is-open');
+    sheet.hidden = true;
+  }
+
+  function askConfirm({ title, message, confirmLabel, onConfirm }) {
+    if (confirmTitle) confirmTitle.textContent = title || 'Confirmer ?';
+    if (confirmMessage) confirmMessage.textContent = message || '';
+    if (confirmOk) confirmOk.textContent = confirmLabel || 'Confirmer';
+    confirmAction = onConfirm || null;
+    openSheet(confirmSheet);
+  }
+
+  on(confirmOk, 'click', () => {
+    const action = confirmAction;
+    confirmAction = null;
+    closeSheet(confirmSheet);
+    if (action) action();
+  });
+
+  [tradeSheet, confirmSheet].forEach((sheet) => {
+    if (!sheet) return;
+    sheet.querySelectorAll('[data-close]').forEach((b) => on(b, 'click', () => closeSheet(sheet)));
+  });
+
+  function openTradePicker(uid, cardId) {
+    const data = friendProfiles.get(uid);
+    const wanted = cardsDatabase.find((c) => c.id === cardId);
+    if (!wanted) return;
+    tradeTarget = { uid, cardId };
+    const who = data ? data.pseudo : 'Ton ami';
+    if (tradeSheetSub) {
+      tradeSheetSub.textContent = `${who} te donne « ${wanted.name} ». Choisis une de tes cartes à lui donner en échange :`;
+    }
+    const owned = countMap();
+    const mine = cardsDatabase.filter((c) => owned.has(c.id));
+    if (tradePicker) {
+      tradePicker.replaceChildren(...mine.map((card) => {
+        const info = RARITIES[card.rarity] || RARITIES.common;
+        const n = owned.get(card.id) || 0;
+        const b = el('button', 'picker-tile');
+        b.type = 'button';
+        b.style.setProperty('--r-color', info.color);
+        b.style.setProperty('--r-glow', info.glow);
+        b.append(cardFrame(card, { mini: true, alt: card.name }));
+        if (n > 1) b.append(el('span', 'coll-pill', `x${n}`));
+        on(b, 'click', () => {
+          closeSheet(tradeSheet);
+          askConfirm({
+            title: 'Proposer l’échange ?',
+            message: `Tu donnes « ${card.name} » et tu reçois « ${wanted.name} » de ${who}. ${who} pourra accepter ou refuser.`,
+            confirmLabel: 'Proposer',
+            onConfirm: () => createTrade({ toUid: uid, giveId: card.id, receiveId: wanted.id, price: 0 })
+          });
+        });
+        return b;
+      }));
+    }
+    openSheet(tradeSheet);
+  }
+
+  function askBuy(uid, cardId, price) {
+    const data = friendProfiles.get(uid);
+    const card = cardsDatabase.find((c) => c.id === cardId);
+    if (!card) return;
+    if (state.coins < price) {
+      showToast('Pas assez de pièces pour cet achat.');
+      return;
+    }
+    const who = data ? data.pseudo : 'Ton ami';
+    askConfirm({
+      title: 'Acheter cette carte ?',
+      message: `« ${card.name} » (${RARITIES[card.rarity].label}) coûte ${fmt(price)} 🪙. ${who} pourra accepter ou refuser la vente.`,
+      confirmLabel: `Acheter · ${fmt(price)} 🪙`,
+      onConfirm: () => createTrade({ toUid: uid, giveId: null, receiveId: card.id, price })
+    });
+  }
+
+  /* ---------------------------------------------------------------- échanges
+     Un échange est un document trades/{id} partagé par les deux joueurs.
+     Chacun applique sa propre moitié dans SA sauvegarde (les règles
+     Firestore restent « propriétaire uniquement ») : quand les deux
+     moitiés sont appliquées, l'échange passe à « done ». Si l'autre joueur
+     est hors ligne, sa moitié s'applique à sa prochaine connexion. */
+
+  async function createTrade({ toUid, giveId, receiveId, price }) {
+    if (!cloudReady()) {
+      showToast('Connexion requise pour échanger.');
+      return;
+    }
+    const id = `${currentUser.uid}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      await cloudDb.collection('trades').doc(id).set({
+        fromUid: currentUser.uid,
+        toUid,
+        giveId: giveId || null,
+        receiveId: receiveId || null,
+        price: Number(price) || 0,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        applied: {}
+      });
+      showToast('Échange proposé ! Ton ami le verra dans « En ligne ».');
+      await loadTrades();
+      renderOnline();
+    } catch (error) {
+      showToast('Impossible d’envoyer la proposition. Réessaie.');
+    }
+  }
+
+  async function updateTrade(id, patch) {
+    if (!cloudReady()) return;
+    try {
+      await cloudDb.collection('trades').doc(id).update(patch);
+    } catch (error) {
+      console.warn('Échange non mis à jour:', error);
+    }
+  }
+
+  function snapshotDocs(snap) {
+    if (!snap) return [];
+    if (Array.isArray(snap.docs)) return snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    const out = [];
+    if (typeof snap.forEach === 'function') snap.forEach((d) => out.push({ id: d.id, data: d.data() }));
+    return out;
+  }
+
+  async function loadTrades() {
+    if (!cloudReady()) return;
+    const tradesColl = cloudDb.collection('trades');
+    if (!tradesColl || typeof tradesColl.where !== 'function') return;
+    const uid = currentUser.uid;
+    const found = new Map();
+    try {
+      const q1 = tradesColl.where('fromUid', '==', uid);
+      const q2 = tradesColl.where('toUid', '==', uid);
+      const [s1, s2] = await Promise.all([q1.get(), q2.get()]);
+      for (const t of [...snapshotDocs(s1), ...snapshotDocs(s2)]) {
+        found.set(t.id, { id: t.id, ...t.data });
+      }
+    } catch (error) {
+      console.warn('Échanges illisibles:', error);
+      return;
+    }
+    trades = [...found.values()];
+    for (const trade of trades) {
+      if (trade.status === 'accepted' && !(trade.applied && trade.applied[uid])) {
+        await applyMyHalf(trade);
+      }
+    }
+    if (app.dataset.tab === 'online') renderOnline();
+  }
+
+  function subscribeTrades() {
+    if (!cloudReady() || tradesUnsub) return;
+    const uid = currentUser.uid;
+    try {
+      const onSnap = (snap) => {
+        const found = new Map(trades.map((t) => [t.id, t]));
+        for (const t of snapshotDocs(snap)) found.set(t.id, { id: t.id, ...t.data });
+        trades = [...found.values()];
+        if (app.dataset.tab === 'online') renderOnline();
+      };
+      const q1 = cloudDb.collection('trades').where('fromUid', '==', uid);
+      const q2 = cloudDb.collection('trades').where('toUid', '==', uid);
+      if (typeof q1.onSnapshot === 'function') {
+        const un1 = q1.onSnapshot(onSnap, () => {});
+        const un2 = typeof q2.onSnapshot === 'function' ? q2.onSnapshot(onSnap, () => {}) : null;
+        tradesUnsub = () => {
+          try { if (un1) un1(); } catch (error) { /* déjà fermé */ }
+          try { if (un2) un2(); } catch (error) { /* déjà fermé */ }
+        };
+      }
+    } catch (error) { /* temps réel indisponible : loadTrades suffit */ }
+  }
+
+  async function applyMyHalf(trade) {
+    const uid = currentUser.uid;
+    const applied = { ...(trade.applied || {}), [uid]: true };
+    const ids = collectionIds();
+    const removeOne = (id) => {
+      const i = ids.indexOf(id);
+      if (i >= 0) ids.splice(i, 1);
+    };
+    const addOne = (id) => {
+      if (cardsDatabase.some((c) => c.id === id)) ids.push(id);
+    };
+
+    if (trade.price > 0) {
+      if (trade.fromUid === uid) {
+        // Je suis l'acheteur : je paie et je reçois la carte.
+        if (state.coins < trade.price) {
+          await updateTrade(trade.id, { status: 'declined', applied });
+          showToast('Échange refusé : pièces insuffisantes.');
+          return;
+        }
+        addOne(trade.receiveId);
+        state.collection = ids.map((id) => cardsDatabase.find((c) => c.id === id)).filter(Boolean);
+        addCoins(-trade.price);
+      } else {
+        // Je suis le vendeur : je donne la carte et je reçois les pièces.
+        if (!ids.includes(trade.receiveId)) {
+          await updateTrade(trade.id, { status: 'declined', applied });
+          showToast('Échange refusé : tu n’as plus cette carte.');
+          return;
+        }
+        removeOne(trade.receiveId);
+        state.collection = ids.map((id) => cardsDatabase.find((c) => c.id === id)).filter(Boolean);
+        addCoins(trade.price);
+      }
+    } else {
+      // Échange : je donne giveId, je reçois receiveId.
+      if (!ids.includes(trade.giveId)) {
+        await updateTrade(trade.id, { status: 'declined', applied });
+        showToast('Échange refusé : tu n’as plus cette carte.');
+        return;
+      }
+      removeOne(trade.giveId);
+      addOne(trade.receiveId);
+      state.collection = ids.map((id) => cardsDatabase.find((c) => c.id === id)).filter(Boolean);
+      save();
+    }
+    saveProfileSoon();
+    renderCollection();
+    const done = Object.keys(applied).length >= 2;
+    await updateTrade(trade.id, { applied, status: done ? 'done' : 'accepted' });
+    trade.applied = applied;
+    trade.status = done ? 'done' : 'accepted';
+    showToast('Échange terminé !');
+  }
+
+  async function acceptTrade(trade) {
+    await updateTrade(trade.id, { status: 'accepted' });
+    trade.status = 'accepted';
+    await applyMyHalf(trade);
+    renderOnline();
+  }
+
+  async function declineTrade(trade) {
+    await updateTrade(trade.id, { status: 'declined' });
+    trade.status = 'declined';
+    renderOnline();
+  }
+
+  async function cancelTrade(trade) {
+    await updateTrade(trade.id, { status: 'cancelled' });
+    trade.status = 'cancelled';
+    renderOnline();
+  }
+
+  function cardName(id) {
+    const card = cardsDatabase.find((c) => c.id === id);
+    return card ? card.name : 'une carte';
+  }
+
+  function tradeText(trade, incoming) {
+    const otherUid = incoming ? trade.fromUid : trade.toUid;
+    const other = friendProfiles.get(otherUid);
+    const who = other ? other.pseudo : 'Ton ami';
+    if (trade.price > 0) {
+      return incoming
+        ? `${who} te vend « ${cardName(trade.receiveId)} » pour ${fmt(trade.price)} 🪙`
+        : `Tu achètes « ${cardName(trade.receiveId)} » à ${who} pour ${fmt(trade.price)} 🪙`;
+    }
+    return incoming
+      ? `${who} t’offre « ${cardName(trade.receiveId)} » contre ton « ${cardName(trade.giveId)} »`
+      : `Tu proposes ton « ${cardName(trade.giveId)} » contre « ${cardName(trade.receiveId)} » à ${who}`;
+  }
+
+  function renderTrades() {
+    if (!tradesIn || !tradesOut) return;
+    const uid = currentUser && currentUser.uid;
+    // Profils des autres joueurs inconnus : on les charge puis on rafraîchit.
+    trades.forEach((t) => {
+      const other = t.toUid === uid ? t.fromUid : t.toUid;
+      if (other && !friendProfiles.has(other)) {
+        fetchFriendProfile(other).then(() => {
+          if (app.dataset.tab === 'online') renderOnline();
+        });
+      }
+    });
+    const incoming = trades.filter((t) => t.toUid === uid && (t.status === 'pending' || t.status === 'accepted'));
+    const outgoing = trades.filter((t) => t.fromUid === uid && (t.status === 'pending' || t.status === 'accepted'));
+    const build = (list, isIncoming) => {
+      if (!list.length) {
+        return [el('p', 'online-empty', isIncoming ? 'Aucune proposition reçue.' : 'Aucune proposition envoyée.')];
+      }
+      return list.map((trade) => {
+        const row = el('div', 'trade-row');
+        row.append(el('span', 'trade-text', tradeText(trade, isIncoming)));
+        if (trade.status === 'pending') {
+          if (isIncoming) {
+            const ok = el('button', 'mini-btn primary', 'Accepter');
+            ok.type = 'button';
+            on(ok, 'click', () => acceptTrade(trade));
+            const no = el('button', 'mini-btn danger', 'Refuser');
+            no.type = 'button';
+            on(no, 'click', () => declineTrade(trade));
+            row.append(ok, no);
+          } else {
+            const cancel = el('button', 'mini-btn', 'Annuler');
+            cancel.type = 'button';
+            on(cancel, 'click', () => cancelTrade(trade));
+            row.append(cancel);
+          }
+        } else {
+          row.append(el('span', 'trade-status', 'En attente de l’autre joueur…'));
+        }
+        return row;
+      });
+    };
+    tradesIn.replaceChildren(...build(incoming, true));
+    tradesOut.replaceChildren(...build(outgoing, false));
+  }
 
   /* Inspection : la carte suit le doigt / la souris (tilt + reflet holographique). */
   let inspRaf = 0;

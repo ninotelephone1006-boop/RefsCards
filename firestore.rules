@@ -1,20 +1,68 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs.
     match /playerSaves/{userId} {
       function ownsSave() {
         return request.auth != null && request.auth.uid == userId;
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'updatedAt'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
         && request.resource.data.firstPack is bool
         && request.resource.data.collection is list
         && request.resource.data.collection.size() <= 10000
+        && request.resource.data.friends is list
+        && request.resource.data.friends.size() <= 500
+        && request.resource.data.packsOpened is int
+        && request.resource.data.packsOpened >= 0
         && request.resource.data.updatedAt is timestamp;
+      allow delete: if false;
+    }
+
+    // Profil public (pseudo, avatar, code ami, stats, collection) : lisible par
+    // tout joueur connecté (c'est ce que voient les amis), modifiable uniquement
+    // par son propriétaire.
+    match /playerProfiles/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.pseudo is string
+        && request.resource.data.pseudo.size() <= 24
+        && request.resource.data.avatar is string
+        && request.resource.data.avatar.size() <= 300000
+        && request.resource.data.friendCode is string
+        && request.resource.data.friendCode.matches('^REFS-[A-Z0-9]{6}$');
+      allow delete: if false;
+    }
+
+    // Annuaire code ami -> uid (recherche d'amis par code).
+    match /friendCodes/{code} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Échanges / achats entre deux joueurs : seules les deux parties peuvent
+    // lire et modifier la proposition. Chaque joueur applique sa moitié dans
+    // sa propre sauvegarde (playerSaves reste « propriétaire uniquement »).
+    match /trades/{tradeId} {
+      function isParty() {
+        return request.auth != null
+          && (request.auth.uid == resource.data.fromUid
+              || request.auth.uid == resource.data.toUid);
+      }
+      allow read: if isParty();
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if isParty();
       allow delete: if false;
     }
   }
