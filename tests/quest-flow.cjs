@@ -1,6 +1,6 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/quest-flow.cjs
 // Vérifie le système de quêtes / succès / niveau / notifications :
-// - quests.js : 20 quêtes, 30 succès, progression à vie (rétroactive), XP.
+// - quests.js : 70 quêtes (dont des récompenses en PACKS, sans pièces), 30 succès, progression à vie (rétroactive), XP.
 // - intégration : onglet Quêtes, cinq quêtes actives, réclamation libre, récompenses (pièces + XP), remplacement automatique, badges,
 //   succès qui se débloquent, panneau de notifications et persistance.
 const { JSDOM } = require('jsdom');
@@ -128,18 +128,34 @@ const freshSave = () => ({
 });
 
 (async () => {
-  /* ---------- 1. Données pures : 20 quêtes, 30 succès, XP, rétroactivité. ---------- */
+  /* ---------- 1. Données pures : 70 quêtes, 30 succès, XP, rétroactivité. ---------- */
   {
     const dom = new JSDOM('<!DOCTYPE html><body></body>', { url: 'https://refs-cards.test/', runScripts: 'outside-only' });
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
     const Q = vm.runInContext('RefsQuests', context);
-    assert.equal(Q.QUESTS.length, 20, 'exactement 20 quêtes');
+    assert.equal(Q.QUESTS.length, 70, 'exactement 70 quêtes');
     assert.equal(Q.ACHIEVEMENTS.length, 30, 'exactement 30 succès');
-    assert.equal(new Set(Q.QUESTS.map((q) => q.id)).size, 20, 'ids de quêtes uniques');
+    assert.equal(new Set(Q.QUESTS.map((q) => q.id)).size, 70, 'ids de quêtes uniques');
     assert.equal(new Set(Q.ACHIEVEMENTS.map((a) => a.id)).size, 30, 'ids de succès uniques');
-    assert.ok(Q.QUESTS.every((q) => q.title && q.desc && q.metric && q.target >= 1 && q.reward && q.reward.coins > 0 && q.reward.xp > 0),
+    assert.ok(Q.QUESTS.every((q) => q.title && q.desc && q.metric && q.target >= 1 && q.reward),
       'chaque quête a un titre, un objectif et une récompense');
+    /* Chaque quête donne au moins quelque chose, et les récompenses sont
+       variées : beaucoup offrent des PACKS, parfois sans aucune pièce. */
+    const rewards = Q.QUESTS.map((q) => Q.questReward(q));
+    assert.ok(rewards.every((r) => r.coins > 0 || r.xp > 0 || Object.keys(r.packs).length > 0),
+      'chaque quête donne des pièces, de l’XP ou des packs');
+    const withPacks = Q.QUESTS.filter((q) => Object.keys(Q.questReward(q).packs).length > 0);
+    assert.ok(withPacks.length >= 40, `au moins 40 quêtes donnent des packs, vu ${withPacks.length}`);
+    const packOnly = rewards.filter((r) => !r.coins);
+    assert.ok(packOnly.length >= 30, `au moins 30 quêtes sans pièces, vu ${packOnly.length}`);
+    assert.ok(rewards.some((r) => r.coins === 0 && r.xp === 0 && Object.keys(r.packs).length > 0),
+      'au moins une quête ne donne QUE des packs');
+    assert.ok(rewards.some((r) => r.coins === 0 && r.xp > 0 && Object.keys(r.packs).length > 0),
+      'au moins une quête donne XP + packs sans pièces');
+    assert.deepEqual(Object.keys(Q.questReward({ reward: { packs: { rare: 2, legend: 0, nope: 3 } } }).packs), ['rare'],
+      'les packs inconnus / à zéro sont ignorés');
+    assert.equal(Q.packRewardLabel({ rare: 1, video: 2 }), '1 Pack Rare + 2 Pack Vidéo', 'libellé des packs');
     assert.ok(Q.ACHIEVEMENTS.every((a) => a.title && a.desc && a.metric && a.target >= 1 && a.xp > 0),
       'chaque succès a un titre, un objectif et de l’XP');
     /* Progression à vie : les compteurs absolus comptent, sans remise à zéro. */
@@ -173,7 +189,7 @@ const freshSave = () => ({
     assert.equal(lvl(250).into, 150);
     assert.equal(lvl(300).level, 3);
     dom.window.close();
-    console.log('PASS données : 20 quêtes, 30 succès, progression rétroactive et niveaux cohérents');
+    console.log('PASS données : 70 quêtes (dont récompenses en packs), 30 succès, progression rétroactive et niveaux cohérents');
   }
 
   /* ---------- 2. Page Quêtes : onglet, quête active, verrouillage. ---------- */
@@ -188,7 +204,7 @@ const freshSave = () => ({
     doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
     assert.equal(doc.getElementById('app').dataset.tab, 'quests');
-    assert.equal(doc.getElementById('quests-count').textContent, '0 / 20 terminées · 5 quêtes actives');
+    assert.equal(doc.getElementById('quests-count').textContent, '0 / 70 terminées · 5 quêtes actives');
     assert.equal(doc.getElementById('level-value').textContent, '1');
     assert.equal(doc.getElementById('ach-count').textContent, '0 / 30');
     const claim = doc.querySelector('.quest-claim');
@@ -231,7 +247,7 @@ const freshSave = () => ({
     await wait(60);
     assert.equal(hook.state.coins, 100, '100 pièces de quête, le niveau ne crédite pas');
     assert.equal(hook.questState.xp, 150, '50 (quête) + 50 (a01) + 50 (a26 niveau 2) = 150 XP');
-    assert.deepEqual(doc.getElementById('quests-count').textContent, '1 / 20 terminées · 5 quêtes actives');
+    assert.deepEqual(doc.getElementById('quests-count').textContent, '1 / 70 terminées · 5 quêtes actives');
     assert.equal(doc.querySelector('.quest-title').textContent, 'Petite collection', 'quête 2 débloquée après la 1re');
     assert.equal(doc.querySelectorAll('.quest-done-row').length, 1, 'quête 1 dans les terminées');
     assert.equal(doc.querySelector('.quest-claim').disabled, true, 'quête 2 pas encore réclamable (0 carte unique)');
@@ -277,7 +293,7 @@ const freshSave = () => ({
        récompense disponible tout de suite. */
     assert.equal(doc.querySelector('.quest-claim').disabled, false, 'quête 1 rétroactive : réclamable sans rien refaire');
     assert.ok(doc.querySelector('.quest-card').classList.contains('is-ready'), 'carte marquée « prête »');
-    assert.match(doc.getElementById('quests-count').textContent, /0 \/ 20 terminées · 5 quêtes actives · récompense prête/);
+    assert.match(doc.getElementById('quests-count').textContent, /0 \/ 70 terminées · 5 quêtes actives · récompense prête/);
     assert.equal(doc.getElementById('tab-badge-quests').hidden, false, 'badge de l’onglet allumé');
 
     /* Réclamation : +100 🪙, puis la quête 2 « 5 cartes différentes » est
@@ -400,7 +416,7 @@ const freshSave = () => ({
     assert.equal(hook2.questState.baseline, undefined, 'aucun baseline à restaurer');
     second.doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
-    assert.equal(second.doc.getElementById('quests-count').textContent, '1 / 20 terminées · 5 quêtes actives', 'on reprend à la quête 2');
+    assert.equal(second.doc.getElementById('quests-count').textContent, '1 / 70 terminées · 5 quêtes actives', 'on reprend à la quête 2');
     assert.equal(second.doc.querySelector('.quest-title').textContent, 'Petite collection', 'pas de retour en arrière');
     assert.ok(hook2.questState.notifications.length >= 1, 'notifications rechargées');
     second.w.close();
@@ -444,16 +460,58 @@ const freshSave = () => ({
   /* Fin de liste : moins de cinq actives, puis écran terminé. */
   {
     const save = freshSave();
-    save.quests = Array.from({ length: 18 }, (_, i) => `q${String(i + 1).padStart(2, '0')}`);
+    save.quests = Array.from({ length: 68 }, (_, i) => `q${String(i + 1).padStart(2, '0')}`);
     const { w, doc } = await boot(save);
-    assert.equal(doc.querySelectorAll('.quest-card').length, 2);
+    assert.equal(doc.querySelectorAll('.quest-card').length, 2, 'deux dernières quêtes actives');
     w.close();
-    save.quests.push('q19', 'q20');
+    /* Fin de la saison 2 : les 70 quêtes réclamées => écran terminé. */
+    save.quests = Array.from({ length: 70 }, (_, i) => `q${String(i + 1).padStart(2, '0')}`);
     const last = await boot(save);
     assert.equal(last.doc.querySelectorAll('.quest-card').length, 0);
     assert.ok(last.doc.querySelector('.quest-all-done'));
     assert.equal(last.doc.getElementById('tab-badge-quests').hidden, true);
     last.w.close();
+  }
+
+  /* Récompenses en PACKS : une quête sans pièces remplit l'inventaire. */
+  {
+    const { w, doc, store } = await boot(freshSave());
+    doc.querySelector('[data-tab="quests"]').click();
+    await wait(30);
+    /* q01 « Premier déchir » : récompense en pièces + XP (pas de pack). */
+    doc.querySelector('[data-quest-id="q01"] .quest-claim').click();
+    await wait(40);
+    /* On valide les quêtes 2 à 20, puis on réclame q21 « Booster offert »
+       (1 Pack Classique, 0 pièce). */
+    const hook = w.__quest;
+    hook.questState.completed.push('q02', 'q03', 'q04', 'q05');
+    hook.setPackOpened(2);
+    hook.track();
+    await wait(30);
+    /* On termine aussi q06..q20 pour que q21 entre dans la fenêtre. */
+    const claimed = Array.from({ length: 15 }, (_, i) => `q${String(i + 6).padStart(2, '0')}`);
+    hook.questState.completed.push(...claimed);
+    hook.track();
+    await wait(30);
+    assert.ok(doc.querySelector('[data-quest-id="q21"]'), 'q21 devient active');
+    const packBadge = doc.querySelector('[data-quest-id="q21"] .quest-reward-pack');
+    assert.ok(packBadge, 'la récompense en pack est affichée');
+    assert.match(packBadge.textContent, /1 Pack Classique/);
+    assert.equal(doc.querySelectorAll('[data-quest-id="q21"] .quest-reward').length, 2,
+      'pas de pastille de pièces pour une quête sans argent');
+    const coinsBefore = hook.state.coins;
+    const stockBefore = hook.state.packStock.classic;
+    doc.querySelector('[data-quest-id="q21"] .quest-claim').click();
+    await wait(60);
+    assert.equal(hook.state.coins, coinsBefore, 'aucune pièce versée');
+    assert.equal(hook.state.packStock.classic, stockBefore + 1, 'le pack est ajouté à l’inventaire');
+    assert.ok(hook.questState.completed.includes('q21'));
+    const notice = hook.questState.notifications.find((n) => /Booster offert/.test(n.message));
+    assert.ok(notice && /Pack Classique/.test(notice.message), 'notification détaillant le pack');
+    await wait(400);
+    assert.ok(store.playerSaves.me.packStock.classic >= stockBefore + 1, 'packOffert persisté dans la sauvegarde');
+    w.close();
+    console.log('PASS récompenses en packs : inventaire crédité, pas de pièces, affichage et persistance');
   }
 
   console.log('PASS quest flow (quêtes, succès, niveaux, notifications)');

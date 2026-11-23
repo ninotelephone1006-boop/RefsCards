@@ -323,7 +323,14 @@
       QUEST_WINDOW: 5,
       activeQuests: () => [],
       questProgress: () => ({ value: 0, target: 1, done: false }),
-      achievementProgress: () => ({ value: 0, target: 1, done: false })
+      achievementProgress: () => ({ value: 0, target: 1, done: false }),
+      questReward: (quest) => ({
+        coins: Math.max(0, Number((quest && quest.reward || {}).coins) || 0),
+        xp: Math.max(0, Number((quest && quest.reward || {}).xp) || 0),
+        packs: {}
+      }),
+      packRewardLabel: () => '',
+      PACK_LABELS: {}
     };
   const NOTIF_ICONS = { quest: '🗺️', achievement: '🏆', level: '⭐', friend: '👥', market: '🪙', system: '✦' };
   const QUEST_NOTIFICATIONS_MAX = 50;
@@ -5762,11 +5769,31 @@
     if (app && app.dataset.tab === 'quests') renderQuests();
   }
 
+  /* Ajoute à l'inventaire les boosters offerts par une quête
+     (`{ rare: 1, video: 2 }`). Renvoie le nombre de packs ajoutés : 0 quand la
+     quête ne donne que des pièces / de l'XP. Si le pack courant n'est plus en
+     stock, on bascule sur le premier type disponible pour que l'onglet Pack
+     reste jouable. */
+  function grantQuestPacks(packs) {
+    if (!packs || typeof packs !== 'object') return 0;
+    let added = 0;
+    for (const type of PACK_TYPES) {
+      const qty = Math.max(0, Math.floor(Number(packs[type]) || 0));
+      if (!qty) continue;
+      state.packStock[type] = Math.max(0, Number(state.packStock[type]) || 0) + qty;
+      added += qty;
+    }
+    if (added && (state.packStock[state.currentPackType] || 0) <= 0) {
+      const first = PACK_TYPES.find((type) => (Number(state.packStock[type]) || 0) > 0);
+      if (first) selectPackType(first, { silent: true });
+    }
+    return added;
+  }
+
   /* Réclamation libre parmi les cinq actives : la suivante prend sa place. */
   function claimActiveQuest(id) {
     const quest = activeQuests().find((q) => q.id === id);
     if (!quest) return;
-    const reward = quest.reward || { coins: 0, xp: 0 };
     const progress = Quests.questProgress(quest, questCtx());
     if (!progress.done) {
       showToast('Objectif pas encore atteint : termine d’abord cette quête.');
@@ -5775,14 +5802,28 @@
     if (questState.completed.indexOf(quest.id) >= 0) return;
     questState.completed.push(quest.id);
     questReadyNotifiedIds.delete(quest.id);
-    const coins = Math.max(0, Math.floor(Number(reward.coins) || 0));
-    const xp = Math.max(0, Math.floor(Number(reward.xp) || 0));
+    /* Récompense normalisée : pièces, XP et/ou boosters (certaines quêtes ne
+       donnent AUCUNE pièce, seulement de l'XP et des packs). */
+    const questReward = Quests.questReward(quest);
+    const coins = questReward.coins;
+    const xp = questReward.xp;
+    const packs = questReward.packs;
+    const packText = Quests.packRewardLabel(packs);
+    const parts = [];
+    if (coins) parts.push(`+${fmt(coins)} 🪙`);
+    if (xp) parts.push(`+${fmt(xp)} XP`);
+    if (packText) parts.push(`+${packText}`);
+    const rewardSummary = parts.join(' et ') || 'récompense récupérée';
     if (coins) addCoins(coins);
+    if (grantQuestPacks(packs) && (app.dataset.tab === 'pack' || app.dataset.tab === 'shop')) {
+      renderShop();
+      renderPackInventory();
+    }
     pushNotification('quest', 'Quête terminée',
-      `« ${quest.title} » : +${fmt(coins)} 🪙 et +${fmt(xp)} XP.`);
+      `« ${quest.title} » : ${rewardSummary}.`);
     if (xp) gainXp(xp);
     if (SFX && typeof SFX.chaChing === 'function') SFX.chaChing();
-    showToast(`Quête terminée : ${quest.title} ! +${fmt(coins)} 🪙`, 3800);
+    showToast(`Quête terminée : ${quest.title} ! ${rewardSummary}`, 3800);
     save();
     checkAchievements();
     checkQuests();
@@ -5916,7 +5957,8 @@
     const active = activeQuests();
     const ctx = questCtx();
     for (const quest of active) {
-      const reward = quest.reward || { coins: 0, xp: 0 };
+      const reward = Quests.questReward(quest);
+      const packText = Quests.packRewardLabel(reward.packs);
       const progress = Quests.questProgress(quest, ctx);
       const card = el('article', 'quest-card' + (progress.done ? ' is-ready' : ''));
       card.dataset.questId = quest.id;
@@ -5944,10 +5986,11 @@
       card.append(progressBlock);
       const meta = el('div', 'quest-meta');
       const rewards = el('div', 'quest-rewards');
-      rewards.append(
-        el('span', 'quest-reward', `🪙 ${fmt(reward.coins)}`),
-        el('span', 'quest-reward quest-reward-xp', `⭐ ${fmt(reward.xp)} XP`)
-      );
+      if (reward.coins) rewards.append(el('span', 'quest-reward', `🪙 ${fmt(reward.coins)}`));
+      if (reward.xp) rewards.append(el('span', 'quest-reward quest-reward-xp', `⭐ ${fmt(reward.xp)} XP`));
+      /* Quêtes qui offrent des boosters (et parfois rien d'autre) : on détaille
+         le contenu exact du lot dans une pastille dédiée. */
+      if (packText) rewards.append(el('span', 'quest-reward quest-reward-pack', `📦 ${packText}`));
       const claim = el('button', 'quest-claim', progress.done ? 'RÉCLAMER LA RÉCOMPENSE' : 'EN COURS…');
       claim.type = 'button';
       claim.disabled = !progress.done;
@@ -5974,10 +6017,16 @@
         const definition = Quests.QUESTS.find((q) => q.id === id);
         if (!definition) return;
         const row = el('div', 'quest-done-row');
+        const doneReward = Quests.questReward(definition);
+        const doneParts = [];
+        if (doneReward.coins) doneParts.push(`+${fmt(doneReward.coins)} 🪙`);
+        if (doneReward.xp) doneParts.push(`+${fmt(doneReward.xp)} XP`);
+        const donePacks = Quests.packRewardLabel(doneReward.packs);
+        if (donePacks) doneParts.push(`+${donePacks}`);
         row.append(
           el('span', 'quest-icon', definition.icon || '🎯'),
           el('span', '', definition.title),
-          el('span', 'quest-done-reward', `+${fmt((definition.reward || {}).coins || 0)} 🪙`),
+          el('span', 'quest-done-reward', doneParts.join(' · ')),
           el('span', 'quest-done-check', '✓')
         );
         list.append(row);

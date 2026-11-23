@@ -4,13 +4,15 @@
    Chargement : script classique avant app.js (index.html). Expose l'objet
    global `RefsQuests` lu par app.js ; les tests jsdom le chargent aussi.
 
-   - `QUESTS` : 20 quêtes jouées 5 PAR 5. Chaque quête pose un objectif
-     (`metric` + `target`) et une récompense (`coins`, `xp`). app.js affiche
+   - `QUESTS` : 70 quêtes jouées 5 PAR 5. Chaque quête pose un objectif
+     (`metric` + `target`) et une récompense : `coins`, `xp` et/ou `packs`
+     (ex. `packs: { rare: 1 }`). Certaines quêtes ne donnent donc PAS de
+     pièces : elles offrent de l'XP et des boosters à ouvrir. app.js affiche
      en même temps les 5 premières quêtes pas encore réclamées : le joueur
      choisit l'ordre dans lequel il les fait (et les réclame dans n'importe
      quel ordre). Dès qu'une quête est réclamée, la suivante « pop » pour
      prendre sa place, de sorte qu'il y a toujours 5 quêtes en cours
-     (jusqu'à épuisement des 20). Les quêtes au-delà de la fenêtre restent
+     (jusqu'à épuisement des 70). Les quêtes au-delà de la fenêtre restent
      invisibles tant qu'elles ne sont pas entrées dans les 5.
    - `ACHIEVEMENTS` : 30 succès, libres (non séquentiels). Ils se débloquent
      automatiquement dès que leur condition est remplie.
@@ -70,12 +72,27 @@ const RefsQuests = (() => {
      est réclamée, la suivante de la liste pop pour la remplacer. */
   const QUEST_WINDOW = 5;
 
-  /* ------------------------------------------------------------- les 20 quêtes
+  /* Types de boosters pouvant être offerts par une quête (clés de
+     `state.packStock` dans app.js). */
+  const PACK_KEYS = ['classic', 'rare', 'legend', 'video'];
+
+  const PACK_LABELS = {
+    classic: 'Pack Classique',
+    rare: 'Pack Rare',
+    legend: 'Pack Légende',
+    video: 'Pack Vidéo'
+  };
+
+  /* ------------------------------------------------------------- les 70 quêtes
      Ordre croissant de difficulté : les premières se bouclent en quelques
      minutes, les dernières demandent une vraie collection (et donc de
      fusionner, vendre, ouvrir beaucoup de boosters). L'ordre ne bloque plus
      : les 5 premières non réclamées sont actives en parallèle, dans n'importe
-     quel ordre de réclamation. */
+     quel ordre de réclamation.
+     Récompenses : `coins` et `xp` restent facultatifs (`coins: 0` = quête
+     sans argent) et `packs` offre des boosters directement dans l'inventaire,
+     par exemple `packs: { rare: 1 }`. Une quête peut donc donner uniquement
+     de l'XP, uniquement des packs, ou les deux. */
   const QUESTS = [
     {
       id: 'q01', icon: '🎯', title: 'Premier déchir',
@@ -176,6 +193,259 @@ const RefsQuests = (() => {
       id: 'q20', icon: '🌟', title: 'Maître des cartes',
       desc: 'Ouvre 30 boosters.',
       metric: 'packsOpened', target: 30, reward: { coins: 1500, xp: 500 }
+    },
+
+    /* ---- Saison 2 : 50 quêtes de plus (q21 → q70). Beaucoup ne paient pas
+       en pièces mais en boosters (`packs`), pour varier les récompenses. ---- */
+    {
+      id: 'q21', icon: '🎁', title: 'Booster offert',
+      desc: 'Ouvre 2 boosters.',
+      metric: 'packsOpened', target: 2, reward: { coins: 0, xp: 60, packs: { classic: 1 } }
+    },
+    {
+      id: 'q22', icon: '🃏', title: 'Petit tas',
+      desc: 'Possède 8 cartes différentes.',
+      metric: 'unique', target: 8, reward: { coins: 0, xp: 90, packs: { classic: 1 } }
+    },
+    {
+      id: 'q23', icon: '👥', title: 'Deuxième contact',
+      desc: 'Aie 2 amis.',
+      metric: 'friends', target: 2, reward: { coins: 0, xp: 110, packs: { classic: 1 } }
+    },
+    {
+      id: 'q24', icon: '⚗️', title: 'Double fusion',
+      desc: 'Réalise 2 fusions.',
+      metric: 'fusions', target: 2, reward: { coins: 0, xp: 120, packs: { classic: 1 } }
+    },
+    {
+      id: 'q25', icon: '🛒', title: 'Deuxième achat',
+      desc: 'Achète 3 packs dans le Shop.',
+      metric: 'packsBought', target: 3, reward: { coins: 0, xp: 130, packs: { classic: 1 } }
+    },
+    {
+      id: 'q26', icon: '📦', title: 'Le rythme continue',
+      desc: 'Ouvre 7 boosters.',
+      metric: 'packsOpened', target: 7, reward: { coins: 0, xp: 150, packs: { rare: 1 } }
+    },
+    {
+      id: 'q27', icon: '🔵', title: 'Trois Rares',
+      desc: 'Possède 5 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 5, reward: { coins: 0, xp: 170, packs: { rare: 1 } }
+    },
+    {
+      id: 'q28', icon: '🏷️', title: 'Deuxième vente',
+      desc: 'Encaisse 2 ventes sur le marché.',
+      metric: 'marketSales', target: 2, reward: { coins: 0, xp: 160, packs: { classic: 2 } }
+    },
+    {
+      id: 'q29', icon: '🎁', title: 'Journée faste',
+      desc: 'Récupère 3 packs gratuits.',
+      metric: 'freePacks', target: 3, reward: { coins: 0, xp: 140, packs: { rare: 1 } }
+    },
+    {
+      id: 'q30', icon: '📚', title: 'Douze en tout',
+      desc: 'Possède 12 cartes différentes.',
+      metric: 'unique', target: 12, reward: { coins: 0, xp: 180, packs: { classic: 2 } }
+    },
+    {
+      id: 'q31', icon: '🎬', title: 'Vidéo amateur',
+      desc: 'Ouvre 10 boosters.',
+      metric: 'packsOpened', target: 10, reward: { coins: 0, xp: 200, packs: { video: 1 } }
+    },
+    {
+      id: 'q32', icon: '🟣', title: 'Trois Épiques',
+      desc: 'Possède 3 cartes Épiques ou plus.',
+      metric: 'epicPlus', target: 3, reward: { coins: 0, xp: 220, packs: { rare: 1 } }
+    },
+    {
+      id: 'q33', icon: '🧪', title: 'Fusionneur',
+      desc: 'Réalise 8 fusions.',
+      metric: 'fusions', target: 8, reward: { coins: 0, xp: 240, packs: { legend: 1 } }
+    },
+    {
+      id: 'q34', icon: '🤝', title: 'Quatre amis',
+      desc: 'Aie 4 amis.',
+      metric: 'friends', target: 4, reward: { coins: 0, xp: 220, packs: { classic: 2 } }
+    },
+    {
+      id: 'q35', icon: '💼', title: 'Petit commerce',
+      desc: 'Gagne 500 pièces grâce à tes ventes.',
+      metric: 'marketEarned', target: 500, reward: { coins: 0, xp: 200, packs: { rare: 1 } }
+    },
+    {
+      id: 'q36', icon: '🛍️', title: 'Acheteur régulier',
+      desc: 'Achète 6 packs dans le Shop.',
+      metric: 'packsBought', target: 6, reward: { coins: 0, xp: 230, packs: { classic: 2 } }
+    },
+    {
+      id: 'q37', icon: '🃏', title: 'Trente exemplaires',
+      desc: 'Possède 30 cartes en tout (doublons compris).',
+      metric: 'total', target: 30, reward: { coins: 0, xp: 250, packs: { rare: 1 } }
+    },
+    {
+      id: 'q38', icon: '✦', title: 'Première shiny',
+      desc: 'Obtiens une carte shiny.',
+      metric: 'shiny', target: 1, reward: { coins: 0, xp: 300, packs: { video: 1 } }
+    },
+    {
+      id: 'q39', icon: '📦', title: 'Ouverture sérieuse',
+      desc: 'Ouvre 20 boosters.',
+      metric: 'packsOpened', target: 20, reward: { coins: 0, xp: 320, packs: { legend: 1 } }
+    },
+    {
+      id: 'q40', icon: '🔵', title: 'Huit Rares',
+      desc: 'Possède 8 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 8, reward: { coins: 0, xp: 300, packs: { rare: 2 } }
+    },
+    {
+      id: 'q41', icon: '🏷️', title: 'Vendeur actif',
+      desc: 'Encaisse 4 ventes sur le marché.',
+      metric: 'marketSales', target: 4, reward: { coins: 0, xp: 280, packs: { classic: 2 } }
+    },
+    {
+      id: 'q42', icon: '🛒', title: 'Chineur',
+      desc: 'Achète 2 cartes sur le marché.',
+      metric: 'marketBuys', target: 2, reward: { coins: 0, xp: 260, packs: { classic: 2 } }
+    },
+    {
+      id: 'q43', icon: '🎁', title: 'Six gratuits',
+      desc: 'Récupère 6 packs gratuits.',
+      metric: 'freePacks', target: 6, reward: { coins: 0, xp: 280, packs: { rare: 1 } }
+    },
+    {
+      id: 'q44', icon: '👑', title: 'Deux Légendaires',
+      desc: 'Possède 2 cartes Légendaires ou plus.',
+      metric: 'legendaryPlus', target: 2, reward: { coins: 0, xp: 400, packs: { legend: 1 } }
+    },
+    {
+      id: 'q45', icon: '📚', title: 'Dix-huit uniques',
+      desc: 'Possède 18 cartes différentes.',
+      metric: 'unique', target: 18, reward: { coins: 0, xp: 380, packs: { rare: 2 } }
+    },
+    {
+      id: 'q46', icon: '⚗️', title: 'Fusion experte',
+      desc: 'Réalise 12 fusions.',
+      metric: 'fusions', target: 12, reward: { coins: 0, xp: 380, packs: { legend: 1 } }
+    },
+    {
+      id: 'q47', icon: '🤝', title: 'Cercle d’amis',
+      desc: 'Aie 5 amis.',
+      metric: 'friends', target: 5, reward: { coins: 0, xp: 350, packs: { classic: 2, rare: 1 } }
+    },
+    {
+      id: 'q48', icon: '📦', title: 'Vingt-cinq boosters',
+      desc: 'Ouvre 25 boosters.',
+      metric: 'packsOpened', target: 25, reward: { coins: 0, xp: 420, packs: { video: 1 } }
+    },
+    {
+      id: 'q49', icon: '⭐', title: 'Niveau 3',
+      desc: 'Atteins le niveau 3.',
+      metric: 'level', target: 3, reward: { coins: 0, xp: 0, packs: { rare: 1 } }
+    },
+    {
+      id: 'q50', icon: '💎', title: 'Cinquante exemplaires',
+      desc: 'Possède 50 cartes en tout.',
+      metric: 'total', target: 50, reward: { coins: 0, xp: 450, packs: { rare: 2 } }
+    },
+    {
+      id: 'q51', icon: '🟣', title: 'Cinq Épiques',
+      desc: 'Possède 5 cartes Épiques ou plus.',
+      metric: 'epicPlus', target: 5, reward: { coins: 0, xp: 450, packs: { legend: 1 } }
+    },
+    {
+      id: 'q52', icon: '🛍️', title: 'Dix achats',
+      desc: 'Achète 10 packs dans le Shop.',
+      metric: 'packsBought', target: 10, reward: { coins: 500, xp: 400, packs: { classic: 3 } }
+    },
+    {
+      id: 'q53', icon: '🏷️', title: 'Six ventes',
+      desc: 'Encaisse 6 ventes sur le marché.',
+      metric: 'marketSales', target: 6, reward: { coins: 0, xp: 400, packs: { rare: 2 } }
+    },
+    {
+      id: 'q54', icon: '✦', title: 'Deux shiny',
+      desc: 'Possède 2 cartes shiny.',
+      metric: 'shiny', target: 2, reward: { coins: 0, xp: 500, packs: { legend: 1 } }
+    },
+    {
+      id: 'q55', icon: '🎁', title: 'Dix gratuits',
+      desc: 'Récupère 10 packs gratuits.',
+      metric: 'freePacks', target: 10, reward: { coins: 0, xp: 400, packs: { video: 1 } }
+    },
+    {
+      id: 'q56', icon: '📚', title: 'Vingt-deux uniques',
+      desc: 'Possède 22 cartes différentes.',
+      metric: 'unique', target: 22, reward: { coins: 600, xp: 420, packs: { rare: 2 } }
+    },
+    {
+      id: 'q57', icon: '💼', title: 'Commerce sérieux',
+      desc: 'Gagne 1 500 pièces grâce à tes ventes.',
+      metric: 'marketEarned', target: 1500, reward: { coins: 0, xp: 420, packs: { legend: 1 } }
+    },
+    {
+      id: 'q58', icon: '🔵', title: 'Douze Rares',
+      desc: 'Possède 12 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 12, reward: { coins: 0, xp: 450, packs: { rare: 3 } }
+    },
+    {
+      id: 'q59', icon: '📦', title: 'Trente-cinq boosters',
+      desc: 'Ouvre 35 boosters.',
+      metric: 'packsOpened', target: 35, reward: { coins: 0, xp: 500, packs: { legend: 1 } }
+    },
+    {
+      id: 'q60', icon: '⭐', title: 'Niveau 5',
+      desc: 'Atteins le niveau 5.',
+      metric: 'level', target: 5, reward: { coins: 0, xp: 0, packs: { legend: 1, video: 1 } }
+    },
+    {
+      id: 'q61', icon: '🛒', title: 'Vrai collectionneur',
+      desc: 'Achète 5 cartes sur le marché.',
+      metric: 'marketBuys', target: 5, reward: { coins: 0, xp: 500, packs: { rare: 2 } }
+    },
+    {
+      id: 'q62', icon: '⚗️', title: 'Fusion industrielle',
+      desc: 'Réalise 18 fusions.',
+      metric: 'fusions', target: 18, reward: { coins: 0, xp: 550, packs: { legend: 1 } }
+    },
+    {
+      id: 'q63', icon: '👥', title: 'Six amis',
+      desc: 'Aie 6 amis.',
+      metric: 'friends', target: 6, reward: { coins: 0, xp: 500, packs: { rare: 2 } }
+    },
+    {
+      id: 'q64', icon: '🏆', title: 'Quinze quêtes',
+      desc: 'Termine 15 quêtes.',
+      metric: 'questsDone', target: 15, reward: { coins: 0, xp: 600, packs: { legend: 2 } }
+    },
+    {
+      id: 'q65', icon: '👑', title: 'Trois Légendaires',
+      desc: 'Possède 3 cartes Légendaires ou plus.',
+      metric: 'legendaryPlus', target: 3, reward: { coins: 0, xp: 650, packs: { legend: 1, video: 1 } }
+    },
+    {
+      id: 'q66', icon: '🪙', title: 'Dix ventes',
+      desc: 'Encaisse 10 ventes sur le marché.',
+      metric: 'marketSales', target: 10, reward: { coins: 1200, xp: 600, packs: { legend: 1 } }
+    },
+    {
+      id: 'q67', icon: '📦', title: 'Quarante boosters',
+      desc: 'Ouvre 40 boosters.',
+      metric: 'packsOpened', target: 40, reward: { coins: 0, xp: 650, packs: { video: 2 } }
+    },
+    {
+      id: 'q68', icon: '🃏', title: 'Quatre-vingts exemplaires',
+      desc: 'Possède 80 cartes en tout.',
+      metric: 'total', target: 80, reward: { coins: 0, xp: 700, packs: { legend: 2 } }
+    },
+    {
+      id: 'q69', icon: '⭐', title: 'Niveau 8',
+      desc: 'Atteins le niveau 8.',
+      metric: 'level', target: 8, reward: { coins: 0, xp: 0, packs: { legend: 2, video: 1 } }
+    },
+    {
+      id: 'q70', icon: '🌍', title: 'Légende de Refs',
+      desc: 'Possède 30 cartes différentes.',
+      metric: 'unique', target: 30, reward: { coins: 2500, xp: 1000, packs: { legend: 2, video: 2 } }
     }
   ];
 
@@ -212,7 +482,7 @@ const RefsQuests = (() => {
     { id: 'a27', icon: '⭐', title: 'Niveau 5', desc: 'Atteins le niveau 5.', metric: 'level', target: 5, xp: 150 },
     { id: 'a28', icon: '🌟', title: 'Niveau 10', desc: 'Atteins le niveau 10.', metric: 'level', target: 10, xp: 400 },
     { id: 'a29', icon: '🗺️', title: 'Baroudeur', desc: 'Termine 5 quêtes.', metric: 'questsDone', target: 5, xp: 150 },
-    { id: 'a30', icon: '🏆', title: 'Maître des quêtes', desc: 'Termine les 20 quêtes.', metric: 'questsDone', target: 20, xp: 500 }
+    { id: 'a30', icon: '🏆', title: 'Maître des quêtes', desc: 'Termine les 70 quêtes.', metric: 'questsDone', target: 70, xp: 500 }
   ];
 
   /* Niveaux : le passage au niveau n coûte 100 × n XP. xpForLevel(n) renvoie
@@ -269,6 +539,36 @@ const RefsQuests = (() => {
     return active;
   }
 
+  /* Récompense d'une quête, normalisée : `{ coins, xp, packs }`.
+     - `coins` / `xp` : entiers >= 0 (0 = la quête n'en donne pas) ;
+     - `packs` : objet { classic?, rare?, legend?, video? } d'entiers > 0,
+       vide si la quête ne donne pas de booster. Une quête peut donc donner
+       uniquement de l'XP, uniquement des packs, ou tout à la fois. */
+  function questReward(quest) {
+    const raw = (quest && quest.reward) || {};
+    const packs = {};
+    const rawPacks = raw.packs && typeof raw.packs === 'object' ? raw.packs : {};
+    for (const key of PACK_KEYS) {
+      const n = Math.max(0, Math.floor(Number(rawPacks[key]) || 0));
+      if (n > 0) packs[key] = n;
+    }
+    return {
+      coins: Math.max(0, Math.floor(Number(raw.coins) || 0)),
+      xp: Math.max(0, Math.floor(Number(raw.xp) || 0)),
+      packs
+    };
+  }
+
+  /* Liste lisible des packs d'une récompense : « 1 Pack Rare + 2 Pack Vidéo ».
+     Chaîne vide si la quête ne donne aucun booster. */
+  function packRewardLabel(packs) {
+    const source = packs && typeof packs === 'object' ? packs : {};
+    return PACK_KEYS
+      .filter((key) => Number(source[key]) > 0)
+      .map((key) => `${Math.floor(Number(source[key]))} ${PACK_LABELS[key] || key}`)
+      .join(' + ');
+  }
+
   /* Progression d'un succès : même mesure absolue que les quêtes. */
   function achievementProgress(achievement, ctx) {
     const target = Math.max(1, Math.floor(Number(achievement.target) || 1));
@@ -288,6 +588,10 @@ const RefsQuests = (() => {
     metricValue,
     metricLabel,
     questProgress,
-    achievementProgress
+    achievementProgress,
+    PACK_KEYS,
+    PACK_LABELS,
+    questReward,
+    packRewardLabel
   };
 })();
