@@ -18,7 +18,7 @@ function makeStore(collection = ['pieds-de-rapace', 'chasseur-royer'], coins = 5
         collection: [...collection],
         friends: ['friend1'],
         packsOpened: 3,
-        packStock: { classic: packs.classic || 0, rare: packs.rare || 0 }
+        packStock: { classic: packs.classic || 0, rare: packs.rare || 0, legend: packs.legend || 0 }
       }
     },
     playerProfiles: {
@@ -77,7 +77,13 @@ function makeFirestore(store) {
       const tx = {
         get: async (ref) => ({ exists: !!store[ref.coll][ref.id], data: () => structuredClone(store[ref.coll][ref.id]) }),
         set: (ref, data) => writes.push(() => { store[ref.coll][ref.id] = structuredClone(data); }),
-        update: (ref, data) => writes.push(() => { store[ref.coll][ref.id] = { ...store[ref.coll][ref.id], ...structuredClone(data) }; })
+        update: (ref, data) => {
+          if (ref.coll === 'playerSaves') {
+            assert.equal(data.packStock.legend, store.playerSaves[ref.id].packStock.legend,
+              'toute transaction doit conserver les packs légendaires (champ requis par les règles)');
+          }
+          writes.push(() => { store[ref.coll][ref.id] = { ...store[ref.coll][ref.id], ...structuredClone(data) }; });
+        }
       };
       const result = await fn(tx);
       writes.forEach((write) => write());
@@ -322,7 +328,7 @@ function buttonByText(root, text) {
   w2.close(); console.log('PASS marché : choix de la quantité à vendre, retrait partiel/total et achat par quantité');
 
   /* 3. Marché des packs : le vendeur choisit le type, le nombre et le prix. */
-  const s3 = await boot(['pieds-de-rapace'], 500, { classic: 2, rare: 1 });
+  const s3 = await boot(['pieds-de-rapace'], 500, { classic: 2, rare: 1, legend: 4 });
   const w3 = s3.w; const doc3 = s3.doc; const store3 = s3.store;
   const submit3 = async (form) => { submitForm(w3, form); await wait(10); };
   const confirm3 = async () => { assert.equal(doc3.getElementById('confirm-sheet').hidden, false); doc3.getElementById('confirm-ok').click(); await wait(150); };
@@ -381,5 +387,6 @@ function buttonByText(root, text) {
   assert.equal(store3.playerSaves.me.packStock.rare, 1, 'le pack acheté arrive dans l’inventaire');
   assert.equal(store3.marketListings.frare.status, 'sold');
   assert.equal(store3.marketListings.frare.buyerUid, 'me');
+  assert.equal(store3.playerSaves.me.packStock.legend, 4, 'les packs légendaires sont conservés après ventes, retraits et achat');
   w3.close(); console.log('PASS marché des packs : mise en vente, retrait, prix libre et achat chez l’ami');
 })().catch(error => { console.error(error); process.exitCode = 1; });
