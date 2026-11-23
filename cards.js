@@ -183,8 +183,17 @@ const cardsDatabase = [
     description: 'skibidi gros plan de fagar',
     rarity: 'rare',
     emoji: '🔍',
-    image: 'assets/Cartes/fagarzoom.JPEG',
+    image: 'assets/Cartes/fagarzoom.jpeg',
     color: '#8fc8ef'
+  },
+  {
+    id: 'ford-bierry',
+    name: 'Ford Bierry',
+    description: 'le cylindrée de bierry',
+    rarity: 'epic',
+    emoji: '🚗',
+    image: 'assets/Cartes/fordbierry.JPEG',
+    color: '#c6a0eb'
   }
 ];
 
