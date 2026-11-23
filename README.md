@@ -112,6 +112,8 @@ L'écran de compte affiche désormais toujours la cause d'un échec (message d'e
 - **« Ce domaine (mon-domaine) n'est pas autorisé »** → ajoute exactement ce domaine (sans chemin, sans `https://`) dans **Firebase → Authentication → Settings → Authorized domains**. `localhost` y est déjà par défaut ; un domaine d'aperçu changeant doit être ajouté à chaque nouveau nom.
 - **« La connexion Google n'est pas activée »** → active le fournisseur **Google** dans **Authentication → Sign-in method**.
 - **« Accès cloud refusé »** → republie les règles Firestore (`firebase deploy --only firestore:rules`).
+- **`Missing or insufficient permissions` dans la console** (sur `playerProfiles/…`, `friendCodes/…`, `trades` — messages « Profil illisible », « Profil non sauvegardé », « Échanges illisibles ») ou **« Recherche impossible pour le moment alors que ta connexion fonctionne** → le projet Firebase n'a pas les règles à jour : celles-ci autorisent `playerProfiles`, `friendCodes` et `trades`, absents des versions publiées avant l'ajout des pages Compte et En ligne. Republie-les (`firebase deploy --only firestore:rules`, ou Firebase Console → **Firestore Database → Rules** → colle le contenu de `firestore.rules` → **Publier**), puis recharge. Le jeu détecte ce refus et affiche désormais un message explicite au lieu de « vérifie ta connexion ».
+- **`VM30:1 Failed to execute script … (reading 'appendChild')`** → ce n'est pas le jeu : aucune ligne du code n'utilise `appendChild` (les scripts sont classiques, `defer`, versionnés). C'est un script injecté par une extension du navigateur (bloqueur, assistant…). Vérifie en navigation privée, extensions désactivées ; si l'erreur persiste sans extension, copie la trace entière.
 
 Quand c'est possible, le jeu retente automatiquement la connexion par redirection complète (`signInWithRedirect`) si la fenêtre Google est bloquée ; une redirection réussie ramène directement sur la collection du joueur.
 
@@ -119,9 +121,12 @@ Quand c'est possible, le jeu retente automatiquement la connexion par redirectio
 
 ```bash
 npm install --no-save jsdom          # uniquement pour les tests
-node tests/card-flow.cjs             # ouverture de booster + chemins d'images
+npm test                             # toute la suite
 node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
+node tests/card-flow.cjs             # ouverture de booster + chemins d'images
+node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges, achats)
+node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 ```
 
 ## Pages Compte et En ligne (amis, échanges, achats)
