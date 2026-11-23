@@ -406,6 +406,15 @@ const cardsDatabase = [
     emoji: '🔍',
     image: 'assets/Cartes/mathiszoom.jpg',
     color: '#8fc8ef'
+  },
+  {
+    id: 'king-mathis',
+    name: 'King Mathis',
+    description: 'il est de droite',
+    rarity: 'legendary',
+    emoji: '👑',
+    image: 'assets/Cartes/king-mathis.jpeg',
+    color: '#f5d979'
   }
 ];
 
