@@ -29,6 +29,17 @@ Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'a
 - **Aucun `addEventListener` sur un élément nul** : `app.js` passe par les helpers `on()` / `qs()`, qui se contentent d'un avertissement si un élément manque, et l'écran de compte comme le bouton Google restent fonctionnels.
 - **Filet de sécurité** : un petit script inline de `index.html` affiche un message dans l'écran de compte si `app.js` n'a pas démarré (cache obsolète, script bloqué). `app.js` signale son démarrage via `window.REFS_CARDS_READY`.
 
+## Écran de chargement à l'ouverture
+
+À l'ouverture, un écran de chargement (`#loading-screen`, dans `index.html`) s'affiche immédiatement, le temps de savoir si une session Google est déjà active :
+
+- **Session active** : le jeu s'ouvre directement, sans passer par la page de connexion.
+- **Pas de session** : la page de connexion (`#auth-screen`) s'affiche.
+- **Firebase absent ou en erreur** : la page de connexion s'affiche avec le message d'explication.
+- **Firebase muet** : après 8 s, la page de connexion s'affiche avec un avertissement ; si la session est finalement retrouvée, le jeu prend le relais.
+
+Le contrôle est fait par `app.js` (`showLoginPage()` / `hideLoading()`). `tests/loading-screen.cjs` couvre ces cas.
+
 ## Mises à jour : bandeau « Nouvelle version disponible »
 
 Le site est statique : un onglet déjà ouvert continue d'exécuter les fichiers de son ancienne version après un déploiement. `version-check.js` compare donc la version chargée avec celle du `index.html` **en ligne** et, si elles diffèrent, affiche un bandeau en bas de l'écran : **« Nouvelle version disponible »** avec les boutons **Recharger** et **Plus tard**.
