@@ -8,13 +8,13 @@
 
   /* Boutique : les packs s'achètent dans le Shop et vont dans l'inventaire
      (onglet Pack). Les prix sont réglés AU-DESSUS de la valeur moyenne d'un
-     pack (classique ≈ 394 🪙, rare ≈ 419 🪙 pour 5 cartes) : à 100 🪙,
+     pack (classique ≈ 394 🪙, rare ≈ 447 🪙 pour 5 cartes) : à 100 🪙,
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
   const PACK_PRICES = { classic: 500, rare: 1000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
-  const RARE_BOOST = 1.2; // pack rare : poids des raretés Rare+ multipliés par 1,2 (+20 %)
+  const RARE_BOOST = 1.2; // pack rare : chances d'obtenir une rareté Rare+ multipliées par 1,2 (+20 % réels)
   const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
   const PACK_IMAGES = { classic: 'assets/packet.png', rare: 'assets/packetrare.png' };
@@ -450,14 +450,21 @@
 
   /* --------------------------------------------------------------- tirage */
 
-  /* Poids effectifs d'une rareté pour un type de pack. Pack rare : les
-     raretés Rare et plus (rank >= 2) voient leur poids multiplié par
-     RARE_BOOST (1,2 = +20 % relatif), puis tout est renormalisé — les
-     Communes/Inhabituelles baissent donc légèrement en part relative. */
+  /* Pourcentage effectif d'une rareté pour un type de pack. Pack rare : la
+     chance d'obtenir chaque rareté Rare et plus (rank >= 2) est réellement
+     multipliée par RARE_BOOST (1,2 = +20 % de chances, ex. Légendaire 2,5 %
+     → 3 %). Le surplus est pris sur les Communes/Inhabituelles, dont les
+     pourcentages sont réduits au prorata : le total reste égal à 100 %. */
+  const HIGH_RANK = RARITIES.rare.rank;
+  const LOW_BASE = Object.values(RARITIES).filter((r) => r.rank < HIGH_RANK).reduce((s, r) => s + r.weight, 0);
+  const HIGH_BASE = Object.values(RARITIES).filter((r) => r.rank >= HIGH_RANK).reduce((s, r) => s + r.weight, 0);
+  const LOW_BOOSTED_FACTOR = (LOW_BASE + HIGH_BASE - HIGH_BASE * RARE_BOOST) / LOW_BASE;
+
   function rarityWeight(key, boosted) {
     const info = RARITIES[key];
     if (!info) return 0;
-    return boosted && info.rank >= RARITIES.rare.rank ? info.weight * RARE_BOOST : info.weight;
+    if (!boosted) return info.weight;
+    return info.rank >= HIGH_RANK ? info.weight * RARE_BOOST : info.weight * LOW_BOOSTED_FACTOR;
   }
 
   function pickCard(forcedRarity, boosted) {
@@ -2032,7 +2039,7 @@
   });
 
   /* Probabilités : générées depuis RARITIES pour rester toujours justes.
-     En pack rare, les pourcentages sont renormalisés (+20 % sur Rare+). */
+     En pack rare : +20 % de chances sur chaque rareté Rare+ (voir rarityWeight). */
   function renderOdds(boosted) {
     if (!packOdds) return;
     packOdds.replaceChildren();
@@ -2050,7 +2057,7 @@
       packOdds.append(row);
     });
     if (boosted) {
-      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : CHANCES RARE+ +20 %'));
+      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : +20 % DE CHANCES SUR RARE+'));
     }
   }
 
