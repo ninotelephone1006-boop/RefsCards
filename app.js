@@ -32,7 +32,8 @@
   /* Packs annoncés mais pas encore disponibles : visibles dans le Shop, avec
      un badge « BIENTÔT », sans achat ni ouverture possible. Passer `video` à
      false (ou retirer la clé) publie le Pack Vidéo sans autre changement. */
-  const PACK_COMING_SOON = { video: true };
+  /* Tous les packs sont publiés et achetables, y compris le Pack Vidéo. */
+  const PACK_COMING_SOON = {};
   function packComingSoon(type) { return Boolean(PACK_COMING_SOON[type]); }
   /* En mode démo seulement, on autorise l'ouverture pour prévisualiser. */
   function isPackAvailable(type) { return !packComingSoon(type) || isDemoMode(); }
