@@ -15,14 +15,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs.
+    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs,
+    // inventaire de packs (Shop) et quota de packs gratuits quotidiens.
     match /playerSaves/{userId} {
       function ownsSave() {
         return request.auth != null && request.auth.uid == userId;
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'freeDate', 'freeUsed', 'updatedAt'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
@@ -33,6 +34,22 @@ service cloud.firestore {
         && request.resource.data.friends.size() <= 500
         && request.resource.data.packsOpened is int
         && request.resource.data.packsOpened >= 0
+        && (!('packStock' in request.resource.data)
+            || (request.resource.data.packStock is map
+                && request.resource.data.packStock.keys().hasOnly(['classic', 'rare'])
+                && request.resource.data.packStock.classic is int
+                && request.resource.data.packStock.classic >= 0
+                && request.resource.data.packStock.classic <= 100000
+                && request.resource.data.packStock.rare is int
+                && request.resource.data.packStock.rare >= 0
+                && request.resource.data.packStock.rare <= 100000))
+        && (!('freeDate' in request.resource.data)
+            || (request.resource.data.freeDate is string
+                && request.resource.data.freeDate.size() <= 10))
+        && (!('freeUsed' in request.resource.data)
+            || (request.resource.data.freeUsed is int
+                && request.resource.data.freeUsed >= 0
+                && request.resource.data.freeUsed <= 3))
         && request.resource.data.updatedAt is timestamp;
       allow delete: if false;
     }
@@ -111,7 +128,7 @@ service cloud.firestore {
 
 `npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, le bouton reste cliquable mais explique ce qui manque (voir le dépannage ci-dessous).
 
-Le premier booster est offert ; chaque booster suivant coûte 100 pièces, déduites au moment de l'achat.
+Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙**, Pack Rare doré **1 000 🪙** (chances Rare et plus **+20 %**). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 en classique, ≈ 419 🪙 en rare) pour que l'argent reste un défi — à l'ancien prix de 100 🪙, chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait infini. Chaque jour, **3 packs classiques gratuits** sont à récupérer dans le Shop (un par un, se réinitialisent à minuit). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
 
 ## Chargement des scripts
 
@@ -151,11 +168,21 @@ node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges, 
 node tests/friend-requests.cjs       # demandes d'ami : acceptation/refus, fiche ami
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
+node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare +20 %
+node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
 ```
 
-## Pages Compte et En ligne (amis, échanges, achats)
+## Page Shop (boutique + inventaire)
 
-La barre de navigation compte quatre onglets : **Pack**, **Collection**, **En ligne** et **Compte**.
+La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**, **En ligne** et **Compte**.
+
+- **Achat direct supprimé** : le bouton « Ouvrir un booster » du récap (et celui de la fusion) renvoie désormais au Shop. Les packs achetés vont dans l'**inventaire** (compteur dans l'onglet Pack) et s'ouvrent depuis là — ouvrir un pack en consomme 1. Sans pack en inventaire, la déchirure est bloquée et un bouton « Aller au Shop » apparaît.
+- **Deux packs** : **Pack Classique** (`assets/packet.png`, **500 🪙**) et **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, chances Rare et plus **+20 %** relatives, renormalisées — les pourcentages affichés sous le pack suivent le type choisi). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 / ≈ 419 🪙) pour éviter l'argent infini de l'ancien prix à 100 🪙.
+- **Achats multiples** : sélecteur de quantité (1 à 10, raccourcis ×1 / ×5 / ×10) par pack ; le bouton affiche le total et se désactive si le solde est insuffisant.
+- **3 gratuits par jour** : 3 packs classiques à récupérer un par un dans le Shop (bannière 🎁, pastilles de progression, quota `freeDate`/`freeUsed` par jour calendaire local, réinitialisé à minuit, pastille sur l'onglet Shop tant qu'il en reste). Le premier pack offert des nouveaux comptes arrive aussi dans l'inventaire.
+- **Sauvegarde** : `playerSaves/{uid}` gagne `packStock {classic, rare}`, `freeDate` et `freeUsed` (les anciennes sauvegardes sans ces champs démarrent à 0, avec migration du premier pack offert). **Republie `firestore.rules`** pour les autoriser.
+
+## Pages Compte et En ligne (amis, échanges, achats)
 
 ### Page Compte
 
@@ -173,15 +200,15 @@ La barre de navigation compte quatre onglets : **Pack**, **Collection**, **En li
 - **Acheter** : le prix d'une carte vaut **le double de sa récompense de rareté** (Commune 40 🪙, Inhabituelle 70 🪙, Rare 110 🪙, Super Rare 160 🪙, Épique 240 🪙, Ultra épique 350 🪙, Mythique 480 🪙, Légendaire 680 🪙, Divine 1 040 🪙, Secrète 1 800 🪙). Le bouton est désactivé si ton solde est insuffisant.
 - **Acceptation** : quand un joueur accepte, il applique sa moitié dans **sa propre** sauvegarde (il donne sa carte / paie, et reçoit l'autre carte / les pièces), puis marque l'échange comme appliqué de son côté. L'autre joueur applique sa moitié à son tour — immédiatement s'il est en ligne, sinon à sa prochaine connexion (`loadTrades` rejoue les moitiés en attente). Quand les deux moitiés sont appliquées, l'échange passe à `done`. Les échanges reçus/envoyés se mettent à jour en temps réel (`onSnapshot`).
 
-Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends` et `packsOpened`), `playerProfiles/{uid}` (public pour les joueurs connectés), `friendCodes/{code}` (annuaire), `friendRequests/{fromUid}__{toUid}` (demandes d'ami à accepter, réservées aux deux parties), `trades/{id}` (propositions réservées aux deux parties). Les règles correspondantes sont dans `firestore.rules` — **republie-les** (`firebase deploy --only firestore:rules`) pour activer les nouvelles pages.
+Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends`, `packsOpened`, `packStock`, `freeDate`, `freeUsed`), `playerProfiles/{uid}` (public pour les joueurs connectés), `friendCodes/{code}` (annuaire), `friendRequests/{fromUid}__{toUid}` (demandes d'ami à accepter, réservées aux deux parties), `trades/{id}` (propositions réservées aux deux parties). Les règles correspondantes sont dans `firestore.rules` — **republie-les** (`firebase deploy --only firestore:rules`) pour activer les nouvelles pages.
 
 ## Déroulé d'une ouverture
 
 1. **Découpe manuelle** : le booster flotte au centre (parallaxe souris, `touch-action: none`). Une ligne de découpe lumineuse, guidée par une flèche, attend à 15 % du haut. Glisser vers la droite (doigt ou souris) fait progresser la coupe de 0 à 100 % : trait incandescent, gerbe d'étincelles, rabat soulevé en `clip-path`, bruit de papier/plastique dont le timbre suit la vitesse du geste.
 2. **Seuil** : relâché avant 75 %, le paquet revient en place avec un rebond élastique (et un léger craquement). À partir de 75 %, la déchirure s'achève : le haut s'envole en tournoyant dans un flash, éjecte la pile de cinq cartes et déclenche le *pop* d'ouverture.
 3. **Pile de cartes** : les cinq cartes sont triées de la moins rare à la plus rare, la plus rare au fond. Un clic retourne la carte du dessus (`rotateY`), avec parallaxe/tilt et reflet holographique qui suit le curseur. Les dix raretés ont leur mise en scène, regroupée en trois paliers d'effets : halo coloré (Commune, Inhabituelle), anneau + étincelles (Rare, Super Rare), ralenti + tremblement d'écran (Épique, Ultra épique), rayons rotatifs + pluie + hologramme (Mythique, Légendaire, Divine, Secrète).
-4. **Rangement** : après l'avoir révélée, touche la carte pour la manipuler (tilt/parallaxe), puis appuie sur **Carte suivante** (ou clique à côté dans la table) pour la faire glisser vers le récapitulatif (whoosh) et dévoiler la suivante. Au clavier, Entrée/Espace range la carte révélée. Une fois les cinq cartes rangées, le bouton de rachat animé apparaît (`100 🪙`, premier booster offert).
-5. **Fusion** : à la fin du booster, une **demande de fusion** s'ouvre : chaque paire de cartes identiques peut être échangée contre une carte de la rareté supérieure (la fusion est sans risque, les légendaires étant au sommet).
+4. **Rangement** : après l'avoir révélée, touche la carte pour la manipuler (tilt/parallaxe), puis appuie sur **Carte suivante** (ou clique à côté dans la table) pour la faire glisser vers le récapitulatif (whoosh) et dévoiler la suivante. Au clavier, Entrée/Espace range la carte révélée. Une fois les cinq cartes rangées, le bouton **Aller au Shop** apparaît (les packs s'achètent dans la boutique et vont dans l'inventaire).
+5. **Demande de fusion** : à la fin du booster (ou dès qu'un doublon existe), une **demande de fusion** s'ouvre : chaque paire de cartes identiques peut être échangée contre une carte de la rareté supérieure (la fusion est sans risque, les légendaires étant au sommet). Elle est aussi accessible à tout moment depuis l'onglet **Collection**, via le bouton `DEMANDE DE FUSION · N DOUBLON(S)` affiché au-dessus de la grille.
 
 ## Son
 
@@ -190,6 +217,7 @@ Tout est synthétisé en direct avec la Web Audio API (aucun fichier audio) : d�
 ## Paramètres utiles
 
 - `?demo=1` : force un tirage de démonstration (aperçu de plusieurs raretés).
+- `?demo=fusion` : pack de démonstration contenant deux paires identiques ; la **demande de fusion** s'ouvre toute seule après les cinq cartes (aucun pack consommé).
 - Clavier : `Entrée`/`Espace` sur le booster ouvre la déchirure, `→` fait progresser la coupe, `Maj+Entrée` sur une carte révélée l'ouvre en grand, `Échap` ferme l'inspection ou la fusion.
 - Inspection : double-clic (ou double-tap) sur une carte révélée, ou clic sur une vignette du butin, pour l'afficher en grand.
 

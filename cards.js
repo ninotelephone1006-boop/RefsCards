@@ -183,6 +183,12 @@ const cardsDatabase = [
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */
 const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-fagar', 'babault-musique'];
 
+/* Tirage de démonstration « fusion » : utilisé par ?demo=fusion (ou le bouton
+   Démo) pour montrer la demande de fusion sans devoir farmer un doublon.
+   Contient deux paires fusionnables : chasseur-royer (commune) ×2 et
+   toilet-call (inhabituelle) ×2, plus une rare pour varier les visuels. */
+const fusionDemoDraw = ['chasseur-royer', 'chasseur-royer', 'toilet-call', 'toilet-call', 'gros-plan-royer'];
+
 /* Résout les chemins d'image possibles pour une carte : chemin explicite,
    ou nom de fichier sans extension décliné sur les extensions courantes.
    L'application essaie chaque candidat jusqu'à trouver le visuel. */

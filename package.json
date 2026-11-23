@@ -5,7 +5,7 @@
   "description": "Refs Cards avec comptes et sauvegardes Firebase cloud",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/auth-flow.cjs && node tests/script-loading.cjs && node tests/card-flow.cjs && node tests/social-flow.cjs && node tests/friend-requests.cjs && node tests/permission-denied.cjs && node tests/profile-save.cjs"
+    "test": "node tests/auth-flow.cjs && node tests/script-loading.cjs && node tests/card-flow.cjs && node tests/shop-flow.cjs && node tests/fusion-flow.cjs && node tests/social-flow.cjs && node tests/friend-requests.cjs && node tests/permission-denied.cjs && node tests/profile-save.cjs"
   },
   "engines": {
     "node": ">=18"
