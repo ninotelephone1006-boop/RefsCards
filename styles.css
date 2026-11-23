@@ -2492,3 +2492,11 @@ html,body{background:var(--bg)}
 .inventory-go-shop{padding:11px 20px;border-radius:12px;border:1px solid #a855f766;
   background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:13px;font-weight:800;cursor:pointer}
 
+
+/* Marché entre amis */
+.market-block{margin-top:20px;padding:14px;border:1px solid #a855f733;border-radius:14px;background:#120c1cf5}
+.market-block h3{margin:14px 0 8px}.market-form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:14px 0}
+.market-form label{flex-basis:100%;font-size:11px;color:#c4a1ff;font-weight:700}
+.market-form input,.market-form select{flex:1 1 150px;min-width:0;padding:10px;border:1px solid #725598;border-radius:9px;background:#0f0b14;color:#fff;font:inherit}
+.market-form select option{background:#160f20}.market-block #market-refresh{margin-top:12px}
+.market-busy{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#090510bd;color:#fff;font-weight:700}

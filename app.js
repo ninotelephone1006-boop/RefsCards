@@ -2081,6 +2081,7 @@
   let currentUser = null;
   let currentEmail = '';
   let saveTimer = 0;
+  let saveQueue = Promise.resolve(true);
 
   /* Délai au bout duquel on considère que la fenêtre Google ne répond pas.
      Sans cela, un pop-up bloqué par le navigateur laissait le bouton inerte
@@ -2203,12 +2204,16 @@
     selectPackType(state.currentPackType);
   }
 
-  async function saveNow() {
-    if (!currentUser || !cloudDb) return true;
+  function saveNow(force = false) {
+    if (marketBusy && !force) {
+      const uid = currentUser && currentUser.uid;
+      return marketDone.then(() => currentUser && currentUser.uid === uid ? saveNow() : false);
+    }
+    if (!currentUser || !cloudDb) return Promise.resolve(true);
     clearTimeout(saveTimer);
     const userId = currentUser.uid;
-    try {
-      await cloudDb.collection('playerSaves').doc(userId).set({
+    const db = cloudDb;
+    const data = {
         coins: state.coins,
         firstPack: state.firstPack,
         collection: state.collection.map((c) => c.id),
@@ -2221,14 +2226,19 @@
         freeDate: state.freeDate || todayKey(),
         freeUsed: clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY),
         updatedAt: serverTimestamp()
-      }, { merge: true });
-      return true;
-    } catch (error) {
-      if (!noteCloudError('Sauvegarde cloud impossible', error)) {
-        showToast('Sauvegarde impossible pour le moment. Vérifie ta connexion.');
+      };
+    saveQueue = saveQueue.then(async () => {
+      try {
+        await db.collection('playerSaves').doc(userId).set(data, { merge: true });
+        return true;
+      } catch (error) {
+        if (!noteCloudError('Sauvegarde cloud impossible', error)) {
+          showToast('Sauvegarde impossible pour le moment. Vérifie ta connexion.');
+        }
+        return false;
       }
-      return false;
-    }
+    });
+    return saveQueue;
   }
 
   function save() {
@@ -2254,6 +2264,7 @@
     subscribeFriendRequests();
     loadTrades();
     subscribeTrades();
+    loadMarket();
     if (authScreen) authScreen.hidden = true;
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
@@ -2279,7 +2290,13 @@
     sentRequests = [];
     sentRequestsByUid.clear();
     pendingFriendUids.clear();
+    friendRemovalInFlight.clear();
+    removedFriendsThisSession.clear();
+    knownRequestIds.clear();
+    hadRequests = false;
     trades = [];
+    marketListings = [];
+    marketGifts = [];
     selectedFriendUid = null;
     rulesHelpShown = false;
     state.packStock = { classic: 0, rare: 0 };
@@ -2489,6 +2506,11 @@
       renderShop();
     } else if (tab === 'inventory') {
       renderInventory();
+    } else if (tab === 'online') {
+      renderOnline();
+      loadMarket();
+      loadFriendRequests();
+      if (selectedFriendUid) loadFriendListings(selectedFriendUid);
     } else if (tab === 'pack') {
       renderPackInventory();
       // Les vues Pack étaient masquées : on remesure tout.
@@ -3245,6 +3267,8 @@
   }
 
   /* Met à jour l'état local à partir des documents reçus, puis rafraîchit. */
+  const friendRemovalInFlight = new Set();
+  const removedFriendsThisSession = new Set();
   let knownRequestIds = new Set(); // pour n'annoncer que les NOUVELLES demandes
   let hadRequests = false;         // false = premier chargement (pas de toast au démarrage)
   async function ingestFriendRequests(incoming, outgoing) {
@@ -3258,28 +3282,34 @@
     // Mes demandes envoyées : index + uids encore en attente.
     sentRequestsByUid.clear();
     pendingFriendUids.clear();
-    const acceptedMine = [];
     for (const r of sentRequests) {
       if (r.status === 'pending') {
         sentRequestsByUid.set(r.toUid, r.id);
         pendingFriendUids.add(r.toUid);
-      } else if (r.status === 'accepted' && !(r.applied && r.applied[uid])) {
-        acceptedMine.push(r);
       }
     }
-    /* Profils publics des joueurs concernés : sans ça les demandes
-       afficheraient « Joueur » au lieu du pseudo/photo. */
+    /* Une demande acceptée fait foi pour les deux joueurs, même si un ancien
+       client a marqué applied avant d'enregistrer la liste. Cela répare aussi
+       les sauvegardes interrompues ou échouées. Une suppression volontaire
+       est conservée dans removedBy sur la demande. */
+    const accepted = [...incoming, ...outgoing].filter((r) =>
+      r.status === 'accepted' && (r.fromUid === uid || r.toUid === uid)
+      && !(r.removedBy && r.removedBy[uid]));
     const unknown = new Set();
     friendRequests.forEach((r) => unknown.add(r.fromUid));
-    pendingFriendUids.forEach((uid) => unknown.add(uid));
-    for (const uid of unknown) {
-      if (!friendProfiles.has(uid)) await fetchFriendProfile(uid);
+    pendingFriendUids.forEach((otherUid) => unknown.add(otherUid));
+    for (const otherUid of unknown) {
+      if (!currentUser || currentUser.uid !== uid) return;
+      if (!friendProfiles.has(otherUid)) await fetchFriendProfile(otherUid);
     }
 
-    for (const r of acceptedMine) {
-      await addFriendToList(r.toUid, { announce: true });
-      await updateFriendRequest(r.id, { applied: { ...(r.applied || {}), [uid]: true } });
+    for (const r of accepted) {
+      if (!currentUser || currentUser.uid !== uid) return;
+      const otherUid = r.fromUid === uid ? r.toUid : r.fromUid;
+      if (!otherUid || friendRemovalInFlight.has(otherUid) || removedFriendsThisSession.has(otherUid)) continue;
+      await addFriendToList(otherUid, { announce: true });
     }
+    if (!currentUser || currentUser.uid !== uid) return;
     /* Nouvelle demande reçue pendant la session : on prévient tout de suite
        (le joueur peut accepter depuis « Demandes reçues »). */
     const fresh = friendRequests.filter((r) => !knownRequestIds.has(r.id));
@@ -3369,8 +3399,9 @@
         toUid: uid,
         status: 'pending',
         createdAt: serverTimestamp(),
-        applied: { [mine]: true }
+        applied: {}
       });
+      removedFriendsThisSession.delete(uid);
       pendingFriendUids.add(uid);
       sentRequestsByUid.set(uid, id);
       const data = await fetchFriendProfile(uid);
@@ -3404,6 +3435,7 @@
       renderOnline();
       return;
     }
+    removedFriendsThisSession.delete(request.fromUid);
     friendRequests = friendRequests.filter((r) => r.id !== request.id);
     const data = await fetchFriendProfile(request.fromUid);
     await addFriendToList(request.fromUid, { announce: false });
@@ -3490,11 +3522,18 @@
 
   function renderOnline() {
     if (!onlineView) return;
+    renderMarket();
     if (friendsCount) friendsCount.textContent = String(friends.length);
     if (friendsEmpty) friendsEmpty.hidden = friends.length > 0;
     if (friendsList) {
       const frag = document.createDocumentFragment();
       friends.forEach((uid) => {
+        if (!friendProfiles.has(uid)) {
+          const owner = currentUser && currentUser.uid;
+          fetchFriendProfile(uid).then(() => {
+            if (currentUser && currentUser.uid === owner && friends.includes(uid)) renderOnline();
+          });
+        }
         const data = friendProfiles.get(uid) || {
           pseudo: 'Joueur', avatar: '', totalCards: 0, uniqueCards: 0
         };
@@ -3515,13 +3554,7 @@
         on(view, 'click', () => openFriendDetail(uid));
         const remove = el('button', 'mini-btn danger', 'Retirer');
         remove.type = 'button';
-        on(remove, 'click', () => {
-          friends = friends.filter((u) => u !== uid);
-          save();
-          if (selectedFriendUid === uid) closeFriendDetail();
-          renderOnline();
-          showToast('Ami retiré');
-        });
+        on(remove, 'click', () => removeFriend(uid));
         row.append(img, fb, idBox, view, remove);
         frag.append(row);
       });
@@ -3530,6 +3563,42 @@
     renderFriendRequests();
     renderTrades();
     if (selectedFriendUid) renderFriendDetail(selectedFriendUid);
+  }
+
+  /* Mémorise une suppression explicite sur toutes les demandes acceptées
+     entre ces joueurs avant d'enlever l'ami localement. Ainsi la réparation
+     ne ressuscite pas cette amitié à la prochaine connexion. */
+  async function removeFriend(otherUid) {
+    if (!cloudReady() || friendRemovalInFlight.has(otherUid)) return;
+    const uid = currentUser.uid;
+    friendRemovalInFlight.add(otherUid);
+    try {
+      const coll = cloudDb.collection('friendRequests');
+      const [incoming, outgoing] = await Promise.all([
+        coll.where('toUid', '==', uid).get(),
+        coll.where('fromUid', '==', uid).get()
+      ]);
+      const requests = [...snapshotDocs(incoming), ...snapshotDocs(outgoing)].filter(({ data }) =>
+        data.status === 'accepted' &&
+        ((data.fromUid === uid && data.toUid === otherUid) || (data.toUid === uid && data.fromUid === otherUid)));
+      // Les UID des comptes Google Firebase sont alphanumériques ; la mise à
+      // jour ciblée ne remplace pas les éventuelles suppressions de l'autre.
+      for (const request of requests) {
+        await coll.doc(request.id).update({ [`removedBy.${uid}`]: true });
+      }
+      if (!currentUser || currentUser.uid !== uid) return;
+      removedFriendsThisSession.add(otherUid);
+      friends = friends.filter((u) => u !== otherUid);
+      save();
+      if (selectedFriendUid === otherUid) closeFriendDetail();
+      renderOnline();
+      showToast('Ami retiré');
+    } catch (error) {
+      noteCloudError('Suppression de l’ami impossible', error);
+      showToast('Impossible de retirer cet ami. Vérifie ta connexion et réessaie.');
+    } finally {
+      friendRemovalInFlight.delete(otherUid);
+    }
   }
 
   /* Demandes reçues (Accepter / Refuser) et envoyées (en attente / Annuler).
@@ -3603,6 +3672,7 @@
     await fetchFriendProfile(uid);
     if (selectedFriendUid !== uid) return;
     renderFriendDetail(uid);
+    loadFriendListings(uid);
     try {
       if (friendDetail && typeof friendDetail.scrollIntoView === 'function') {
         friendDetail.scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start' });
@@ -3651,7 +3721,6 @@
       const ownedCards = cardsDatabase.filter((c) => owned.has(c.id));
       friendCards.replaceChildren(...ownedCards.map((card, i) => {
         const info = RARITIES[card.rarity] || RARITIES.common;
-        const price = info.reward * 2;
         const tile = el('div', 'friend-card');
         tile.style.setProperty('--i', i);
         tile.style.setProperty('--r-color', info.color);
@@ -3667,11 +3736,7 @@
         const swap = el('button', 'mini-btn', 'Échanger');
         swap.type = 'button';
         on(swap, 'click', () => openTradePicker(uid, card.id));
-        const buy = el('button', 'mini-btn primary', `Acheter · ${fmt(price)} 🪙`);
-        buy.type = 'button';
-        if (state.coins < price) buy.disabled = true;
-        on(buy, 'click', () => askBuy(uid, card.id, price));
-        actions.append(swap, buy);
+        actions.append(swap);
         tile.append(actions);
         return tile;
       }));
@@ -3752,22 +3817,226 @@
     openSheet(tradeSheet);
   }
 
-  function askBuy(uid, cardId, price) {
-    const data = friendProfiles.get(uid);
-    const card = cardsDatabase.find((c) => c.id === cardId);
-    if (!card) return;
-    if (state.coins < price) {
-      showToast('Pas assez de pièces pour cet achat.');
-      return;
+  /* Marché : la carte / les pièces sont mises en réserve avant d'être reçues.
+     Chaque opération modifie seulement la sauvegarde de son propriétaire et
+     le document de réserve, dans une transaction Firestore indivisible. */
+  let marketListings = [];
+  let marketGifts = [];
+  let marketBusy = false;
+  let marketDone = Promise.resolve();
+  let finishMarket = null;
+  const marketMessage = $('market-message');
+  const marketCard = $('market-card');
+  const marketPrice = $('market-price');
+  const myListings = $('my-listings');
+  const marketInbox = $('market-inbox');
+  const friendListings = $('friend-listings');
+  const giftAmount = $('gift-amount');
+  const MAX_COINS = 1000000000;
+
+  function marketNumber(input, min) {
+    const value = input && input.value.trim();
+    const n = Number(value);
+    if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < min || n > MAX_COINS) {
+      throw new Error(`Choisis un nombre entier entre ${fmt(min)} et ${fmt(MAX_COINS)}.`);
     }
-    const who = data ? data.pseudo : 'Ton ami';
-    askConfirm({
-      title: 'Acheter cette carte ?',
-      message: `« ${card.name} » (${RARITIES[card.rarity].label}) coûte ${fmt(price)} 🪙. ${who} pourra accepter ou refuser la vente.`,
-      confirmLabel: `Acheter · ${fmt(price)} 🪙`,
-      onConfirm: () => createTrade({ toUid: uid, giveId: null, receiveId: card.id, price })
-    });
+    return n;
   }
+
+  function marketInfo(message) {
+    if (marketMessage) marketMessage.textContent = message;
+    showToast(message);
+  }
+
+  function renderMarket() {
+    if (!currentUser) return;
+    if (marketCard) {
+      const old = marketCard.value;
+      const owned = countMap();
+      const options = cardsDatabase.filter((c) => owned.has(c.id)).map((card) => {
+        const option = el('option', '', `${card.name} (x${owned.get(card.id)})`);
+        option.value = card.id;
+        return option;
+      });
+      if (!options.length) {
+        const option = el('option', '', 'Aucune carte disponible');
+        option.value = '';
+        options.push(option);
+      }
+      marketCard.replaceChildren(...options);
+      if (owned.has(old)) marketCard.value = old;
+    }
+    if (myListings) {
+      const active = marketListings.filter((l) => l.status === 'open');
+      myListings.replaceChildren(...(active.length ? active.map((listing) => {
+        const row = el('div', 'trade-row');
+        row.append(el('span', 'trade-text', `${cardName(listing.cardId)} · ${fmt(listing.price)} 🪙`));
+        const cancel = el('button', 'mini-btn', 'Retirer de la vente');
+        cancel.type = 'button';
+        on(cancel, 'click', () => marketTransaction('cancel', listing.id));
+        row.append(cancel);
+        return row;
+      }) : [el('p', 'online-empty', 'Aucune carte en vente.') ]));
+    }
+    if (marketInbox) {
+      const income = [
+        ...marketListings.filter((l) => l.status === 'sold').map((l) => ({ ...l, kind: 'sale' })),
+        ...marketGifts.filter((g) => g.status === 'pending').map((g) => ({ ...g, kind: 'gift' }))
+      ];
+      marketInbox.replaceChildren(...(income.length ? income.map((item) => {
+        const row = el('div', 'trade-row');
+        const text = item.kind === 'sale' ? `Vente de « ${cardName(item.cardId)} » : ${fmt(item.price)} 🪙` : `Cadeau de pièces : ${fmt(item.amount)} 🪙`;
+        row.append(el('span', 'trade-text', text));
+        const claim = el('button', 'mini-btn primary', 'Récupérer');
+        claim.type = 'button';
+        on(claim, 'click', () => marketTransaction(item.kind === 'sale' ? 'claimSale' : 'claimGift', item.id));
+        row.append(claim);
+        return row;
+      }) : [el('p', 'online-empty', 'Rien à récupérer pour le moment.') ]));
+    }
+  }
+
+  async function loadMarket() {
+    if (!cloudReady()) return;
+    if (typeof cloudDb.collection('marketListings').where !== 'function' || typeof cloudDb.collection('coinGifts').where !== 'function') return;
+    const uid = currentUser.uid;
+    try {
+      const [listings, gifts] = await Promise.all([
+        cloudDb.collection('marketListings').where('sellerUid', '==', uid).get(),
+        cloudDb.collection('coinGifts').where('toUid', '==', uid).get()
+      ]);
+      if (!currentUser || currentUser.uid !== uid) return;
+      marketListings = snapshotDocs(listings).map((d) => ({ id: d.id, ...d.data }));
+      marketGifts = snapshotDocs(gifts).map((d) => ({ id: d.id, ...d.data }));
+      renderMarket();
+    } catch (error) { noteCloudError('Marché illisible', error); }
+  }
+
+  async function loadFriendListings(uid) {
+    if (!cloudReady() || !friendListings) return;
+    friendListings.replaceChildren(el('p', 'online-empty', 'Chargement des ventes…'));
+    try {
+      const snap = await cloudDb.collection('marketListings').where('sellerUid', '==', uid).get();
+      if (selectedFriendUid !== uid) return;
+      const listings = snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })).filter((l) => l.status === 'open');
+      friendListings.replaceChildren(...(listings.length ? listings.map((listing) => {
+        const row = el('div', 'trade-row');
+        row.append(el('span', 'trade-text', `${cardName(listing.cardId)} · ${fmt(listing.price)} 🪙`));
+        const buy = el('button', 'mini-btn primary', 'Acheter');
+        buy.type = 'button';
+        on(buy, 'click', () => askConfirm({
+          title: 'Acheter cette carte ?',
+          message: `Acheter « ${cardName(listing.cardId)} » pour ${fmt(listing.price)} 🪙 ?`,
+          confirmLabel: 'Acheter',
+          onConfirm: () => marketTransaction('buy', listing.id)
+        }));
+        row.append(buy);
+        return row;
+      }) : [el('p', 'online-empty', 'Aucune carte en vente pour le moment.') ]));
+    } catch (error) {
+      if (selectedFriendUid === uid) friendListings.replaceChildren(el('p', 'online-empty', 'Impossible de charger les ventes. Réessaie.'));
+      noteCloudError('Ventes de l’ami illisibles', error);
+    }
+  }
+
+  async function marketTransaction(action, id, value) {
+    if (!cloudReady() || marketBusy) return;
+    if (typeof cloudDb.runTransaction !== 'function') { marketInfo('Transactions indisponibles. Réessaie plus tard.'); return; }
+    const uid = currentUser.uid;
+    const db = cloudDb;
+    marketBusy = true;
+    marketDone = new Promise((resolve) => { finishMarket = resolve; });
+    const overlay = el('div', 'market-busy', 'Transaction en cours…');
+    overlay.setAttribute('role', 'status');
+    document.body.append(overlay);
+    gameRegions.forEach((region) => region.setAttribute('inert', ''));
+    try {
+      if (!await saveNow(true)) throw new Error('Sauvegarde impossible : transaction annulée.');
+      const saveRef = db.collection('playerSaves').doc(uid);
+      const collName = action === 'gift' || action === 'claimGift' ? 'coinGifts' : 'marketListings';
+      const ref = id ? db.collection(collName).doc(id) : db.collection(collName).doc();
+      const result = await db.runTransaction(async (tx) => {
+        const saveSnap = await tx.get(saveRef);
+        const itemSnap = id ? await tx.get(ref) : null;
+        if (!saveSnap.exists) throw new Error('Sauvegarde introuvable.');
+        const saveData = saveSnap.data();
+        const coins = saveData.coins;
+        const cards = [...saveData.collection];
+        const item = itemSnap && itemSnap.exists ? itemSnap.data() : null;
+        let nextCoins = coins;
+        let patch;
+        if (action === 'list') {
+          const index = cards.indexOf(value.cardId);
+          if (index < 0) throw new Error('Tu ne possèdes plus cette carte.');
+          cards.splice(index, 1);
+          tx.set(ref, { sellerUid: uid, cardId: value.cardId, price: value.price, status: 'open', buyerUid: '', createdAt: serverTimestamp() });
+        } else if (action === 'gift') {
+          if (!saveData.friends.includes(value.toUid) || uid === value.toUid) throw new Error('Ce joueur ne fait plus partie de tes amis.');
+          if (coins < value.amount) throw new Error('Tu n’as pas assez de pièces.');
+          nextCoins -= value.amount;
+          tx.set(ref, { fromUid: uid, toUid: value.toUid, amount: value.amount, status: 'pending', createdAt: serverTimestamp() });
+        } else if (action === 'cancel') {
+          if (!item || item.sellerUid !== uid || item.status !== 'open') throw new Error('Cette annonce n’est plus disponible.');
+          if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
+          cards.push(item.cardId); patch = { status: 'cancelled' };
+        } else if (action === 'buy') {
+          if (!item || item.status !== 'open' || item.sellerUid === uid) throw new Error('Cette carte n’est plus en vente.');
+          if (!friends.includes(item.sellerUid)) throw new Error('Cette vente est réservée à tes amis.');
+          if (coins < item.price) throw new Error('Tu n’as pas assez de pièces.');
+          if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
+          nextCoins -= item.price; cards.push(item.cardId); patch = { status: 'sold', buyerUid: uid };
+        } else if (action === 'claimSale') {
+          if (!item || item.sellerUid !== uid || item.status !== 'sold') throw new Error('Cette vente a déjà été récupérée.');
+          nextCoins += item.price; patch = { status: 'completed' };
+        } else if (action === 'claimGift') {
+          if (!item || item.toUid !== uid || item.status !== 'pending') throw new Error('Ce cadeau a déjà été récupéré.');
+          nextCoins += item.amount; patch = { status: 'claimed' };
+        } else throw new Error('Action inconnue.');
+        if (nextCoins > MAX_COINS) throw new Error('Ton solde dépasserait la limite de pièces. Dépense-en avant de récupérer ce montant.');
+        if (patch) tx.update(ref, patch);
+        tx.update(saveRef, { coins: nextCoins, collection: cards, updatedAt: serverTimestamp() });
+        return { coins: nextCoins, cards };
+      });
+      if (!currentUser || currentUser.uid !== uid) return;
+      state.coins = result.coins;
+      state.collection = result.cards.map((cardId) => cardsDatabase.find((c) => c.id === cardId)).filter(Boolean);
+      updateCoins(); renderCollection(); renderShop(); renderAccount(); saveProfileSoon();
+      marketInfo({ list: 'Carte mise en vente !', gift: 'Cadeau envoyé ! Ton ami pourra le récupérer.', cancel: 'Carte rendue à ta collection.', buy: 'Carte achetée !', claimSale: 'Pièces de la vente récupérées !', claimGift: 'Cadeau récupéré !' }[action]);
+      await loadMarket();
+      if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
+    } catch (error) {
+      marketInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Transaction impossible. Réessaie.'));
+      await loadMarket();
+      if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
+    } finally {
+      overlay.remove();
+      if (currentUser && currentUser.uid === uid) gameRegions.forEach((region) => region.removeAttribute('inert'));
+      marketBusy = false;
+      finishMarket();
+      finishMarket = null;
+    }
+  }
+
+  on($('market-list-form'), 'submit', (e) => {
+    e.preventDefault();
+    try {
+      const price = marketNumber(marketPrice, 0);
+      const cardId = marketCard.value;
+      if (!cardId || !cardsDatabase.some((c) => c.id === cardId)) throw new Error('Choisis une carte à vendre.');
+      askConfirm({ title: 'Mettre en vente ?', message: `Réserver « ${cardName(cardId)} » pour ${fmt(price)} 🪙 ?`, confirmLabel: 'Mettre en vente', onConfirm: () => marketTransaction('list', null, { cardId, price }) });
+    } catch (error) { marketInfo(error.message); }
+  });
+  on($('gift-form'), 'submit', (e) => {
+    e.preventDefault();
+    try {
+      const amount = marketNumber(giftAmount, 1);
+      const toUid = selectedFriendUid;
+      if (!friends.includes(toUid)) throw new Error('Choisis un ami.');
+      askConfirm({ title: 'Donner des pièces ?', message: `Envoyer ${fmt(amount)} 🪙 à ${(friendProfiles.get(toUid) || {}).pseudo || 'ton ami'} ?`, confirmLabel: 'Donner', onConfirm: () => marketTransaction('gift', null, { toUid, amount }) });
+    } catch (error) { marketInfo(error.message); }
+  });
+  on($('market-refresh'), 'click', () => { loadMarket(); if (selectedFriendUid) loadFriendListings(selectedFriendUid); });
+
 
   /* ---------------------------------------------------------------- échanges
      Un échange est un document trades/{id} partagé par les deux joueurs.

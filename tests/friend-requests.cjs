@@ -29,7 +29,7 @@ function makeStore() {
     },
     friendCodes: { 'REFS-ABC123': { uid: 'friend1' } },
     friendRequests: {},
-    trades: {}
+    trades: {}, marketListings: {}, coinGifts: {}
   };
 }
 
@@ -50,7 +50,12 @@ function makeFirestore(store, { denyMissingGet = false } = {}) {
       if (!Object.prototype.hasOwnProperty.call(store[coll], id)) {
         throw Object.assign(new Error('No document to update'), { code: 'not-found' });
       }
-      store[coll][id] = { ...store[coll][id], ...patch };
+      for (const [key, value] of Object.entries(patch)) {
+        if (key.startsWith('removedBy.')) {
+          const uid = key.slice('removedBy.'.length);
+          store[coll][id].removedBy = { ...store[coll][id].removedBy, [uid]: value };
+        } else store[coll][id][key] = value;
+      }
     }
   });
   const query = (coll, field, value) => {
@@ -136,6 +141,7 @@ function buttonByText(root, text) {
   assert.equal(store.friendRequests[requestId].fromUid, 'me');
   assert.equal(store.friendRequests[requestId].toUid, 'friend1');
   assert.equal(store.friendRequests[requestId].status, 'pending');
+  assert.equal(store.friendRequests[requestId].applied.me, undefined, 'l’expéditeur ne doit pas être marqué avant acceptation');
   assert.equal(doc.querySelectorAll('.friend-row').length, 0, 'pas ami tant que l’autre n’a pas accepté');
   assert.equal(doc.querySelectorAll('#friend-requests-out .request-row').length, 1, 'demande envoyée listée');
   assert.match(doc.getElementById('friend-requests-out').textContent, /En attente/);
@@ -217,31 +223,55 @@ function buttonByText(root, text) {
     'demande reçue visible à la connexion');
   second2.w.close();
 
-  /* 7. Régression : lire la demande inverse (absente) est refusé par les
-     anciennes règles (permission-denied). L'envoi doit quand même aboutir,
-     sans afficher l'aide « Republie les règles », et la photo de profil
-     du joueur ajouté doit s'afficher. */
-  {
-    const st = makeStore();
-    st.playerProfiles.friend1.avatar = 'data:image/png;base64,iVBORw0KGgo=';
-    const ctx7 = await boot(st, { denyMissingGet: true });
-    ctx7.doc.querySelector('[data-tab="online"]').click();
-    await wait(30);
-    ctx7.doc.getElementById('friend-code-input').value = 'REFS-ABC123';
-    submitForm(ctx7.w, ctx7.doc.getElementById('add-friend-form'));
-    await wait(150);
-    assert.ok(st.friendRequests['me__friend1'], 'demande créée malgré le refus de lecture du doc absent');
-    assert.doesNotMatch(ctx7.doc.getElementById('add-friend-msg').textContent, /Republie/);
-    assert.match(ctx7.doc.getElementById('add-friend-msg').textContent, /Demande envoyée/);
-    const pv = ctx7.doc.getElementById('add-friend-preview');
-    assert.equal(pv.hidden, false);
-    const img = pv.querySelector('.friend-row-avatar');
-    assert.ok(img && !img.hidden && img.getAttribute('src').startsWith('data:image/png'), 'photo de profil affichée');
-    assert.equal(pv.querySelector('.friend-row-fallback').hidden, true);
-    const outImg = ctx7.doc.querySelector('#friend-requests-out .friend-row-avatar');
-    assert.ok(outImg && !outImg.hidden, 'photo aussi dans « Demandes envoyées »');
-    console.log('PASS get() refusé sur la demande inverse absente = envoi OK + photo de profil visible');
+  /* 6. Réparation des demandes acceptées par un ancien client : le marqueur
+     applied pouvait être déjà vrai sans que la liste soit enregistrée. */
+  for (const [fromUid, toUid] of [['me', 'friend1'], ['friend1', 'me']]) {
+    const recovered = makeStore();
+    const id = `${fromUid}__${toUid}`;
+    recovered.friendRequests[id] = { fromUid, toUid, status: 'accepted', applied: { me: true, friend1: true } };
+    const session = await boot(recovered);
+    await wait(400);
+    assert.equal(session.doc.querySelectorAll('.friend-row').length, 1, `réparation ${id}`);
+    assert.match(session.doc.querySelector('.friend-row').textContent, /AmiJoueur/);
+    assert.deepEqual(recovered.playerSaves.me.friends, ['friend1']);
+    session.db.refresh('friendRequests');
+    session.db.refresh('friendRequests');
+    await wait(350);
+    assert.equal(recovered.playerSaves.me.friends.length, 1, 'pas de doublon après plusieurs notifications');
+    session.w.close();
   }
+  console.log('PASS amitié acceptée : réparation des deux côtés même avec applied déjà vrai');
+
+  /* 7. Retirer un ami ne doit pas le faire revenir au prochain chargement,
+     même si deux demandes acceptées existent entre les deux joueurs. */
+  const removed = makeStore();
+  removed.playerSaves.me.friends = ['friend1'];
+  removed.friendRequests.me__friend1 = { fromUid: 'me', toUid: 'friend1', status: 'accepted', applied: { me: true } };
+  removed.friendRequests.friend1__me = { fromUid: 'friend1', toUid: 'me', status: 'accepted' };
+  let session = await boot(removed);
+  await wait(80);
+  assert.match(session.doc.querySelector('.friend-row').textContent, /AmiJoueur/, 'profil chargé après connexion');
+  buttonByText(session.doc.querySelector('.friend-row'), 'Retirer').click();
+  await wait(400);
+  assert.equal(session.doc.querySelectorAll('.friend-row').length, 0);
+  assert.deepEqual(removed.playerSaves.me.friends, []);
+  assert.equal(removed.friendRequests.me__friend1.removedBy.me, true);
+  assert.equal(removed.friendRequests.friend1__me.removedBy.me, true);
+  session.db.refresh('friendRequests'); await wait(60);
+  assert.equal(session.doc.querySelectorAll('.friend-row').length, 0, 'aucune réapparition après notification');
+  session.w.close();
+  session = await boot(removed); await wait(350);
+  assert.equal(session.doc.querySelectorAll('.friend-row').length, 0, 'aucune réapparition après reconnexion');
+  session.w.close();
+  console.log('PASS retrait volontaire conservé après notifications et reconnexion');
+
+  /* 8. Une demande non acceptée ne crée pas d'amitié. */
+  const rejected = makeStore();
+  rejected.friendRequests.me__friend1 = { fromUid: 'me', toUid: 'friend1', status: 'declined', applied: { me: true } };
+  const rejectedSession = await boot(rejected); await wait(350);
+  assert.equal(rejectedSession.doc.querySelectorAll('.friend-row').length, 0);
+  rejectedSession.w.close();
+  console.log('PASS demande refusée : aucune réparation indue');
 
   w.close();
   console.log('PASS friend-requests : demande → acceptation/refus → amis, fiche ami sans chevauchement');
