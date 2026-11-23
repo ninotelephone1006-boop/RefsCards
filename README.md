@@ -127,6 +127,7 @@ node tests/script-loading.cjs        # scripts classiques + defer + cache-bustin
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges, achats)
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
+node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
 ```
 
 ## Pages Compte et En ligne (amis, échanges, achats)
@@ -135,8 +136,8 @@ La barre de navigation compte quatre onglets : **Pack**, **Collection**, **En li
 
 ### Page Compte
 
-- **Photo de profil en grand** en haut : bouton 📷 pour téléverser une image (recadrée en carré, réduite à 256 px en JPEG, stockée dans le profil public — pas besoin de Firebase Storage). Bouton « Utiliser ma photo Google » pour revenir à la photo du compte Google.
-- **Pseudo modifiable** (1 à 24 caractères), affiché en haut de la page et dans le HUD à la place de l'adresse e-mail. Cliquer sur l'avatar ou le nom dans le HUD ouvre cette page.
+- **Photo de profil en grand** en haut : bouton 📷 pour téléverser une image (recadrée en carré, réduite à 256 px en JPEG, stockée dans le profil public — pas besoin de Firebase Storage). Bouton « Utiliser ma photo Google » pour revenir à la photo du compte Google. La photo est écrite dans le profil cloud dès le choix du fichier et s'affiche partout (page Compte **et** avatar du HUD) ; si l'écriture échoue, l'ancienne photo est restaurée et un message l'explique.
+- **Pseudo modifiable** (1 à 24 caractères), affiché en haut de la page et dans le HUD à la place de l'adresse e-mail. Cliquer sur l'avatar ou le nom dans le HUD ouvre cette page. Le pseudo est sauvegardé dans le profil cloud via le bouton « Enregistrer » **et automatiquement** après la frappe (sans attendre le bouton) ; en cas d'échec de sauvegarde, l'ancien pseudo est restauré avec un message d'erreur plutôt qu'un faux « mis à jour ».
 - **Code ami** stable de la forme `REFS-XXXXXX`, dérivé de l'uid du compte, avec bouton « Copier ». Il est enregistré dans l'annuaire `friendCodes/{code}` pour être retrouvé par les amis.
 - **Statistiques** : pièces, cartes totales, cartes uniques (x / total), doublons, valeur de la collection (somme des récompenses), meilleure rareté, boosters ouverts, nombre d'amis, plus le détail des cartes par rareté.
 

@@ -1891,28 +1891,17 @@
     if (app.dataset.tab === 'account') renderAccount();
   }
 
-  function showGame(user, saveData) {
+  async function showGame(user, saveData) {
     currentUser = user;
     currentEmail = user.email || '';
-    const displayName = user.displayName || currentEmail || 'Joueur';
-    if (accountEmail) {
-      accountEmail.textContent = displayName;
-      accountEmail.title = currentEmail || displayName;
-    }
-    if (accountAvatar) {
-      if (user.photoURL) {
-        accountAvatar.src = user.photoURL;
-        accountAvatar.alt = `Photo de profil de ${displayName}`;
-        accountAvatar.hidden = false;
-      } else {
-        accountAvatar.removeAttribute('src');
-        accountAvatar.hidden = true;
-      }
-    }
     applySave(saveData);
     syncHudName();
-    // Profil public (pseudo, avatar, code ami) + échanges en attente.
-    loadProfile();
+    syncHudAvatar();
+    /* Profil public (pseudo, avatar, code ami) chargé AVANT d'afficher le
+       jeu : un changement de pseudo ou de photo fait juste après la
+       connexion ne doit pas être écrasé par ce chargement (qui réécrit le
+       profil cloud avec les anciennes valeurs). */
+    await loadProfile();
     loadTrades();
     subscribeTrades();
     if (authScreen) authScreen.hidden = true;
@@ -1925,6 +1914,10 @@
 
   function showAuth() {
     clearTimeout(saveTimer);
+    window.clearTimeout(profileTimer);
+    profileTimer = 0;
+    window.clearTimeout(pseudoTimer);
+    pseudoTimer = 0;
     currentUser = null;
     currentEmail = '';
     profile.pseudo = '';
@@ -2085,7 +2078,7 @@
         try {
           const snapshot = await cloudDb.collection('playerSaves').doc(user.uid).get();
           if (!currentUser || currentUser.uid !== user.uid) return;
-          showGame(user, snapshot.exists ? snapshot.data() : null);
+          await showGame(user, snapshot.exists ? snapshot.data() : null);
         } catch (error) {
           currentUser = null;
           showAuth();
@@ -2260,6 +2253,7 @@
   let tradeTarget = null;            // {uid, cardId} : carte visée par l'échange en cours
   let confirmAction = null;
   let profileTimer = 0;
+  let pseudoTimer = 0;              // auto-sauvegarde du pseudo pendant la frappe
   let rulesHelpShown = false;       // un seul toast « règles » par session
 
   function serverTimestamp() {
@@ -2410,12 +2404,23 @@
     if (!profile.friendCode) profile.friendCode = await ensureFriendCode();
     await saveProfile();
     syncHudName();
+    syncHudAvatar();
     renderAccount();
     renderOnline();
   }
 
+  /* Écrit le profil public dans Firestore et renvoie true si l'écriture a
+     abouti. Les appelants (pseudo, photo) ne doivent annoncer « mis à jour »
+     que sur true : sinon le joueur croit sa modification enregistrée alors
+     qu'elle disparaîtra au rechargement. */
   async function saveProfile() {
-    if (!cloudReady()) return;
+    if (!cloudReady()) return false;
+    /* Les règles Firestore refusent TOUT le document si friendCode ne
+       matche pas ^REFS-[A-Z0-9]{6}$ : sans code valide, le pseudo et la
+       photo ne seraient jamais persistés. On le régénère avant d'écrire. */
+    if (!/^REFS-[A-Z0-9]{6}$/.test(profile.friendCode || '')) {
+      profile.friendCode = await ensureFriendCode();
+    }
     const stats = myStats();
     try {
       await cloudDb.collection('playerProfiles').doc(currentUser.uid).set({
@@ -2429,8 +2434,10 @@
         collection: collectionIds(),
         updatedAt: serverTimestamp()
       }, { merge: true });
+      return true;
     } catch (error) {
       noteCloudError('Profil non sauvegardé', error);
+      return false;
     }
   }
 
@@ -2440,6 +2447,26 @@
     profileTimer = window.setTimeout(() => { saveProfile(); }, 600);
   }
 
+  /* Vide les sauvegardes différées du profil (pseudo tapé, stats) quand
+     l'onglet se ferme ou passe en arrière-plan, pour ne pas perdre un
+     changement fait juste avant. */
+  function flushProfileSaves() {
+    if (profileTimer) {
+      window.clearTimeout(profileTimer);
+      profileTimer = 0;
+      saveProfile();
+    }
+    if (pseudoTimer) {
+      window.clearTimeout(pseudoTimer);
+      pseudoTimer = 0;
+      const value = (pseudoInput && pseudoInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+      if (value && value !== profile.pseudo) {
+        profile.pseudo = value;
+        saveProfile();
+      }
+    }
+  }
+
   function syncHudName() {
     if (accountEmail) {
       accountEmail.textContent = profile.pseudo || currentEmail || 'Joueur';
@@ -2447,12 +2474,38 @@
     }
   }
 
+  /* L'avatar du HUD (en haut de l'écran) suit la photo personnalisée, avec
+     repli sur la photo Google. Sans ça, changer de photo ne se voyait pas
+     hors de la page Compte et semblait « non sauvegardé ». */
+  function syncHudAvatar() {
+    if (!accountAvatar) return;
+    const googlePhoto = (currentUser && currentUser.photoURL) || '';
+    const src = profile.avatar || googlePhoto;
+    if (src) {
+      accountAvatar.src = src;
+      accountAvatar.alt = `Photo de profil de ${profile.pseudo || currentEmail || 'Joueur'}`;
+      accountAvatar.hidden = false;
+    } else {
+      accountAvatar.removeAttribute('src');
+      accountAvatar.hidden = true;
+    }
+  }
+
   function setProfileMsg(msg) {
     if (profileMsg) profileMsg.textContent = msg || '';
   }
 
+  /* Fermeture d'onglet / passage en arrière-plan : on vide les sauvegardes
+     différées du profil pour ne pas perdre un pseudo ou une photo modifiés
+     à la dernière seconde. */
+  on(window, 'pagehide', flushProfileSaves);
+  on(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushProfileSaves();
+  });
+
   function renderAccount() {
     if (!accountView) return;
+    syncHudAvatar();
     const stats = myStats();
     const googlePhoto = (currentUser && currentUser.photoURL) || '';
     const avatarSrc = profile.avatar || googlePhoto;
@@ -2507,19 +2560,53 @@
     }
   }
 
+  /* Enregistre un nouveau pseudo dans le profil cloud. L'affichage est mis
+     à jour immédiatement, mais si l'écriture échoue (règles Firestore,
+     connexion…), l'ancienne valeur est restaurée et un message d'erreur
+     l'explique : on ne prétend jamais qu'un pseudo est sauvegardé alors
+     qu'il disparaîtra au rechargement. */
+  async function savePseudo(value) {
+    if (!value || value === profile.pseudo) return true;
+    const previous = profile.pseudo;
+    profile.pseudo = value;
+    syncHudName();
+    renderAccount();
+    const ok = await saveProfile();
+    if (!ok) {
+      profile.pseudo = previous;
+      syncHudName();
+      renderAccount();
+      setProfileMsg('Sauvegarde impossible pour le moment. Ton pseudo n’a pas été enregistré — réessaie.');
+      return false;
+    }
+    setProfileMsg('Pseudo mis à jour !');
+    showToast(`Pseudo : ${value}`);
+    return true;
+  }
+
   on(pseudoForm, 'submit', async (e) => {
     e.preventDefault();
+    window.clearTimeout(pseudoTimer);
+    pseudoTimer = 0;
     const value = (pseudoInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 24);
     if (!value) {
       setProfileMsg('Choisis un pseudo (1 à 24 caractères).');
       return;
     }
-    profile.pseudo = value;
-    await saveProfile();
-    syncHudName();
-    renderAccount();
-    setProfileMsg('Pseudo mis à jour !');
-    showToast(`Pseudo : ${value}`);
+    await savePseudo(value);
+  });
+
+  /* Auto-sauvegarde : le pseudo est enregistré tout seul après la frappe
+     (sans attendre le bouton « Enregistrer »), pour ne pas perdre un
+     changement oublié. */
+  on(pseudoInput, 'input', () => {
+    window.clearTimeout(pseudoTimer);
+    pseudoTimer = window.setTimeout(async () => {
+      pseudoTimer = 0;
+      const value = (pseudoInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 24);
+      if (!value) return;
+      await savePseudo(value);
+    }, 800);
   });
 
   on(friendCodeCopy, 'click', async () => {
@@ -2547,15 +2634,23 @@
       setProfileMsg('Choisis une image (PNG, JPG…).');
       return;
     }
+    const previous = profile.avatar;
     try {
       profile.avatar = await resizeAvatar(file, 256);
-      await saveProfile();
-      renderAccount();
-      setProfileMsg('Photo de profil mise à jour !');
-      showToast('Photo de profil mise à jour');
     } catch (error) {
       setProfileMsg('Impossible de lire cette image. Réessaie avec un autre fichier.');
+      return;
     }
+    renderAccount(); // la nouvelle photo s'affiche tout de suite, partout (page Compte + HUD)
+    const ok = await saveProfile();
+    if (!ok) {
+      profile.avatar = previous;
+      renderAccount();
+      setProfileMsg('Sauvegarde impossible pour le moment. Ta photo n’a pas été enregistrée — réessaie.');
+      return;
+    }
+    setProfileMsg('Photo de profil mise à jour !');
+    showToast('Photo de profil mise à jour');
   });
 
   function resizeAvatar(file, size) {
@@ -2575,7 +2670,15 @@
             const sx = (img.naturalWidth - side) / 2;
             const sy = (img.naturalHeight - side) / 2;
             ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
-            resolve(canvas.toDataURL('image/jpeg', 0.82));
+            /* Les règles Firestore limitent l'avatar à 300 000 caractères :
+               on baisse la qualité JPEG jusqu'à passer sous la limite, sinon
+               l'écriture du profil serait refusée et la photo perdue. */
+            let url = canvas.toDataURL('image/jpeg', 0.82);
+            for (const quality of [0.7, 0.55, 0.4]) {
+              if (url.length <= 290000) break;
+              url = canvas.toDataURL('image/jpeg', quality);
+            }
+            resolve(url);
           } catch (error) {
             reject(error);
           }
@@ -2587,9 +2690,16 @@
   }
 
   on(avatarGoogleBtn, 'click', async () => {
+    const previous = profile.avatar;
     profile.avatar = '';
-    await saveProfile();
     renderAccount();
+    const ok = await saveProfile();
+    if (!ok) {
+      profile.avatar = previous;
+      renderAccount();
+      setProfileMsg('Sauvegarde impossible pour le moment. Ta photo n’a pas été enregistrée — réessaie.');
+      return;
+    }
     setProfileMsg('Ta photo Google est de nouveau utilisée.');
   });
 
