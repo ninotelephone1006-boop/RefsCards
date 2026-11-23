@@ -1902,6 +1902,8 @@
        connexion ne doit pas être écrasé par ce chargement (qui réécrit le
        profil cloud avec les anciennes valeurs). */
     await loadProfile();
+    loadFriendRequests();
+    subscribeFriendRequests();
     loadTrades();
     subscribeTrades();
     if (authScreen) authScreen.hidden = true;
@@ -1925,12 +1927,20 @@
     profile.friendCode = '';
     friends = [];
     friendProfiles.clear();
+    friendRequests = [];
+    sentRequests = [];
+    sentRequestsByUid.clear();
+    pendingFriendUids.clear();
     trades = [];
     selectedFriendUid = null;
     rulesHelpShown = false;
     if (tradesUnsub) {
       try { tradesUnsub(); } catch (error) { /* déjà fermé */ }
       tradesUnsub = null;
+    }
+    if (friendRequestsUnsub) {
+      try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
+      friendRequestsUnsub = null;
     }
     if (friendDetail) friendDetail.hidden = true;
     if (accountEmail) {
@@ -2219,6 +2229,10 @@
   const addFriendForm = $('add-friend-form');
   const friendCodeInput = $('friend-code-input');
   const addFriendMsg = $('add-friend-msg');
+  const friendRequestsIn = $('friend-requests-in');
+  const friendRequestsOut = $('friend-requests-out');
+  const friendRequestsEmpty = $('friend-requests-empty');
+  const friendRequestsCount = $('friend-requests-count');
   const tradesIn = $('trades-in');
   const tradesOut = $('trades-out');
   const friendsList = $('friends-list');
@@ -2245,10 +2259,15 @@
      collection — c'est ce que les amis voient. La sauvegarde privée
      (playerSaves/{uid}) garde en plus la liste d'amis. */
   const profile = { pseudo: '', avatar: '', friendCode: '' };
-  let friends = [];                  // uids de mes amis
+  let friends = [];                  // uids de mes amis (acceptés des deux côtés)
   const friendProfiles = new Map();  // uid -> profil public d'un ami
+  let friendRequests = [];           // demandes d'ami où je suis destinataire
+  let friendRequestsUnsub = null;
   let trades = [];                   // échanges où je suis partie
   let tradesUnsub = null;
+  let sentRequests = [];             // demandes d'ami que j'ai envoyées (requêtes)
+  const sentRequestsByUid = new Map(); // uid -> id du document friendRequests
+  const pendingFriendUids = new Set(); // uids demandés mais pas encore acceptés
   let selectedFriendUid = null;
   let tradeTarget = null;            // {uid, cardId} : carte visée par l'échange en cours
   let confirmAction = null;
@@ -2740,8 +2759,244 @@
     if (addFriendMsg) addFriendMsg.textContent = msg || '';
   }
 
-  on(addFriendForm, 'submit', async (e) => {
-    e.preventDefault();
+  /* ------------------------------------------- demandes d'ami (acceptation)
+     Ajouter quelqu'un ne crée plus un ami dans le dos de l'autre joueur :
+     cela envoie une DEMANDE (friendRequests/{fromUid}__{toUid}). Le
+     destinataire la voit dans « Demandes reçues » et doit l'accepter ; une
+     fois acceptée, les deux joueurs ont chacun l'autre dans sa liste
+     d'amis (chacun écrit la sienne, les règles Firestore restant
+     « propriétaire uniquement »). L'expéditeur applique sa moitié dès qu'il
+     voit la demande acceptée — tout de suite s'il est en ligne, sinon à sa
+     prochaine connexion. */
+
+  function friendRequestId(fromUid, toUid) {
+    return `${fromUid}__${toUid}`;
+  }
+
+  /* Ajoute un uid à ma liste d'amis locale + cloud. Renvoie true si c'est un
+     nouvel ami. */
+  async function addFriendToList(uid, { announce = true } = {}) {
+    if (!uid || uid === (currentUser && currentUser.uid)) return false;
+    pendingFriendUids.delete(uid);
+    if (friends.includes(uid)) return false;
+    friends.push(uid);
+    save();
+    const data = await fetchFriendProfile(uid);
+    if (announce) showToast(`${data.pseudo} : vous êtes maintenant amis !`);
+    renderOnline();
+    return true;
+  }
+
+  function applyRequestDoc(id, d) {
+    return { id, ...d };
+  }
+
+  /* Charge mes demandes reçues (en attente) et envoyées. Traite aussi les
+     demandes que J'AI envoyées et qui ont été acceptées pendant que j'étais
+     hors ligne : elles deviennent des amis à ce moment-là. */
+  async function loadFriendRequests() {
+    if (!cloudReady()) return;
+    const coll = cloudDb.collection('friendRequests');
+    if (!coll || typeof coll.where !== 'function') return;
+    const uid = currentUser.uid;
+    let incoming = [];
+    let outgoing = [];
+    try {
+      const [inSnap, outSnap] = await Promise.all([
+        coll.where('toUid', '==', uid).get(),
+        coll.where('fromUid', '==', uid).get()
+      ]);
+      incoming = snapshotDocs(inSnap).map((d) => applyRequestDoc(d.id, d.data));
+      outgoing = snapshotDocs(outSnap).map((d) => applyRequestDoc(d.id, d.data));
+    } catch (error) {
+      noteCloudError('Demandes d’ami illisibles', error);
+      return;
+    }
+    await ingestFriendRequests(incoming, outgoing);
+  }
+
+  /* Met à jour l'état local à partir des documents reçus, puis rafraîchit. */
+  let knownRequestIds = new Set(); // pour n'annoncer que les NOUVELLES demandes
+  let hadRequests = false;         // false = premier chargement (pas de toast au démarrage)
+  async function ingestFriendRequests(incoming, outgoing) {
+    const uid = currentUser && currentUser.uid;
+    if (!uid) return;
+    friendRequests = incoming
+      .filter((r) => r.status === 'pending' && r.toUid === uid)
+      .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+    sentRequests = outgoing.filter((r) => r.fromUid === uid);
+
+    // Mes demandes envoyées : index + uids encore en attente.
+    sentRequestsByUid.clear();
+    pendingFriendUids.clear();
+    const acceptedMine = [];
+    for (const r of sentRequests) {
+      if (r.status === 'pending') {
+        sentRequestsByUid.set(r.toUid, r.id);
+        pendingFriendUids.add(r.toUid);
+      } else if (r.status === 'accepted' && !(r.applied && r.applied[uid])) {
+        acceptedMine.push(r);
+      }
+    }
+    /* Profils publics des joueurs concernés : sans ça les demandes
+       afficheraient « Joueur » au lieu du pseudo/photo. */
+    const unknown = new Set();
+    friendRequests.forEach((r) => unknown.add(r.fromUid));
+    pendingFriendUids.forEach((uid) => unknown.add(uid));
+    for (const uid of unknown) {
+      if (!friendProfiles.has(uid)) await fetchFriendProfile(uid);
+    }
+
+    for (const r of acceptedMine) {
+      await addFriendToList(r.toUid, { announce: true });
+      await updateFriendRequest(r.id, { applied: { ...(r.applied || {}), [uid]: true } });
+    }
+    /* Nouvelle demande reçue pendant la session : on prévient tout de suite
+       (le joueur peut accepter depuis « Demandes reçues »). */
+    const fresh = friendRequests.filter((r) => !knownRequestIds.has(r.id));
+    knownRequestIds = new Set(friendRequests.map((r) => r.id));
+    if (fresh.length && hadRequests) {
+      const who = friendProfiles.get(fresh[0].fromUid);
+      showToast(`${who ? who.pseudo : 'Un joueur'} veut t’ajouter en ami — va dans « En ligne » pour accepter.`, 4200);
+    }
+    hadRequests = true;
+    renderOnline();
+  }
+
+  async function updateFriendRequest(id, patch) {
+    if (!cloudReady()) return false;
+    try {
+      await cloudDb.collection('friendRequests').doc(id).update(patch);
+      return true;
+    } catch (error) {
+      noteCloudError('Demande d’ami non mise à jour', error);
+      return false;
+    }
+  }
+
+  function subscribeFriendRequests() {
+    if (!cloudReady() || friendRequestsUnsub) return;
+    const coll = cloudDb.collection('friendRequests');
+    if (!coll || typeof coll.where !== 'function') return;
+    const uid = currentUser.uid;
+    try {
+      const q1 = coll.where('toUid', '==', uid);
+      const q2 = coll.where('fromUid', '==', uid);
+      if (typeof q1.onSnapshot !== 'function') return;
+      // Une demande acceptée doit arriver même si l'onglet est resté ouvert.
+      const incoming = new Map();
+      const outgoing = new Map();
+      const flush = () => {
+        ingestFriendRequests([...incoming.values()], [...outgoing.values()])
+          .catch(() => { /* signalé par noteCloudError */ });
+      };
+      const watch = (query, map) => query.onSnapshot(
+        (snap) => {
+          for (const d of snapshotDocs(snap)) {
+            const data = applyRequestDoc(d.id, d.data);
+            if (data.status === 'cancelled' || data.status === 'declined') map.delete(d.id);
+            else map.set(d.id, data);
+          }
+          flush();
+        },
+        (error) => noteCloudError('Demandes d’ami illisibles (temps réel)', error)
+      );
+      const un1 = watch(q1, incoming);
+      const un2 = watch(q2, outgoing);
+      friendRequestsUnsub = () => {
+        try { if (un1) un1(); } catch (error) { /* déjà fermé */ }
+        try { if (un2) un2(); } catch (error) { /* déjà fermé */ }
+      };
+    } catch (error) { /* temps réel indisponible : loadFriendRequests suffit */ }
+  }
+
+  /* Envoie une demande d'ami. Si la personne m'avait déjà envoyé une demande
+     en attente, on l'accepte directement : les deux deviennent amis. */
+  async function sendFriendRequest(uid) {
+    const mine = currentUser.uid;
+    const id = friendRequestId(mine, uid);
+    try {
+      // Demande inverse déjà en attente ? On s'accepte mutuellement.
+      const reverseSnap = await cloudDb.collection('friendRequests').doc(friendRequestId(uid, mine)).get();
+      if (reverseSnap.exists) {
+        const reverse = reverseSnap.data() || {};
+        if (reverse.status === 'pending' && reverse.fromUid === uid && reverse.toUid === mine) {
+          await acceptFriendRequest({ id: friendRequestId(uid, mine), ...reverse });
+          setAddFriendMsg('Vous vous étiez déjà ajoutés : vous êtes maintenant amis !');
+          return true;
+        }
+      }
+      await cloudDb.collection('friendRequests').doc(id).set({
+        fromUid: mine,
+        toUid: uid,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        applied: { [mine]: true }
+      });
+      pendingFriendUids.add(uid);
+      sentRequestsByUid.set(uid, id);
+      const data = await fetchFriendProfile(uid);
+      setAddFriendMsg(`Demande envoyée à ${data.pseudo}. Elle doit l’accepter pour que vous soyez amis.`);
+      showToast(`Demande d’ami envoyée à ${data.pseudo}`);
+      renderOnline();
+      return true;
+    } catch (error) {
+      if (isPermissionDenied(error)) {
+        setAddFriendMsg(RULES_HELP);
+      } else {
+        setAddFriendMsg('Impossible d’envoyer la demande. Vérifie ta connexion et réessaie.');
+      }
+      return false;
+    }
+  }
+
+  async function acceptFriendRequest(request) {
+    if (!request || !request.fromUid) return;
+    const uid = currentUser.uid;
+    /* On écrit d'abord l'acceptation dans le cloud : si elle échoue, on
+       n'ajoute PAS l'ami (sinon l'amitié n'existerait que d'un côté et
+       disparaîtrait au rechargement). */
+    const ok = await updateFriendRequest(request.id, {
+      status: 'accepted',
+      applied: { ...(request.applied || {}), [uid]: true }
+    });
+    if (!ok) {
+      setAddFriendMsg('Acceptation impossible pour le moment (règles Firestore ou connexion). Réessaie.');
+      renderOnline();
+      return;
+    }
+    friendRequests = friendRequests.filter((r) => r.id !== request.id);
+    const data = await fetchFriendProfile(request.fromUid);
+    await addFriendToList(request.fromUid, { announce: false });
+    setAddFriendMsg(`${data.pseudo} a été accepté : vous êtes amis.`);
+    showToast(`${data.pseudo} et toi êtes maintenant amis !`);
+    renderOnline();
+  }
+
+  async function declineFriendRequest(request) {
+    const ok = await updateFriendRequest(request.id, { status: 'declined', applied: request.applied || {} });
+    if (!ok) {
+      setAddFriendMsg('Refus impossible pour le moment. Réessaie.');
+      renderOnline();
+      return;
+    }
+    friendRequests = friendRequests.filter((r) => r.id !== request.id);
+    showToast('Demande refusée.');
+    renderOnline();
+  }
+
+  async function cancelFriendRequest(uid) {
+    const id = sentRequestsByUid.get(uid);
+    if (!id) return;
+    await updateFriendRequest(id, { status: 'cancelled' });
+    pendingFriendUids.delete(uid);
+    sentRequestsByUid.delete(uid);
+    sentRequests = sentRequests.filter((r) => r.toUid !== uid);
+    showToast('Demande annulée.');
+    renderOnline();
+  }
+
+  async function submitFriendCode() {
     if (!cloudReady()) {
       setAddFriendMsg('Connecte-toi pour ajouter des amis.');
       return;
@@ -2771,17 +3026,21 @@
         setAddFriendMsg('Cet ami est déjà dans ta liste.');
         return;
       }
-      friends.push(uid);
-      save();
-      const data = await fetchFriendProfile(uid);
-      setAddFriendMsg(`${data.pseudo} ajouté à tes amis !`);
-      showToast(`${data.pseudo} ajouté à tes amis`);
-      friendCodeInput.value = '';
-      renderOnline();
+      if (pendingFriendUids.has(uid)) {
+        setAddFriendMsg('Une demande est déjà en attente pour ce joueur.');
+        return;
+      }
+      const sent = await sendFriendRequest(uid);
+      if (sent) friendCodeInput.value = '';
     } catch (error) {
       if (isPermissionDenied(error)) setAddFriendMsg(RULES_HELP);
       else setAddFriendMsg('Recherche impossible pour le moment. Vérifie ta connexion.');
     }
+  }
+
+  on(addFriendForm, 'submit', (e) => {
+    e.preventDefault();
+    submitFriendCode();
   });
 
   function renderOnline() {
@@ -2823,8 +3082,74 @@
       });
       friendsList.replaceChildren(frag);
     }
+    renderFriendRequests();
     renderTrades();
     if (selectedFriendUid) renderFriendDetail(selectedFriendUid);
+  }
+
+  /* Demandes reçues (Accepter / Refuser) et envoyées (en attente / Annuler).
+     Rien n'est « ami » tant que le destinataire n'a pas accepté. */
+  function renderFriendRequests() {
+    if (friendRequestsCount) friendRequestsCount.textContent = String(friendRequests.length);
+    if (friendRequestsEmpty) friendRequestsEmpty.hidden = friendRequests.length > 0;
+
+    if (friendRequestsIn) {
+      friendRequestsIn.replaceChildren(...friendRequests.map((request) => {
+        const data = friendProfiles.get(request.fromUid) || { pseudo: 'Joueur', avatar: '' };
+        const row = el('div', 'request-row');
+        row.append(friendIdentity(data));
+        const actions = el('div', 'request-actions');
+        const ok = el('button', 'mini-btn primary', 'Accepter');
+        ok.type = 'button';
+        ok.setAttribute('aria-label', `Accepter la demande d’ami de ${data.pseudo || 'ce joueur'}`);
+        on(ok, 'click', () => {
+          ok.disabled = true;
+          acceptFriendRequest(request);
+        });
+        const no = el('button', 'mini-btn danger', 'Refuser');
+        no.type = 'button';
+        on(no, 'click', () => declineFriendRequest(request));
+        actions.append(ok, no);
+        row.append(actions);
+        return row;
+      }));
+    }
+
+    if (friendRequestsOut) {
+      const waiting = [...pendingFriendUids];
+      if (!waiting.length) {
+        friendRequestsOut.replaceChildren(el('p', 'online-empty', 'Aucune demande envoyée en attente.'));
+      } else {
+        friendRequestsOut.replaceChildren(...waiting.map((uid) => {
+          const data = friendProfiles.get(uid) || { pseudo: 'Joueur', avatar: '' };
+          const row = el('div', 'request-row');
+          row.append(friendIdentity(data), el('span', 'request-status', 'En attente d’acceptation…'));
+          const cancel = el('button', 'mini-btn', 'Annuler');
+          cancel.type = 'button';
+          on(cancel, 'click', () => cancelFriendRequest(uid));
+          row.append(cancel);
+          return row;
+        }));
+      }
+    }
+  }
+
+  /* Pastille avatar + pseudo, brique commune des listes d'amis/demandes. */
+  function friendIdentity(data) {
+    const box = el('div', 'friend-row-id');
+    const img = el('img', 'friend-row-avatar');
+    img.alt = '';
+    if (data && data.avatar) img.src = data.avatar;
+    else img.hidden = true;
+    const fb = el('span', 'friend-row-fallback', ((data && data.pseudo) || '?').slice(0, 1).toUpperCase());
+    if (data && data.avatar) fb.hidden = true;
+    box.append(
+      el('strong', 'friend-row-pseudo', (data && data.pseudo) || 'Joueur'),
+      el('span', 'friend-row-sub', `${(data && data.uniqueCards) || 0} uniques · ${(data && data.totalCards) || 0} cartes`)
+    );
+    const wrap = el('div', 'request-id');
+    wrap.append(img, fb, box);
+    return wrap;
   }
 
   async function openFriendDetail(uid) {
@@ -2886,9 +3211,13 @@
         tile.style.setProperty('--i', i);
         tile.style.setProperty('--r-color', info.color);
         tile.style.setProperty('--r-glow', info.glow);
-        tile.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
+        /* cardFrame() est en position:absolute : sans ce cadre au ratio 5:7,
+           les cartes se superposaient et débordaient de la fiche ami. */
+        const frame = el('span', 'friend-card-frame');
+        frame.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
         const n = owned.get(card.id) || 0;
-        if (n > 1) tile.append(el('span', 'coll-pill', `x${n}`));
+        if (n > 1) frame.append(el('span', 'coll-pill', `x${n}`));
+        tile.append(frame);
         const actions = el('div', 'friend-card-actions');
         const swap = el('button', 'mini-btn', 'Échanger');
         swap.type = 'button';

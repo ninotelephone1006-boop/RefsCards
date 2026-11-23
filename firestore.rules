@@ -48,6 +48,28 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Demandes d'ami : friendRequests/{fromUid}__{toUid}. L'expéditeur crée
+    // la demande, le destinataire l'accepte ou la refuse (« on ne devient ami
+    // que si l'autre accepte »). Les deux parties peuvent lire et mettre à jour
+    // la demande ; personne d'autre.
+    match /friendRequests/{requestId} {
+      function isParty() {
+        return request.auth != null
+          && (request.auth.uid == resource.data.fromUid
+              || request.auth.uid == resource.data.toUid);
+      }
+      allow read: if isParty();
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.toUid is string
+        && request.resource.data.status == 'pending';
+      allow update: if isParty()
+        && request.resource.data.fromUid == resource.data.fromUid
+        && request.resource.data.toUid == resource.data.toUid;
+      allow delete: if false;
+    }
+
     // Échanges / achats entre deux joueurs : seules les deux parties peuvent
     // lire et modifier la proposition. Chaque joueur applique sa moitié dans
     // sa propre sauvegarde (playerSaves reste « propriétaire uniquement »).

@@ -61,6 +61,28 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Demandes d'ami : friendRequests/{fromUid}__{toUid}. L'expéditeur crée
+    // la demande, le destinataire l'accepte ou la refuse (« on ne devient ami
+    // que si l'autre accepte »). Les deux parties peuvent lire et mettre à jour
+    // la demande ; personne d'autre.
+    match /friendRequests/{requestId} {
+      function isParty() {
+        return request.auth != null
+          && (request.auth.uid == resource.data.fromUid
+              || request.auth.uid == resource.data.toUid);
+      }
+      allow read: if isParty();
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.toUid is string
+        && request.resource.data.status == 'pending';
+      allow update: if isParty()
+        && request.resource.data.fromUid == resource.data.fromUid
+        && request.resource.data.toUid == resource.data.toUid;
+      allow delete: if false;
+    }
+
     // Échanges / achats entre deux joueurs : seules les deux parties peuvent
     // lire et modifier la proposition. Chaque joueur applique sa moitié dans
     // sa propre sauvegarde (playerSaves reste « propriétaire uniquement »).
@@ -126,6 +148,7 @@ node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges, achats)
+node tests/friend-requests.cjs       # demandes d'ami : acceptation/refus, fiche ami
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
 ```
@@ -143,13 +166,14 @@ La barre de navigation compte quatre onglets : **Pack**, **Collection**, **En li
 
 ### Page En ligne
 
-- **Ajout d'ami par code** : saisis le code ami d'un joueur (`REFS-XXXXXX`, le préfixe et les tirets sont tolérés), l'annuaire retrouve son uid et son profil public est ajouté à ta liste d'amis (stockée dans ta sauvegarde privée, champ `friends`).
-- **Profil d'un ami** : photo, pseudo, code ami, stats (pièces, cartes, uniques, meilleure rareté) et **ses cartes** avec leurs exemplaires.
+- **Demande d'ami par code** : saisis le code ami d'un joueur (`REFS-XXXXXX`, le préfixe, les tirets et la casse sont tolérés), l'annuaire retrouve son uid et une **demande d'ami** est créée (`friendRequests/{moi}__{lui}`, statut `pending`). Personne n'est ajouté d'office : le destinataire doit **accepter**.
+- **Demandes reçues / envoyées** : la page En ligne liste les demandes reçues avec **Accepter** / **Refuser** et les demandes envoyées en attente (avec **Annuler**). Quand le destinataire accepte, **les deux joueurs deviennent amis** : chacun enregistre l'autre dans sa propre liste (`friends` de sa sauvegarde privée) — immédiatement si l'expéditeur est en ligne (temps réel), sinon à sa prochaine connexion. Une demande refusée n'ajoute aucun ami.
+- **Profil d'un ami** : photo, pseudo, code ami, stats (pièces, cartes, uniques, meilleure rareté) et **ses cartes** avec leurs exemplaires, montrées dans une grille régulière (ratio 5:7) avec les boutons Échanger / Acheter sous chaque carte.
 - **Échanger** : sur une carte d'un ami, choisis une de tes cartes à lui donner ; une proposition d'échange est créée (`trades/{id}`, statut `pending`). L'ami la voit dans « Échanges reçus » et peut accepter ou refuser.
 - **Acheter** : le prix d'une carte vaut **le double de sa récompense de rareté** (Commune 40 🪙, Inhabituelle 70 🪙, Rare 110 🪙, Super Rare 160 🪙, Épique 240 🪙, Ultra épique 350 🪙, Mythique 480 🪙, Légendaire 680 🪙, Divine 1 040 🪙, Secrète 1 800 🪙). Le bouton est désactivé si ton solde est insuffisant.
 - **Acceptation** : quand un joueur accepte, il applique sa moitié dans **sa propre** sauvegarde (il donne sa carte / paie, et reçoit l'autre carte / les pièces), puis marque l'échange comme appliqué de son côté. L'autre joueur applique sa moitié à son tour — immédiatement s'il est en ligne, sinon à sa prochaine connexion (`loadTrades` rejoue les moitiés en attente). Quand les deux moitiés sont appliquées, l'échange passe à `done`. Les échanges reçus/envoyés se mettent à jour en temps réel (`onSnapshot`).
 
-Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends` et `packsOpened`), `playerProfiles/{uid}` (public pour les joueurs connectés), `friendCodes/{code}` (annuaire), `trades/{id}` (propositions réservées aux deux parties). Les règles correspondantes sont dans `firestore.rules` — **republie-les** (`firebase deploy --only firestore:rules`) pour activer les nouvelles pages.
+Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends` et `packsOpened`), `playerProfiles/{uid}` (public pour les joueurs connectés), `friendCodes/{code}` (annuaire), `friendRequests/{fromUid}__{toUid}` (demandes d'ami à accepter, réservées aux deux parties), `trades/{id}` (propositions réservées aux deux parties). Les règles correspondantes sont dans `firestore.rules` — **republie-les** (`firebase deploy --only firestore:rules`) pour activer les nouvelles pages.
 
 ## Déroulé d'une ouverture
 

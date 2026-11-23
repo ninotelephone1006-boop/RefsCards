@@ -45,6 +45,7 @@ function makeStore() {
       }
     },
     friendCodes: { 'REFS-ABC123': { uid: 'me' } },
+    friendRequests: {},
     trades: {}
   };
 }
@@ -52,7 +53,7 @@ function makeStore() {
 function makeFirestore(store, { failProfileSet = false } = {}) {
   const docRef = (coll, id) => ({
     get: async () => ({
-      exists: Object.prototype.hasOwnProperty.call(store[coll], id),
+      exists: Object.prototype.hasOwnProperty.call(store[coll] || {}, id),
       data: () => store[coll][id]
     }),
     set: async (data) => {
@@ -63,7 +64,7 @@ function makeFirestore(store, { failProfileSet = false } = {}) {
   });
   const query = (coll, field, value) => {
     const snap = () => ({
-      docs: Object.entries(store[coll])
+      docs: Object.entries(store[coll] || {})
         .filter(([, d]) => d[field] === value)
         .map(([id, d]) => ({ id, data: () => d }))
     });
