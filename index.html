@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.23-9">
+  <meta name="app-version" content="2026.11.23-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-7">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-6">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-7" defer></script>
+  <script src="app.js?v=2026.11.23-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -185,7 +185,6 @@
             <div>
               <strong>GLISSE VERS LA DROITE</strong>
               <span id="hint-text">Trace la ligne de découpe d'un doigt ou à la souris</span>
-              <span class="pack-bulk-hint" id="pack-bulk-hint">ou maintiens 2 s sur le pack pour tout ouvrir d’un coup</span>
             </div>
             <span class="hint-pct" id="hint-pct">0 %</span>
           </div>
@@ -364,34 +363,6 @@
           <button class="inventory-go-shop" id="inventory-go-shop" type="button">Aller au Shop →</button>
         </div>
       </section>
-
-      <!-- ==================== OUVERTURE ÉCLAIR (appui long 2 s) ====================
-           Maintiens 2 s sur un pack de l'inventaire : tous les packs de ce type
-           s'ouvrent d'un coup et toutes les cartes apparaissent en grand, avec
-           une petite animation rapide. -->
-      <div class="bulk-open" id="bulk-open" hidden role="dialog" aria-modal="true"
-           aria-labelledby="bulk-title" aria-describedby="bulk-sub">
-        <div class="bulk-open-panel">
-          <button class="bulk-open-x" id="bulk-close-x" type="button" aria-label="Fermer l’ouverture éclair">✕</button>
-          <div class="bulk-open-head">
-            <div class="bulk-open-pack" aria-hidden="true">
-              <span class="bulk-open-pack-glow"></span>
-              <img id="bulk-pack-img" src="assets/packet.png" alt="" draggable="false">
-              <span class="bulk-open-pack-count" id="bulk-pack-count">×1</span>
-            </div>
-            <div class="bulk-open-head-text">
-              <p class="kicker"><span>✦</span> OUVERTURE ÉCLAIR <span>✦</span></p>
-              <h2 id="bulk-title">Tout ouvert<em>.</em></h2>
-              <p class="bulk-open-sub" id="bulk-sub"></p>
-            </div>
-          </div>
-          <div class="bulk-open-grid" id="bulk-grid"></div>
-          <div class="bulk-open-foot">
-            <p class="bulk-open-summary" id="bulk-summary" aria-live="polite"></p>
-            <button class="bulk-open-done" id="bulk-close" type="button">TOUT RÉCUPÉRER →</button>
-          </div>
-        </div>
-      </div>
 
       <!-- ============================ COLLECTION ============================ -->
       <section class="view collection-view" id="collection-view" aria-label="Collection">
