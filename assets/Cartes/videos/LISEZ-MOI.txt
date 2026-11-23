@@ -1,0 +1,21 @@
+Cartes vidéo — où mettre tes vidéos
+===================================
+
+Dépose ici tes fichiers .mp4 (ou .webm), par exemple :
+  mon-clip.mp4
+
+Puis, dans cards.js, ajoute un bloc `video` à la carte correspondante :
+
+  {
+    id: 'mon-clip',
+    name: 'Mon clip',
+    ...
+    video: { src: 'mon-clip', fps: 30, sound: true, loop: true }
+  }
+
+Raccourcis acceptés :
+  video: 'mon-clip'   ->  équivalent à { src: 'mon-clip' }
+  video: true         ->  cherche assets/Cartes/videos/<id de la carte>.mp4
+
+Toutes les cartes dotées d'un bloc `video` valide entrent automatiquement
+dans le Pack Vidéo. Voir la section « Cartes vidéo » du README.md.

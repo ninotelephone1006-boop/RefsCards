@@ -32,6 +32,11 @@ const CARTE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'avif'];
    et l'aperçu grand format, tout en gardant sa rareté, sa valeur, ses effets
    et la fusion.
 
+   Pour utiliser ses propres vidéos : déposer les fichiers .mp4 / .webm dans
+   assets/Cartes/videos/, puis configurer la carte. Deux raccourcis existent :
+   `video: 'ma-video'` (= { src: 'ma-video' }) et `video: true` (cherche
+   assets/Cartes/videos/<id de la carte>.mp4).
+
    Configuration par carte (tout est optionnel sauf une source) :
 
    video: {
@@ -99,9 +104,14 @@ function normalizeVideoConfig(video) {
   };
 }
 
-/* Raccourci : config normalisée d'une carte, ou null pour une carte image. */
+/* Raccourci : config normalisée d'une carte, ou null pour une carte image.
+   `video: 'ma-video'` est accepté comme alias de `{ src: 'ma-video' }` et
+   `video: true` cherche le fichier `assets/Cartes/videos/<id>.mp4`. */
 function cardVideoConfig(card) {
-  return normalizeVideoConfig(card && card.video);
+  const raw = card && card.video;
+  if (typeof raw === 'string') return normalizeVideoConfig({ src: raw });
+  if (raw === true && card && card.id) return normalizeVideoConfig({ src: String(card.id) });
+  return normalizeVideoConfig(raw);
 }
 
 function isVideoCard(card) {
@@ -341,78 +351,13 @@ const cardsDatabase = [
     emoji: '🕺',
     image: 'assets/Cartes/babaultdancing.png',
     color: '#bff3ff'
-  },
-
-  /* ------------------------------------------------------------------------
-     CARTES VIDÉO · exclusives au Pack Vidéo
-     ------------------------------------------------------------------------
-     `image` sert d'affiche (poster) et de secours si la vidéo ne charge pas.
-     Chaque carte règle librement fps / sound / loop. */
-  {
-    id: 'babault-dancing-live',
-    name: 'Babault Dancing Live',
-    description: 'La chorégraphie en direct, 24 images par seconde.',
-    rarity: 'divine',
-    emoji: '🕺',
-    image: 'assets/Cartes/babaultdancing.png',
-    color: '#bff3ff',
-    video: {
-      src: 'babault-dancing-live', // → assets/Cartes/videos/babault-dancing-live.mp4
-      fps: 24,
-      sound: false,
-      loop: true
-    }
-  },
-  {
-    id: 'karate-fagar-film',
-    name: 'Karate Fagar : le film',
-    description: 'Ça frappe. Et cette fois, il y a le son.',
-    rarity: 'legendary',
-    emoji: '🎬',
-    image: 'assets/Cartes/karate-fagar.jpg',
-    color: '#f5d979',
-    video: {
-      src: 'karate-fagar-le-film',
-      fps: 30,
-      sound: true, // son activé : bouton 🔊 sur la carte + lecture au clic
-      loop: true
-    }
-  },
-  {
-    id: 'royer-rizz-cam',
-    name: 'Royer Rizz Cam',
-    description: '60 images par seconde de pur charisme.',
-    rarity: 'ultraepic',
-    emoji: '📹',
-    image: 'assets/Cartes/royer-rizz.jpg',
-    color: '#ff8fd1',
-    video: {
-      /* Variantes fournies : le lecteur choisit celle qui correspond au fps
-         demandé par la carte, avec repli sur `src`. */
-      src: 'royer-rizz-cam',
-      srcByFps: { 24: 'royer-rizz-cam-24', 60: 'royer-rizz-cam' },
-      fps: 60,
-      sound: false,
-      loop: true
-    }
-  },
-  {
-    id: 'chasseur-royer-slowmo',
-    name: 'Chasseur Royer au ralenti',
-    description: 'Un tir mythique, étiré à 24 images par seconde.',
-    rarity: 'mythic',
-    emoji: '🎞️',
-    image: 'assets/Cartes/chasseur-royer.jpg',
-    color: '#ffa469',
-    video: {
-      src: 'chasseur-royer-slowmo',
-      fps: 24,        // fréquence cible…
-      sourceFps: 60,  // …du fichier source : lecture ralentie ×0,4
-      sound: false,
-      loop: false      // joue une fois puis s'arrête sur la dernière image
-    }
   }
 ];
+
+/* Aucune carte vidéo n'est livrée par défaut : on ajoute les siennes dans
+   cardsDatabase (bloc `video`, voir l'en-tête de ce fichier) et on dépose
+   les fichiers dans assets/Cartes/videos/. Le Pack Vidéo tire alors
+   automatiquement toutes les cartes ainsi configurées. */
 
 /* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */
@@ -425,8 +370,14 @@ const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-f
 const fusionDemoDraw = ['chasseur-royer', 'chasseur-royer', 'toilet-call', 'toilet-call', 'gros-plan-royer'];
 
 /* Tirage de démonstration du Pack Vidéo : ?demo=video (ou le bouton Démo)
-   ouvre directement trois cartes animées, une par réglage fps / son / boucle. */
-const videoDemoDraw = ['babault-dancing-live', 'karate-fagar-film', 'royer-rizz-cam'];
+   ouvre jusqu'à trois cartes vidéo configurées dans cardsDatabase, quelles
+   qu'elles soient — aucune liste d'identifiants n'est codée en dur. */
+function videoDemoIds() {
+  return cardsDatabase
+    .filter((card) => cardVideoConfig(card))
+    .slice(0, 3)
+    .map((card) => card.id);
+}
 
 /* Résout les chemins d'image possibles pour une carte : chemin explicite,
    ou nom de fichier sans extension décliné sur les extensions courantes.

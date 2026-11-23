@@ -55,8 +55,10 @@
      tirable normalement. */
   function packPool(type) {
     if (type === 'video') {
-      const videoCards = cardsDatabase.filter((card) => Boolean(cardVideoInfo(card)));
-      return videoCards.length ? videoCards : cardsDatabase;
+      /* Seules les cartes configurées avec un bloc `video` sortent du Pack
+         Vidéo ; sans carte vidéo, le tirage est simplement vide (voir le
+         garde-fou dans showReveal). */
+      return cardsDatabase.filter((card) => Boolean(cardVideoInfo(card)));
     }
     if (packComingSoon('video') && !isDemoMode()) {
       return cardsDatabase.filter((card) => !cardVideoInfo(card));
@@ -692,7 +694,9 @@
   }
 
   function pickCard(forcedRarity, boosted, packCounts, pool) {
-    const source = pool && pool.length ? pool : cardsDatabase;
+    /* Un pool explicitement fourni est respecté même s'il est vide : le Pack
+       Vidéo ne doit jamais puiser dans les cartes image par accident. */
+    const source = pool || cardsDatabase;
     const validCards = source.filter((c) => RARITIES[c.rarity]);
     if (!validCards.length) return null;
     let candidates = forcedRarity
@@ -731,11 +735,18 @@
     const wantsDemo = demoMode === '1' || demoMode === 'fusion' || demoMode === 'video';
     if (wantsDemo) {
       sessionStorage.setItem('refs-demo', demoMode === 'fusion' ? 'fusion' : demoMode === 'video' ? 'video' : '1');
-      const demoList = packType === 'video' && typeof videoDemoDraw !== 'undefined'
-        ? videoDemoDraw
-        : demoMode === 'fusion' && typeof fusionDemoDraw !== 'undefined'
-          ? fusionDemoDraw
-          : (typeof demoDraw !== 'undefined' ? demoDraw : []);
+      /* Les identifiants de la démo vidéo sont calculés à la volée dans
+         cards.js (videoDemoIds) : ils suivent les cartes vidéo configurées. */
+      let demoList = [];
+      if (packType === 'video' && typeof videoDemoIds === 'function') {
+        demoList = videoDemoIds();
+      } else if (packType === 'video' && typeof videoDemoDraw !== 'undefined') {
+        demoList = videoDemoDraw;
+      } else if (demoMode === 'fusion' && typeof fusionDemoDraw !== 'undefined') {
+        demoList = fusionDemoDraw;
+      } else if (typeof demoDraw !== 'undefined') {
+        demoList = demoDraw;
+      }
       demoList.slice(0, cardCountFor(packType)).forEach((id) => {
         const found = CardMutations.resolve(id);
         if (found) record(found);
@@ -1928,6 +1939,15 @@
       packPool(state.currentPackType),
       state.currentPackType
     );
+    if (!state.deck.length) {
+      /* Pool vide (ex. Pack Vidéo sans aucune carte configurée) : on reste
+         sur l'écran du booster au lieu d'ouvrir une pile vide. */
+      state.phase = 'pack';
+      showToast(state.currentPackType === 'video'
+        ? 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).'
+        : 'Aucune carte à tirer.');
+      return;
+    }
     packView.hidden = true;
     revealView.hidden = false;
     revealView.classList.remove('view-in');
