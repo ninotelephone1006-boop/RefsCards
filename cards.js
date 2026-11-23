@@ -351,14 +351,31 @@ const cardsDatabase = [
     emoji: '🕺',
     image: 'assets/Cartes/babaultdancing.png',
     color: '#bff3ff'
+  },
+  {
+    id: 'sapin-george',
+    name: 'Le Sapin George',
+    description: 'skibidi sapin',
+    rarity: 'rare',
+    emoji: '🎄',
+    image: 'assets/Cartes/sapin-george.jpg',
+    color: '#8fc8ef',
+    video: {
+      src: 'GeorgeSapin',
+      fps: 30,
+      sound: true,
+      loop: true
+    }
   }
 ];
 
-/* Aucune carte vidéo n'est livrée par défaut : on ajoute les siennes dans
-   cardsDatabase (bloc `video`, voir l'en-tête de ce fichier) et on dépose
-   les fichiers dans assets/Cartes/videos/. Le Pack Vidéo tire alors
-   automatiquement toutes les cartes ainsi configurées — et uniquement elles :
-   ces cartes ne sortent pas des autres boosters. */
+/* Une carte vidéo est livrée avec le projet : « Le Sapin George »
+   (`sapin-george`), rare, 30 i/s, avec son, en boucle (fichier
+   `assets/Cartes/videos/GeorgeSapin.mp4`). Pour ajouter les siennes : bloc
+   `video` dans cardsDatabase (voir l'en-tête de ce fichier) et fichiers dans
+   assets/Cartes/videos/. Le Pack Vidéo tire alors automatiquement toutes les
+   cartes ainsi configurées — et uniquement elles : ces cartes ne sortent pas
+   des autres boosters. */
 
 /* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */

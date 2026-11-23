@@ -1,0 +1,21 @@
+Ce dossier contient les vidéos des cartes vidéo.
+
+Pour ajouter une carte vidéo :
+
+1. Dépose ici ton fichier `.mp4` (ou `.webm`), par exemple `mon-clip.mp4`.
+2. Dans `cards.js`, ajoute un bloc `video` à la carte :
+
+   video: { src: 'mon-clip', fps: 30, sound: true, loop: true }
+
+   Un nom simple est cherché dans ce dossier, en `.mp4` puis `.webm` ; un
+   chemin complet (ex. `assets/Cartes/videos/mon-clip.mp4`) est utilisé tel
+   quel. Les clés `fps`, `sound` et `loop` sont optionnelles.
+
+3. Le Pack Vidéo tire automatiquement toutes les cartes dotées d'un bloc
+   `video` valide — et uniquement elles. Elles ne sortent jamais des autres
+   boosters.
+
+Contenu fourni avec le projet :
+
+- `GeorgeSapin.mp4` — vidéo de la carte « Le Sapin George » (`sapin-george`,
+  rare, 30 i/s, son, boucle), décrite dans `cards.js`.
