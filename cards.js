@@ -140,6 +140,15 @@ const cardsDatabase = [
     emoji: '😱',
     image: 'assets/Cartes/shock-brazil.jpeg',
     color: '#67e0d0'
+  },
+  {
+    id: 'bierry-feministe',
+    name: 'Bierry Feministe',
+    description: 'skibidi robe',
+    rarity: 'epic',
+    emoji: '👗',
+    image: 'assets/Cartes/Bierry Feministe.jpg',
+    color: '#c6a0eb'
   }
 ];
 
