@@ -2263,6 +2263,10 @@ html,body{background:var(--bg)}
 .add-friend-row{display:flex;gap:8px}
 .add-friend-row input{text-transform:uppercase;letter-spacing:.06em}
 .online-msg{min-height:16px;margin:8px 0 0;font-size:12px;color:#c4a1ff}
+.add-friend-preview{display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border:1px solid #8b5cf633;border-radius:12px;background:#1a1226}
+.add-friend-preview[hidden]{display:none}
+.add-friend-preview .friend-row-id{flex:1 1 auto;min-width:0}
+.add-friend-preview .friend-row-avatar,.add-friend-preview .friend-row-fallback{width:48px;height:48px;font-size:19px}
 .online-empty{margin:10px 0;color:#8d84a8;font-size:12px;line-height:1.5}
 .trades-list{display:flex;flex-direction:column;gap:8px}
 .trade-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 12px;border:1px solid #ffffff12;border-radius:12px;background:#0f0b14f5}
