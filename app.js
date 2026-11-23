@@ -14,7 +14,11 @@
      faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
   const PACK_PRICES = { classic: 500, rare: 1000, legend: 800, video: 1000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
-  const RARE_BOOST = 1.2; // pack rare : chances d'obtenir une rareté Rare+ multipliées par 1,2 (+20 % réels)
+  // Pack rare : les raretés hautes sont boostées progressivement (plus le rang est
+  // élevé, plus le multiplicateur est grand), tandis que commune/inhabituelle sont
+  // réduites. Le total reste normalisé pour que les pourcentages affichés restent cohérents.
+  const RARE_RANK_FACTOR_BASE = 0.45;
+  const RARE_RANK_FACTOR_STEP = 0.32;
   const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
   const PACK_IMAGES = {
@@ -514,7 +518,7 @@
       },
       rare: {
         title: 'Booster Rare',
-        desc: '5 cartes aléatoires · +20 % de chances sur les raretés.',
+        desc: '5 cartes aléatoires · Les raretés élevées sont plus fréquentes que les communes.',
         rare: true,
       },
       legend: {
@@ -620,32 +624,35 @@
      sa rareté (plutôt que de répartir tout le palier entre ses cartes) : sinon,
      une rareté ne comptant qu'une seule carte — comme Commune avec « Chasseur
      Royer » — raflerait à elle seule 30 % de tous les tirages.
-     En pack rare (boosted) : chaque carte Rare et plus (rank >= 2) gagne +20 %
-     de chances relatives (×1,2), compensées sur les Communes/Inhabituelles afin
-     que le total reste identique. Dans un même booster, un 2e exemplaire d'une
-     carte déjà tirée est atténué (×0,5) et plafonné à 2 copies identiques. */
-  const HIGH_RANK = RARITIES.rare.rank;
+     En pack rare (boosted) : les raretés sont rééquilibrées par rang — plus une
+     carte est rare, plus sa probabilité augmente, tandis que commune/inhabituelle
+     baissent. Cela rend les cartes rares plus fréquentes que les communes, avec
+     un petit bonus aussi sur les très hautes raretés (divine, secrète, etc.).
+     Le total est normalisé pour garder des pourcentages cohérents. Dans un même
+     booster, un 2e exemplaire d'une carte déjà tirée est atténué (×0,5) et
+     plafonné à 2 copies identiques. */
   const MAX_SAME_CARD_PER_PACK = 2;
   const SECOND_COPY_WEIGHT_FACTOR = 0.5;
+
+  function rareRankMultiplier(rank) {
+    return RARE_RANK_FACTOR_BASE + rank * RARE_RANK_FACTOR_STEP;
+  }
 
   function cardBaseWeight(card, boosted, pool) {
     const info = card && RARITIES[card.rarity];
     if (!info) return 0;
     if (!boosted) return info.weight;
-    let lowBase = 0;
-    let highBase = 0;
-    for (const c of (pool && pool.length ? pool : cardsDatabase)) {
+    const list = pool && pool.length ? pool : cardsDatabase;
+    let baseTotal = 0;
+    let boostedTotal = 0;
+    for (const c of list) {
       const r = RARITIES[c.rarity];
       if (!r) continue;
-      if (r.rank < HIGH_RANK) lowBase += r.weight;
-      else highBase += r.weight;
+      baseTotal += r.weight;
+      boostedTotal += r.weight * rareRankMultiplier(r.rank);
     }
-    if (lowBase <= 0 || highBase <= 0) return info.weight;
-    const totalBase = lowBase + highBase;
-    const boostedHigh = Math.min(totalBase, highBase * RARE_BOOST);
-    const highFactor = boostedHigh / highBase;
-    const lowFactor = (totalBase - boostedHigh) / lowBase;
-    return info.weight * (info.rank >= HIGH_RANK ? highFactor : lowFactor);
+    if (baseTotal <= 0 || boostedTotal <= 0) return info.weight;
+    return info.weight * rareRankMultiplier(info.rank) * (baseTotal / boostedTotal);
   }
 
   function rarityWeight(key, boosted, pool) {
@@ -2567,7 +2574,8 @@
   });
 
   /* Probabilités : générées depuis RARITIES pour rester toujours justes.
-     En pack rare : +20 % de chances sur chaque rareté Rare+ (voir rarityWeight). */
+     En pack rare : boost progressif par rang (les raretés élevées deviennent
+     plus fréquentes que les communes, voir cardBaseWeight/rarityWeight). */
   function renderOdds(boosted, pool, packType) {
     if (!packOdds) return;
     packOdds.replaceChildren();
@@ -2586,7 +2594,7 @@
       packOdds.append(row);
     });
     if (boosted) {
-      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : +20 % DE CHANCES SUR RARE+'));
+      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES'));
     }
     if (packType === 'video') {
       packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 2 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
