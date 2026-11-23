@@ -2889,6 +2889,8 @@
     knownRequestIds.clear();
     hadRequests = false;
     marketListings = [];
+    globalListings = [];
+    globalListingsLoaded = false;
     marketGifts = [];
     sentGifts = [];
     knownGiftIds = new Set();
@@ -3127,6 +3129,7 @@
     } else if (tab === 'online') {
       renderOnline();
       loadMarket();
+      loadGlobalMarket();
       loadFriendRequests();
       if (selectedFriendUid) loadFriendListings(selectedFriendUid);
     } else if (tab === 'pack') {
@@ -4165,6 +4168,7 @@
   function renderOnline() {
     if (!onlineView) return;
     renderMarket();
+    renderGlobalMarket();
     if (friendsCount) friendsCount.textContent = String(friends.length);
     if (friendsEmpty) friendsEmpty.hidden = friends.length > 0;
     if (friendsList) {
@@ -4429,6 +4433,11 @@
      Chaque opération modifie seulement la sauvegarde de son propriétaire et
      le document de réserve, dans une transaction Firestore indivisible. */
   let marketListings = [];
+  /* Marché global : toutes les annonces ouvertes du jeu, y compris celles de
+     joueurs qui ne sont pas mes amis. On y voit le pseudo du vendeur et on
+     peut l'acheter (ou l'ajouter en ami) directement. */
+  let globalListings = [];
+  let globalListingsLoaded = false;
   let marketGifts = [];
   let sentGifts = [];                // cadeaux que J'AI envoyés (encore en attente)
   let marketBusy = false;
@@ -4459,6 +4468,12 @@
   const marketInboxCount = $('market-inbox-count');
   const marketSent = $('market-sent');
   const friendListings = $('friend-listings');
+  const globalMarketList = $('global-market-list');
+  const globalMarketCount = $('global-market-count');
+  const globalMarketMessage = $('global-market-message');
+  const globalMarketSearch = $('global-market-search');
+  const globalMarketSort = $('global-market-sort');
+  const globalMarketRefresh = $('global-market-refresh');
   const giftAmount = $('gift-amount');
   const MAX_COINS = 1000000000;
   const MAX_MARKET_QTY = 100;
@@ -4844,6 +4859,202 @@
     marketUnsub = null;
   }
 
+  function globalMarketInfo(message) {
+    if (globalMarketMessage) globalMarketMessage.textContent = message || '';
+  }
+
+  /* Charge toutes les annonces ouvertes, tous vendeurs confondus. Une seule
+     requête (pas de filtre par ami) : c'est ce qui permet de voir le marché
+     des joueurs qu'on ne connaît pas encore. Le pseudo du vendeur vient du
+     profil public (playerProfiles), mis en cache dans friendProfiles. */
+  async function loadGlobalMarket({ keepMessage = false } = {}) {
+    if (!cloudReady() || !globalMarketList) return;
+    if (!keepMessage) globalMarketInfo('');
+    if (!globalListingsLoaded) {
+      globalMarketList.replaceChildren(el('p', 'online-empty', 'Chargement du marché global…'));
+    }
+    try {
+      const coll = cloudDb.collection('marketListings');
+      if (!coll || typeof coll.where !== 'function') return;
+      const snap = await coll.where('status', '==', 'open').get();
+      if (!currentUser) return;
+      globalListings = snapshotDocs(snap)
+        .map((d) => ({ id: d.id, ...d.data }))
+        .filter((l) => l.status === 'open' && l.sellerUid);
+      globalListingsLoaded = true;
+      await Promise.all([...new Set(globalListings.map((l) => l.sellerUid))]
+        .filter((uid) => !friendProfiles.has(uid))
+        .map((uid) => fetchFriendProfile(uid)));
+      if (!currentUser) return;
+      renderGlobalMarket();
+    } catch (error) {
+      globalListingsLoaded = true;
+      if (globalMarketList) {
+        globalMarketList.replaceChildren(el('p', 'online-empty',
+          isPermissionDenied(error)
+            ? 'Le marché global est refusé par les règles Firestore. Republie firestore.rules (voir le README), puis recharge la page.'
+            : 'Impossible de charger le marché global. Vérifie ta connexion et réessaie.'));
+      }
+      noteCloudError('Marché global illisible', error);
+    }
+  }
+
+  /* Regroupe les annonces par vendeur, puis par carte / pack et par prix, pour
+     n'afficher qu'une ligne par vendeur et par offre (« ×3 dispo »). */
+  function groupGlobalListings(list) {
+    const bySeller = new Map();
+    for (const listing of list) {
+      const uid = listing.sellerUid;
+      if (!uid) continue;
+      if (!bySeller.has(uid)) bySeller.set(uid, []);
+      bySeller.get(uid).push(listing);
+    }
+    return [...bySeller.entries()].map(([uid, listings]) => {
+      const data = friendProfiles.get(uid) || { pseudo: 'Joueur', avatar: '' };
+      return { uid, data, groups: groupListings(listings) };
+    });
+  }
+
+  function renderGlobalMarket() {
+    if (!globalMarketList) return;
+    const me = currentUser && currentUser.uid;
+    const rawQuery = (globalMarketSearch && globalMarketSearch.value || '').trim().toLowerCase();
+    const sort = (globalMarketSort && globalMarketSort.value) || 'recent';
+    let sellers = groupGlobalListings(globalListings.filter((l) => l.sellerUid !== me));
+    if (rawQuery) {
+      sellers = sellers.filter(({ data, groups }) =>
+        String((data && data.pseudo) || '').toLowerCase().includes(rawQuery)
+        || groups.some((group) => listingName({ cardId: group.cardId, packType: group.packType }).toLowerCase().includes(rawQuery)));
+    }
+    const openCount = sellers.reduce((total, seller) => total + seller.groups.reduce((sum, g) => sum + g.ids.length, 0), 0);
+    if (globalMarketCount) globalMarketCount.textContent = String(openCount);
+    if (!globalMarketList) return;
+    if (!sellers.length) {
+      globalMarketList.replaceChildren(el('p', 'online-empty', globalListingsLoaded
+        ? (rawQuery ? 'Aucune annonce ne correspond à ce filtre.' : 'Aucune annonce d’un autre joueur pour le moment. Mets les tiennes en vente juste au-dessus !')
+        : 'Chargement du marché global…'));
+      return;
+    }
+    const chronological = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+    const frag = document.createDocumentFragment();
+    for (const seller of sellers) {
+      const card = el('div', 'global-seller');
+      const head = el('div', 'global-seller-head');
+      head.append(friendIdentity(seller.data));
+      const isFriend = friends.includes(seller.uid);
+      if (isFriend) {
+        head.append(el('span', 'global-seller-tag', 'Ami'));
+        const view = el('button', 'mini-btn', 'Profil');
+        view.type = 'button';
+        on(view, 'click', () => openFriendDetail(seller.uid));
+        head.append(view);
+      } else if (pendingFriendUids.has(seller.uid)) {
+        head.append(el('span', 'global-seller-tag', 'Demande envoyée'));
+      } else {
+        const add = el('button', 'mini-btn primary', 'Ajouter en ami');
+        add.type = 'button';
+        add.setAttribute('aria-label', `Ajouter ${(seller.data && seller.data.pseudo) || 'ce vendeur'} en ami`);
+        on(add, 'click', async () => {
+          add.disabled = true;
+          const ok = await sendFriendRequest(seller.uid);
+          if (!ok) add.disabled = false;
+        });
+        head.append(add);
+      }
+      card.append(head);
+      seller.groups.sort((a, b) => {
+        const firstA = globalListings.find((l) => l.id === a.ids[0]) || {};
+        const firstB = globalListings.find((l) => l.id === b.ids[0]) || {};
+        if (sort === 'cheap') return a.price - b.price;
+        if (sort === 'expensive') return b.price - a.price;
+        return chronological(firstA, firstB);
+      });
+      card.append(...seller.groups.map((group) => globalListingRow(seller, group)));
+      frag.append(card);
+    }
+    globalMarketList.replaceChildren(frag);
+  }
+
+  /* Une ligne d'annonce du marché global : nom, prix, quantité à acheter et
+     bouton « Acheter ». L'achat passe par la même transaction que le marché
+     d'un ami ; les règles Firestore décident si le vendeur doit être un ami. */
+  function globalListingRow(seller, group) {
+    const row = el('div', 'trade-row');
+    const count = group.ids.length;
+    const isPack = Boolean(group.packType);
+    const name = isPack ? packName(group.packType) : cardName(group.cardId);
+    const unit = isPack ? 'pack' : 'carte';
+    const label = count > 1
+      ? `${name} (×${count} dispo) · ${fmt(group.price)} 🪙 / ${unit}`
+      : `${name} · ${fmt(group.price)} 🪙`;
+    row.append(el('span', 'trade-text', label));
+    let qtyInput = null;
+    if (count > 1) {
+      const qtyWrap = el('div', 'market-row-qty-wrap');
+      const minus = el('button', 'qty-btn market-row-btn', '−');
+      minus.type = 'button';
+      minus.setAttribute('aria-label', `Acheter ${isPack ? 'un pack' : 'une carte'} de moins`);
+      qtyInput = el('input', 'market-row-qty');
+      qtyInput.type = 'number';
+      qtyInput.min = '1';
+      qtyInput.max = String(count);
+      qtyInput.step = '1';
+      qtyInput.value = '1';
+      qtyInput.inputMode = 'numeric';
+      qtyInput.setAttribute('aria-label', `Quantité de ${name} à acheter`);
+      const plus = el('button', 'qty-btn market-row-btn', '+');
+      plus.type = 'button';
+      plus.setAttribute('aria-label', `Acheter ${isPack ? 'un pack' : 'une carte'} de plus`);
+      const syncRowQty = () => {
+        const raw = qtyInput.value.trim();
+        const val = /^\d+$/.test(raw) ? Number(raw) : NaN;
+        minus.disabled = !Number.isSafeInteger(val) || val <= 1;
+        plus.disabled = !Number.isSafeInteger(val) || val >= count;
+      };
+      on(minus, 'click', () => {
+        const cur = /^\d+$/.test(qtyInput.value.trim()) ? Number(qtyInput.value.trim()) : 1;
+        qtyInput.value = String(clamp(cur - 1, 1, count));
+        syncRowQty();
+        SFX.tick();
+      });
+      on(plus, 'click', () => {
+        const cur = /^\d+$/.test(qtyInput.value.trim()) ? Number(qtyInput.value.trim()) : 1;
+        qtyInput.value = String(clamp(cur + 1, 1, count));
+        syncRowQty();
+        SFX.tick();
+      });
+      on(qtyInput, 'input', syncRowQty);
+      syncRowQty();
+      qtyWrap.append(minus, qtyInput, plus);
+      row.append(qtyWrap);
+    }
+    const buy = el('button', 'mini-btn primary', 'Acheter');
+    buy.type = 'button';
+    on(buy, 'click', () => {
+      try {
+        const quantity = qtyInput ? (isPack ? marketPackQuantity(qtyInput, count) : marketQuantity(qtyInput, count)) : 1;
+        const total = group.price * quantity;
+        if (!Number.isSafeInteger(total)) throw new Error('Montant total trop élevé.');
+        const noun = isPack ? 'pack' : 'carte';
+        const nounPlural = isPack ? 'packs' : 'cartes';
+        const sellerName = (seller.data && seller.data.pseudo) || 'ce joueur';
+        const msg = quantity === 1
+          ? `Acheter « ${name} » à ${sellerName} pour ${fmt(group.price)} 🪙 ?`
+          : `Acheter ${quantity} ${isPack ? 'packs' : 'exemplaires'} de « ${name} » à ${sellerName} pour ${fmt(total)} 🪙 (${fmt(group.price)} 🪙 / ${noun}) ?`;
+        askConfirm({
+          title: quantity === 1 ? `Acheter ce ${noun} ?` : `Acheter ces ${nounPlural} ?`,
+          message: msg,
+          confirmLabel: 'Acheter',
+          onConfirm: () => (quantity === 1
+            ? marketTransaction('buy', group.ids[0], null, { fromGlobal: true })
+            : marketTransaction('buy', null, { ids: group.ids, quantity, unitPrice: group.price }, { fromGlobal: true, sellerUid: seller.uid }))
+        });
+      } catch (error) { globalMarketInfo(error.message); }
+    });
+    row.append(buy);
+    return row;
+  }
+
   async function loadFriendListings(uid) {
     if (!cloudReady() || !friendListings) return;
     friendListings.replaceChildren(el('p', 'online-empty', 'Chargement des ventes…'));
@@ -4933,7 +5144,15 @@
     }
   }
 
-  async function marketTransaction(action, id, value) {
+  async function marketTransaction(action, id, value, options = {}) {
+    /* `fromGlobal` : l'achat vient du marché global. Les messages vont alors
+       dans ce panneau (et le marché global est rechargé) en plus du marché
+       habituel : le joueur voit le résultat là où il a cliqué. */
+    const fromGlobal = Boolean(options && options.fromGlobal);
+    const report = (message) => {
+      marketInfo(message);
+      if (fromGlobal) globalMarketInfo(message);
+    };
     if (!cloudReady()) { marketInfo('Connexion requise pour envoyer des pièces.'); return; }
     if (marketBusy) { marketInfo('Une autre opération est en cours, réessaie dans un instant.'); return; }
     if (typeof cloudDb.runTransaction !== 'function') { marketInfo('Transactions indisponibles. Réessaie plus tard.'); return; }
@@ -4998,7 +5217,9 @@
           if (!item || item.status !== 'open' || item.sellerUid === uid) {
             throw new Error(isPackItem ? 'Ce pack n’est plus en vente.' : 'Cette carte n’est plus en vente.');
           }
-          if (!savedFriends.includes(item.sellerUid)) throw new Error('Cette vente est réservée à tes amis.');
+          /* Le marché global autorise l'achat chez n'importe qui ; l'ancien
+             marché « entre amis » ne proposait que des amis. Les règles
+             Firestore restent seules juge (voir firestore.rules). */
           if (coins < item.price) throw new Error('Tu n’as pas assez de pièces.');
           if (isPackItem) {
             packStock[item.packType] = Math.min(100000, packStock[item.packType] + 1);
@@ -5099,14 +5320,14 @@
         }
         if (doneCount === 0) throw (lastError || new Error('Cette annonce n’est plus en vente.'));
         applyResult(lastResult);
-        marketInfo(doneCount === targetCount
+        report(doneCount === targetCount
           ? (doneCount === 1 ? 'Achat réussi !' : `${doneCount} achats réussis !`)
           : `${doneCount} achat${doneCount > 1 ? 's' : ''} sur ${targetCount} (le reste n’était plus disponible).`);
       } else {
         lastResult = await runSingle(action, id, value);
         doneCount = 1;
         applyResult(lastResult);
-        marketInfo({
+        report({
           gift: 'Cadeau envoyé ! Ton ami peut le récupérer dans « Pièces à récupérer » (annulable tant qu’il ne l’a pas fait).',
           cancelGift: 'Cadeau annulé : tes pièces sont rendues.',
           cancel: 'Annonce retirée : rendu à ton inventaire.',
@@ -5130,12 +5351,14 @@
       }
       await loadMarket();
       if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
+      if (fromGlobal) await loadGlobalMarket({ keepMessage: true });
     } catch (error) {
       if (lastResult) applyResult(lastResult);
       const baseMsg = isPermissionDenied(error) ? RULES_HELP : (error.message || 'Transaction impossible. Réessaie.');
-      marketInfo(doneCount > 0 && targetCount > 1 ? `${doneCount} / ${targetCount} traitée${doneCount > 1 ? 's' : ''} : ${baseMsg}` : baseMsg);
+      report(doneCount > 0 && targetCount > 1 ? `${doneCount} / ${targetCount} traitée${doneCount > 1 ? 's' : ''} : ${baseMsg}` : baseMsg);
       await loadMarket();
       if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
+      if (fromGlobal) await loadGlobalMarket({ keepMessage: true });
     } finally {
       overlay.remove();
       if (currentUser && currentUser.uid === uid) gameRegions.forEach((region) => region.removeAttribute('inert'));
@@ -5198,7 +5421,14 @@
       askConfirm({ title: 'Donner des pièces ?', message: `Envoyer ${fmt(amount)} 🪙 à ${(friendProfiles.get(toUid) || {}).pseudo || 'ton ami'} ?`, confirmLabel: 'Donner', onConfirm: () => marketTransaction('gift', null, { toUid, amount }) });
     } catch (error) { marketInfo(error.message); }
   });
-  on($('market-refresh'), 'click', () => { loadMarket(); if (selectedFriendUid) loadFriendListings(selectedFriendUid); });
+  on($('market-refresh'), 'click', () => {
+    loadMarket();
+    loadGlobalMarket();
+    if (selectedFriendUid) loadFriendListings(selectedFriendUid);
+  });
+  on(globalMarketRefresh, 'click', () => loadGlobalMarket());
+  on(globalMarketSearch, 'input', () => renderGlobalMarket());
+  on(globalMarketSort, 'change', () => renderGlobalMarket());
 
   on(packMarketType, 'change', () => syncPackMarketQty({ reset: true }));
   on(packMarketQtyMinus, 'click', () => {

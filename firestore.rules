@@ -190,7 +190,12 @@ service cloud.firestore {
       function validStatusOpen() {
         return request.resource.data.status == 'open' && request.resource.data.buyerUid == '';
       }
-      allow read: if signedIn();
+      // Le marché est global : les annonces en vente sont lisibles par tous et
+      // achetables par n'importe quel joueur connecté (pas seulement un ami).
+      function listed() {
+        return resource.data.status == 'open';
+      }
+      allow read: if signedIn() && (resource.data.sellerUid == request.auth.uid || listed());
       allow create: if signedIn() && (
         // Carte mise en vente : 1 exemplaire retiré de la collection.
         (request.resource.data.keys().hasOnly(['sellerUid', 'cardId', 'price', 'status', 'buyerUid', 'createdAt'])
@@ -222,8 +227,8 @@ service cloud.firestore {
           && afterSave().coins == beforeSave().coins)
         ||
         // L'acheteur paie et reçoit la carte / le pack dans la même transaction.
+        // Marché global : l'acheteur n'a pas besoin d'être un ami du vendeur.
         (resource.data.sellerUid != request.auth.uid && resource.data.status == 'open'
-          && resource.data.sellerUid in beforeSave().friends
           && request.resource.data.status == 'sold' && request.resource.data.buyerUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyerUid'])
           && ('packType' in resource.data
