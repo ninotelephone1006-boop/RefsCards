@@ -2265,6 +2265,7 @@
     loadTrades();
     subscribeTrades();
     loadMarket();
+    subscribeMarket();
     if (authScreen) authScreen.hidden = true;
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
@@ -2297,6 +2298,10 @@
     trades = [];
     marketListings = [];
     marketGifts = [];
+    sentGifts = [];
+    knownGiftIds = new Set();
+    hadGiftSnapshot = false;
+    unsubscribeMarket();
     selectedFriendUid = null;
     rulesHelpShown = false;
     state.packStock = { classic: 0, rare: 0 };
@@ -3159,8 +3164,8 @@
 
   /* ------------------------------------------------------------------ amis */
 
-  async function fetchFriendProfile(uid) {
-    if (friendProfiles.has(uid)) return friendProfiles.get(uid);
+  async function fetchFriendProfile(uid, { force = false } = {}) {
+    if (!force && friendProfiles.has(uid)) return friendProfiles.get(uid);
     const fallback = {
       pseudo: 'Joueur', avatar: '', friendCode: '',
       coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: []
@@ -3185,9 +3190,11 @@
       }
     } catch (error) {
       noteCloudError('Profil ami illisible', error);
+      // En cas d'échec, on garde la dernière fiche connue plutôt qu'un profil vide.
+      if (friendProfiles.has(uid)) return friendProfiles.get(uid);
     }
-    friendProfiles.set(uid, fallback);
-    return fallback;
+    if (!friendProfiles.has(uid)) friendProfiles.set(uid, fallback);
+    return friendProfiles.get(uid);
   }
 
   function setAddFriendMsg(msg) {
@@ -3669,7 +3676,9 @@
   async function openFriendDetail(uid) {
     selectedFriendUid = uid;
     if (friendDetail) friendDetail.hidden = false;
-    await fetchFriendProfile(uid);
+    // Toujours relire la fiche : le solde affiché doit refléter les pièces
+    // reçues (sinon on croit que le transfert n'a rien changé).
+    await fetchFriendProfile(uid, { force: true });
     if (selectedFriendUid !== uid) return;
     renderFriendDetail(uid);
     loadFriendListings(uid);
@@ -3822,9 +3831,13 @@
      le document de réserve, dans une transaction Firestore indivisible. */
   let marketListings = [];
   let marketGifts = [];
+  let sentGifts = [];                // cadeaux que J'AI envoyés (encore en attente)
   let marketBusy = false;
   let marketDone = Promise.resolve();
   let finishMarket = null;
+  let marketUnsub = null;
+  let knownGiftIds = new Set();      // cadeaux déjà annoncés (pas de toast au 1er chargement)
+  let hadGiftSnapshot = false;
   const marketMessage = $('market-message');
   const marketCard = $('market-card');
   const marketQty = $('market-qty');
@@ -3835,6 +3848,8 @@
   const marketPrice = $('market-price');
   const myListings = $('my-listings');
   const marketInbox = $('market-inbox');
+  const marketInboxCount = $('market-inbox-count');
+  const marketSent = $('market-sent');
   const friendListings = $('friend-listings');
   const giftAmount = $('gift-amount');
   const MAX_COINS = 1000000000;
@@ -3986,6 +4001,7 @@
         ...marketListings.filter((l) => l.status === 'sold').map((l) => ({ ...l, kind: 'sale' })),
         ...marketGifts.filter((g) => g.status === 'pending').map((g) => ({ ...g, kind: 'gift' }))
       ];
+      if (marketInboxCount) marketInboxCount.textContent = String(income.length);
       marketInbox.replaceChildren(...(income.length ? income.map((item) => {
         const row = el('div', 'trade-row');
         const text = item.kind === 'sale' ? `Vente de « ${cardName(item.cardId)} » : ${fmt(item.price)} 🪙` : `Cadeau de pièces : ${fmt(item.amount)} 🪙`;
@@ -3997,22 +4013,107 @@
         return row;
       }) : [el('p', 'online-empty', 'Rien à récupérer pour le moment.') ]));
     }
+    if (marketSent) {
+      const pending = sentGifts.filter((g) => g.status === 'pending');
+      marketSent.replaceChildren(...(pending.length ? pending.map((gift) => {
+        const row = el('div', 'trade-row');
+        const who = (friendProfiles.get(gift.toUid) || {}).pseudo || 'ton ami';
+        row.append(el('span', 'trade-text', `À ${who} : ${fmt(gift.amount)} 🪙 · en attente`));
+        const cancel = el('button', 'mini-btn', 'Annuler');
+        cancel.type = 'button';
+        cancel.setAttribute('aria-label', `Annuler le cadeau de ${fmt(gift.amount)} pièces à ${who}`);
+        on(cancel, 'click', () => marketTransaction('cancelGift', gift.id));
+        row.append(cancel);
+        return row;
+      }) : [el('p', 'online-empty', 'Aucun cadeau en attente.') ]));
+    }
   }
 
+  /* Charge mes annonces, mes cadeaux reçus et mes cadeaux envoyés.
+     Chaque requête est indépendante : un refus de règles sur l'une d'elles
+     ne doit pas laisser tout le marché vide (c'était le cas avant : une
+     requête refusée masquait aussi les ventes et les cadeaux reçus). */
   async function loadMarket() {
-    if (!cloudReady()) return;
-    if (typeof cloudDb.collection('marketListings').where !== 'function' || typeof cloudDb.collection('coinGifts').where !== 'function') return;
+    if (!cloudReady()) return false;
     const uid = currentUser.uid;
-    try {
-      const [listings, gifts] = await Promise.all([
-        cloudDb.collection('marketListings').where('sellerUid', '==', uid).get(),
-        cloudDb.collection('coinGifts').where('toUid', '==', uid).get()
-      ]);
-      if (!currentUser || currentUser.uid !== uid) return;
-      marketListings = snapshotDocs(listings).map((d) => ({ id: d.id, ...d.data }));
-      marketGifts = snapshotDocs(gifts).map((d) => ({ id: d.id, ...d.data }));
-      renderMarket();
-    } catch (error) { noteCloudError('Marché illisible', error); }
+    const fetchAll = (collName, field, value, label) => {
+      const coll = cloudDb.collection(collName);
+      if (typeof coll.where !== 'function') return Promise.resolve(null);
+      return coll.where(field, '==', value).get().then(
+        (snap) => snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })),
+        (error) => { noteCloudError(label, error); return null; }
+      );
+    };
+    const [listings, gifts, sent] = await Promise.all([
+      fetchAll('marketListings', 'sellerUid', uid, 'Mes ventes illisibles'),
+      fetchAll('coinGifts', 'toUid', uid, 'Cadeaux reçus illisibles'),
+      fetchAll('coinGifts', 'fromUid', uid, 'Cadeaux envoyés illisibles')
+    ]);
+    if (!currentUser || currentUser.uid !== uid) return false;
+    if (listings) marketListings = listings;
+    if (gifts) {
+      marketGifts = gifts;
+      knownGiftIds = new Set(marketGifts.map((g) => g.id));
+      hadGiftSnapshot = true;
+    }
+    if (sent) sentGifts = sent;
+    renderMarket();
+    return Boolean(listings || gifts || sent);
+  }
+
+  /* Prévenir qu'un cadeau vient d'arriver (tant que la page est ouverte),
+     sans spammer au premier chargement. */
+  function announceIncomingGifts() {
+    const pending = marketGifts.filter((g) => g.status === 'pending');
+    const fresh = pending.filter((g) => !knownGiftIds.has(g.id));
+    knownGiftIds = new Set(marketGifts.map((g) => g.id));
+    if (!hadGiftSnapshot) { hadGiftSnapshot = true; return; }
+    if (!fresh.length) return;
+    const total = fresh.reduce((sum, g) => sum + (Number(g.amount) || 0), 0);
+    const who = (friendProfiles.get(fresh[0].fromUid) || {}).pseudo || 'Un ami';
+    showToast(fresh.length === 1
+      ? `🪙 ${who} t’a envoyé ${fmt(total)} pièces — « En ligne → Pièces à récupérer ».`
+      : `🪙 ${fresh.length} cadeaux reçus (${fmt(total)} pièces) — « En ligne → Pièces à récupérer ».`, 4800);
+  }
+
+  /* Temps réel : les pièces envoyées par un ami apparaissent sans devoir
+     cliquer sur « Actualiser ». Les erreurs (règles non publiées) sont
+     signalées une fois, sans casser la page. */
+  function subscribeMarket() {
+    if (!cloudReady() || marketUnsub) return;
+    const uid = currentUser.uid;
+    const stops = [];
+    const watch = (collName, field, value, assign, label) => {
+      const coll = cloudDb.collection(collName);
+      if (typeof coll.where !== 'function') return;
+      const query = coll.where(field, '==', value);
+      if (typeof query.onSnapshot !== 'function') return;
+      try {
+        const stop = query.onSnapshot((snap) => {
+          try {
+            if (!currentUser || currentUser.uid !== uid) return;
+            assign(snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })));
+            if (marketBusy) return; // la transaction en cours va rafraîchir elle-même
+            renderMarket();
+            announceIncomingGifts();
+          } catch (error) { noteCloudError(label, error); }
+        }, (error) => noteCloudError(label, error));
+        if (typeof stop === 'function') stops.push(stop);
+      } catch (error) { /* temps réel indisponible : « Actualiser » suffit */ }
+    };
+    watch('marketListings', 'sellerUid', uid, (list) => { marketListings = list; }, 'Mes ventes illisibles (temps réel)');
+    watch('coinGifts', 'toUid', uid, (list) => { marketGifts = list; }, 'Cadeaux reçus illisibles (temps réel)');
+    watch('coinGifts', 'fromUid', uid, (list) => { sentGifts = list; }, 'Cadeaux envoyés illisibles (temps réel)');
+    if (!stops.length) return;
+    marketUnsub = () => {
+      marketUnsub = null;
+      stops.forEach((stop) => { try { stop(); } catch (error) { /* déjà fermé */ } });
+    };
+  }
+
+  function unsubscribeMarket() {
+    if (marketUnsub) marketUnsub();
+    marketUnsub = null;
   }
 
   async function loadFriendListings(uid) {
@@ -4100,7 +4201,8 @@
   }
 
   async function marketTransaction(action, id, value) {
-    if (!cloudReady() || marketBusy) return;
+    if (!cloudReady()) { marketInfo('Connexion requise pour envoyer des pièces.'); return; }
+    if (marketBusy) { marketInfo('Une autre opération est en cours, réessaie dans un instant.'); return; }
     if (typeof cloudDb.runTransaction !== 'function') { marketInfo('Transactions indisponibles. Réessaie plus tard.'); return; }
     const uid = currentUser.uid;
     const db = cloudDb;
@@ -4113,15 +4215,20 @@
 
     const runSingle = (singleAction, singleId, singleValue) => {
       const saveRef = db.collection('playerSaves').doc(uid);
-      const collName = singleAction === 'gift' || singleAction === 'claimGift' ? 'coinGifts' : 'marketListings';
+      const collName = singleAction === 'gift' || singleAction === 'claimGift' || singleAction === 'cancelGift'
+        ? 'coinGifts'
+        : 'marketListings';
       const ref = singleId ? db.collection(collName).doc(singleId) : db.collection(collName).doc();
       return db.runTransaction(async (tx) => {
         const saveSnap = await tx.get(saveRef);
         const itemSnap = singleId ? await tx.get(ref) : null;
         if (!saveSnap.exists) throw new Error('Sauvegarde introuvable.');
         const saveData = saveSnap.data();
-        const coins = saveData.coins;
-        const cards = [...saveData.collection];
+        const coins = Number(saveData.coins) || 0;
+        const cards = Array.isArray(saveData.collection) ? [...saveData.collection] : [];
+        /* On utilise la liste d'amis ENREGISTRÉE (celle que vérifient les
+           règles Firestore), pas l'état mémoire qui peut être en avance. */
+        const savedFriends = Array.isArray(saveData.friends) ? saveData.friends : [];
         const item = itemSnap && itemSnap.exists ? itemSnap.data() : null;
         let nextCoins = coins;
         let patch;
@@ -4131,7 +4238,7 @@
           cards.splice(index, 1);
           tx.set(ref, { sellerUid: uid, cardId: singleValue.cardId, price: singleValue.price, status: 'open', buyerUid: '', createdAt: serverTimestamp() });
         } else if (singleAction === 'gift') {
-          if (!saveData.friends.includes(singleValue.toUid) || uid === singleValue.toUid) throw new Error('Ce joueur ne fait plus partie de tes amis.');
+          if (!savedFriends.includes(singleValue.toUid) || uid === singleValue.toUid) throw new Error('Ce joueur ne fait plus partie de tes amis.');
           if (coins < singleValue.amount) throw new Error('Tu n’as pas assez de pièces.');
           nextCoins -= singleValue.amount;
           tx.set(ref, { fromUid: uid, toUid: singleValue.toUid, amount: singleValue.amount, status: 'pending', createdAt: serverTimestamp() });
@@ -4141,7 +4248,7 @@
           cards.push(item.cardId); patch = { status: 'cancelled' };
         } else if (singleAction === 'buy') {
           if (!item || item.status !== 'open' || item.sellerUid === uid) throw new Error('Cette carte n’est plus en vente.');
-          if (!friends.includes(item.sellerUid)) throw new Error('Cette vente est réservée à tes amis.');
+          if (!savedFriends.includes(item.sellerUid)) throw new Error('Cette vente est réservée à tes amis.');
           if (coins < item.price) throw new Error('Tu n’as pas assez de pièces.');
           if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
           nextCoins -= item.price; cards.push(item.cardId); patch = { status: 'sold', buyerUid: uid };
@@ -4151,6 +4258,10 @@
         } else if (singleAction === 'claimGift') {
           if (!item || item.toUid !== uid || item.status !== 'pending') throw new Error('Ce cadeau a déjà été récupéré.');
           nextCoins += item.amount; patch = { status: 'claimed' };
+        } else if (singleAction === 'cancelGift') {
+          // Le destinataire n'a pas encore récupéré : l'expéditeur est remboursé.
+          if (!item || item.fromUid !== uid || item.status !== 'pending') throw new Error('Ce cadeau n’est plus en attente.');
+          nextCoins += item.amount; patch = { status: 'cancelled' };
         } else throw new Error('Action inconnue.');
         if (nextCoins > MAX_COINS) throw new Error('Ton solde dépasserait la limite de pièces. Dépense-en avant de récupérer ce montant.');
         if (patch) tx.update(ref, patch);
@@ -4228,7 +4339,14 @@
         lastResult = await runSingle(action, id, value);
         doneCount = 1;
         applyResult(lastResult);
-        marketInfo({ gift: 'Cadeau envoyé ! Ton ami pourra le récupérer.', cancel: 'Carte rendue à ta collection.', buy: 'Carte achetée !', claimSale: 'Pièces de la vente récupérées !', claimGift: 'Cadeau récupéré !' }[action]);
+        marketInfo({
+          gift: 'Cadeau envoyé ! Ton ami peut le récupérer dans « Pièces à récupérer » (annulable tant qu’il ne l’a pas fait).',
+          cancelGift: 'Cadeau annulé : tes pièces sont rendues.',
+          cancel: 'Carte rendue à ta collection.',
+          buy: 'Carte achetée !',
+          claimSale: 'Pièces de la vente récupérées !',
+          claimGift: 'Cadeau récupéré !'
+        }[action]);
       }
       await loadMarket();
       if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
