@@ -69,9 +69,20 @@ service cloud.firestore {
     // la demande, le destinataire l'accepte ou la refuse (« on ne devient ami
     // que si l'autre accepte »). Les deux parties peuvent lire et mettre à jour
     // la demande ; personne d'autre.
+    //
+    // L'identifiant du document porte les deux uids ({fromUid}__{toUid}) :
+    // on s'en sert pour autoriser la lecture, y compris quand le document
+    // N'EXISTE PAS (resource == null). Sans cela, « ai-je déjà reçu une
+    // demande de ce joueur ? » renvoyait permission-denied au lieu de « non ».
     match /friendRequests/{requestId} {
+      function uidInId() {
+        return request.auth != null
+          && (requestId.matches('^' + request.auth.uid + '__.+$')
+              || requestId.matches('^.+__' + request.auth.uid + '$'));
+      }
       function isParty() {
         return request.auth != null
+          && resource != null
           && (request.auth.uid == resource.data.fromUid
               || request.auth.uid == resource.data.toUid);
       }
@@ -83,6 +94,8 @@ service cloud.firestore {
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.toUid != request.auth.uid
         && request.resource.data.toUid is string
+        && request.resource.data.toUid.size() > 0
+        && requestId == request.resource.data.fromUid + '__' + request.resource.data.toUid
         && request.resource.data.status == 'pending';
       allow update: if isParty()
         && request.resource.data.fromUid == resource.data.fromUid

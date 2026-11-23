@@ -33,13 +33,18 @@ function makeStore() {
   };
 }
 
-function makeFirestore(store) {
+function makeFirestore(store, { denyMissingGet = false } = {}) {
   const watchers = [];
   const docRef = (coll, id) => ({
-    get: async () => ({
-      exists: Object.prototype.hasOwnProperty.call(store[coll], id),
-      data: () => store[coll][id]
-    }),
+    get: async () => {
+      const exists = Object.prototype.hasOwnProperty.call(store[coll], id);
+      /* Comme Firestore avec une règle `resource.data.x` sur un doc absent :
+         lecture refusée (permission-denied) au lieu de « n'existe pas ». */
+      if (denyMissingGet && !exists && coll === 'friendRequests') {
+        throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+      }
+      return { exists, data: () => store[coll][id] };
+    },
     set: async (data) => { store[coll][id] = { ...(store[coll][id] || {}), ...data }; },
     update: async (patch) => {
       if (!Object.prototype.hasOwnProperty.call(store[coll], id)) {
@@ -79,7 +84,7 @@ function makeFirestore(store) {
   };
 }
 
-async function boot(store = makeStore()) {
+async function boot(store = makeStore(), fsOptions = {}) {
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url: 'https://refs-cards.test/',
     runScripts: 'outside-only',
@@ -99,7 +104,7 @@ async function boot(store = makeStore()) {
     signOut: () => Promise.resolve()
   });
   auth.GoogleAuthProvider = class { setCustomParameters() {} };
-  const db = makeFirestore(store);
+  const db = makeFirestore(store, fsOptions);
   w.firebase = { apps: [], initializeApp() {}, auth, firestore: () => db };
 
   const context = dom.getInternalVMContext();
@@ -142,6 +147,13 @@ function buttonByText(root, text) {
   assert.match(doc.getElementById('friend-requests-out').textContent, /En attente/);
   assert.match(doc.getElementById('add-friend-msg').textContent, /doit l’accepter/);
   console.log('PASS ajout par code = demande en attente, aucun ami créé d’office');
+
+  /* 1 ter. L'aperçu sous le champ montre QUI on vient d'ajouter (photo + pseudo). */
+  const preview = doc.getElementById('add-friend-preview');
+  assert.equal(preview.hidden, false, 'aperçu du joueur ajouté visible');
+  assert.match(preview.textContent, /AmiJoueur/);
+  assert.match(preview.textContent, /Demande envoyée/);
+  console.log('PASS ajout par code = aperçu pseudo/photo du joueur ajouté');
 
   /* 1 bis. Redemander la même personne ne duplique pas la demande. */
   doc.getElementById('friend-code-input').value = 'REFS-ABC123';

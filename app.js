@@ -2663,6 +2663,7 @@
   const addFriendForm = $('add-friend-form');
   const friendCodeInput = $('friend-code-input');
   const addFriendMsg = $('add-friend-msg');
+  const addFriendPreview = $('add-friend-preview');
   const friendRequestsIn = $('friend-requests-in');
   const friendRequestsOut = $('friend-requests-out');
   const friendRequestsEmpty = $('friend-requests-empty');
@@ -3193,6 +3194,22 @@
     if (addFriendMsg) addFriendMsg.textContent = msg || '';
   }
 
+  /* Aperçu du joueur concerné par l'ajout (photo de profil + pseudo), juste
+     sous le champ code ami : on voit QUI on vient d'ajouter / d'accepter. */
+  function showAddFriendPreview(data, status) {
+    if (!addFriendPreview) return;
+    if (!data) {
+      addFriendPreview.hidden = true;
+      addFriendPreview.replaceChildren();
+      return;
+    }
+    const identity = friendIdentity(data);
+    const sub = identity.querySelector('.friend-row-sub');
+    if (sub) sub.textContent = status || '';
+    addFriendPreview.replaceChildren(identity);
+    addFriendPreview.hidden = false;
+  }
+
   /* ------------------------------------------- demandes d'ami (acceptation)
      Ajouter quelqu'un ne crée plus un ami dans le dos de l'autre joueur :
      cela envoie une DEMANDE (friendRequests/{fromUid}__{toUid}). Le
@@ -3358,15 +3375,24 @@
     const mine = currentUser.uid;
     const id = friendRequestId(mine, uid);
     try {
-      // Demande inverse déjà en attente ? On s'accepte mutuellement.
-      const reverseSnap = await cloudDb.collection('friendRequests').doc(friendRequestId(uid, mine)).get();
-      if (reverseSnap.exists) {
-        const reverse = reverseSnap.data() || {};
-        if (reverse.status === 'pending' && reverse.fromUid === uid && reverse.toUid === mine) {
-          await acceptFriendRequest({ id: friendRequestId(uid, mine), ...reverse });
-          setAddFriendMsg('Vous vous étiez déjà ajoutés : vous êtes maintenant amis !');
-          return true;
+      /* Demande inverse déjà en attente ? On s'accepte mutuellement. On
+         regarde d'abord les demandes reçues déjà chargées (temps réel) ;
+         la lecture cloud n'est qu'un filet de sécurité et, si elle échoue
+         (document absent + anciennes règles => permission-denied), on
+         continue simplement avec l'envoi d'une demande. */
+      let reverse = friendRequests.find((r) => r.fromUid === uid && r.status === 'pending') || null;
+      if (!reverse) {
+        try {
+          const reverseSnap = await cloudDb.collection('friendRequests').doc(friendRequestId(uid, mine)).get();
+          if (reverseSnap && reverseSnap.exists) reverse = { id: friendRequestId(uid, mine), ...(reverseSnap.data() || {}) };
+        } catch (error) {
+          console.warn('Lecture de la demande inverse impossible, envoi direct.', error);
         }
+      }
+      if (reverse && reverse.status === 'pending' && reverse.fromUid === uid && reverse.toUid === mine) {
+        await acceptFriendRequest({ ...reverse, id: reverse.id || friendRequestId(uid, mine) });
+        setAddFriendMsg('Vous vous étiez déjà ajoutés : vous êtes maintenant amis !');
+        return true;
       }
       await cloudDb.collection('friendRequests').doc(id).set({
         fromUid: mine,
@@ -3379,6 +3405,7 @@
       pendingFriendUids.add(uid);
       sentRequestsByUid.set(uid, id);
       const data = await fetchFriendProfile(uid);
+      showAddFriendPreview(data, 'Demande envoyée · en attente d’acceptation');
       setAddFriendMsg(`Demande envoyée à ${data.pseudo}. Elle doit l’accepter pour que vous soyez amis.`);
       showToast(`Demande d’ami envoyée à ${data.pseudo}`);
       renderOnline();
@@ -3412,6 +3439,7 @@
     friendRequests = friendRequests.filter((r) => r.id !== request.id);
     const data = await fetchFriendProfile(request.fromUid);
     await addFriendToList(request.fromUid, { announce: false });
+    showAddFriendPreview(data, 'Vous êtes maintenant amis');
     setAddFriendMsg(`${data.pseudo} a été accepté : vous êtes amis.`);
     showToast(`${data.pseudo} et toi êtes maintenant amis !`);
     renderOnline();
@@ -3451,6 +3479,7 @@
       return;
     }
     setAddFriendMsg('Recherche de ton ami…');
+    showAddFriendPreview(null);
     try {
       const snap = await cloudDb.collection('friendCodes').doc(code).get();
       if (!snap.exists) {
@@ -3466,14 +3495,18 @@
         setAddFriendMsg('C’est ton propre code ami !');
         return;
       }
+      const found = await fetchFriendProfile(uid);
       if (friends.includes(uid)) {
+        showAddFriendPreview(found, 'Déjà dans ta liste d’amis');
         setAddFriendMsg('Cet ami est déjà dans ta liste.');
         return;
       }
       if (pendingFriendUids.has(uid)) {
+        showAddFriendPreview(found, 'Demande déjà envoyée · en attente');
         setAddFriendMsg('Une demande est déjà en attente pour ce joueur.');
         return;
       }
+      showAddFriendPreview(found, 'Joueur trouvé · envoi de la demande…');
       const sent = await sendFriendRequest(uid);
       if (sent) friendCodeInput.value = '';
     } catch (error) {
