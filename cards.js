@@ -367,15 +367,6 @@ const cardsDatabase = [
     }
   },
   {
-    id: 'le-cul-de-mathis',
-    name: 'Le cul de mathis',
-    description: 'joli fessier',
-    rarity: 'divine',
-    emoji: '🍑',
-    image: 'assets/Cartes/Mathiscul.jpeg',
-    color: '#bff3ff'
-  },
-  {
     id: 'piter-la-br',
     name: 'Piter la Br',
     description: "il m'excite beaucoup",
