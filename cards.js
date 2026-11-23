@@ -210,7 +210,7 @@ const cardsDatabase = [
     description: 'pas de bourré',
     rarity: 'divine',
     emoji: '🕺',
-    image: 'babault dancing',
+    image: 'assets/Cartes/babaultdancing.png',
     color: '#bff3ff'
   }
 ];
