@@ -31,7 +31,7 @@ vm.runInContext(`
   }
 `, context);
 vm.runInContext(fs.readFileSync('app.js', 'utf8').replace(/\}\)\(\);\s*$/, `
-  window.testMutations = { state, applySave, renderCollection, countMap, fusableEntries,
+  window.testMutations = { state, applySave, renderCollection, renderFilters, countMap, fusableEntries,
     statsFor, cardFrame, drawPack, collectionIds };
 })();`), context);
 const api = w.testMutations;
@@ -42,8 +42,30 @@ assert.equal(api.countMap().get('chasseur-royer::shiny'), 2);
 assert.equal(api.fusableEntries().length, 1);
 assert.equal(api.fusableEntries()[0].card.mutation, 'shiny');
 assert.equal(JSON.stringify(api.collectionIds()), JSON.stringify(['chasseur-royer', 'chasseur-royer::shiny', 'chasseur-royer::shiny']));
+api.renderFilters();
 api.renderCollection();
-assert.ok(w.document.querySelector('#coll-grid .mutation-shiny') || w.document.querySelector('.coll-tile .mutation-shiny'));
+/* Les Shiny ne font plus de tuile à part : une seule tuile pour la carte de base. */
+const ownedTiles = [...w.document.querySelectorAll('#coll-grid .coll-tile')]
+  .filter((tile) => !tile.classList.contains('is-locked'));
+assert.equal(ownedTiles.length, 1);
+const tile = ownedTiles[0];
+assert.equal(tile.querySelector('.mutation-shiny'), null);
+assert.ok(tile.querySelector('.cf-id').textContent.includes('chasseur-royer'));
+assert.ok(tile.querySelector('.coll-shiny-star'), 'étoile Shiny manquante sur la tuile');
+assert.equal(tile.querySelector('.coll-pill').textContent, 'x3');
+tile.click();
+const inspectCounts = w.document.querySelector('#inspect-counts');
+assert.ok(!inspectCounts.hidden, 'compteurs absents à l\'ouverture de la tuile');
+assert.match(inspectCounts.textContent, /Normal\s*×1/);
+assert.match(inspectCounts.textContent, /Shiny\s*×2/);
+assert.ok(w.document.querySelector('#inspect-card .cf-id').textContent.includes('chasseur-royer'));
+assert.equal(w.document.querySelector('#inspect-card .mutation-shiny'), null);
+const chip = (key) => [...w.document.querySelectorAll('#coll-filters .chip')].find((c) => c.dataset.filter === key);
+chip('shiny').click();
+assert.equal([...w.document.querySelectorAll('#coll-grid .coll-tile')]
+  .filter((t) => !t.classList.contains('is-locked')).length, 1);
+assert.equal(w.document.querySelectorAll('#coll-grid .coll-tile').length, 1);
+chip('all').click();
 const shiny = api.state.collection[1];
 assert.ok(api.cardFrame(shiny).querySelector('.cf-mutation').textContent.includes('Shiny'));
 const stats = api.statsFor(api.collectionIds(), 0);
@@ -58,4 +80,4 @@ const pack = api.drawPack(false);
 assert.ok(pack.every(c => c.mutation === 'shiny'));
 assert.equal(new Set(pack.map(c => c.id)).size, new Set(pack.map(c => c.baseId)).size);
 dom.window.close();
-console.log('PASS mutations : dix taux exacts, bornes, originaux, variantes, fusion, collection, sauvegarde et tirage');
+console.log('PASS mutations : dix taux, bornes, originaux, inventaire groupé (étoile + compteurs), filtre, fusion, sauvegarde et tirage');

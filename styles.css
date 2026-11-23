@@ -1660,6 +1660,20 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   animation: inspect-glow 4.6s ease-in-out infinite;
 }
 .inspect-card .cf { border-radius: 16px; }
+/* Compteurs normaux / Shiny affichés sous la carte lorsqu'on ouvre une
+   tuile de la collection (la carte montrée reste la version normale). */
+.inspect-counts{position:absolute;left:50%;top:calc(100% + 10px);transform:translateX(-50%);z-index:2;
+  display:flex;gap:8px;align-items:center;justify-content:center;white-space:nowrap}
+.inspect-counts[hidden]{display:none}
+.inspect-count{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid #ffffff2b;border-radius:999px;
+  background:#0b090ef2;color:#ded7ea;font:700 11px 'Space Grotesk',sans-serif;letter-spacing:.02em;
+  box-shadow:0 8px 22px #0008;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.inspect-count.is-mutation{border-color:#fff0aa99;color:#fff0aa;box-shadow:0 0 18px -6px #ffe78199,0 8px 22px #0008}
+.inspect-count-icon{font-size:13px;line-height:1}
+@media(max-height:560px){
+  .inspect-counts{top:auto;bottom:8px}
+  .inspect-count{padding:4px 9px;font-size:10px}
+}
 .inspect-x {
   position: absolute;
   top: -2px;
@@ -2145,6 +2159,11 @@ html,body{background:var(--bg)}
 .coll-tile .cf-name{font-size:clamp(8px,10.5cqw,15px)}
 .coll-pill{position:absolute;right:5px;bottom:5px;z-index:8;padding:2px 7px;border-radius:99px;
   background:#07050fe6;border:1px solid var(--r-color);font:700 11px 'Space Grotesk',sans-serif;color:#fff}
+/* Petite étoile : la carte reste celle de base, le Shiny est un exemplaire en plus. */
+.coll-shiny-star{position:absolute;top:5px;right:5px;z-index:9;width:20px;height:20px;display:grid;place-items:center;
+  border:1px solid #fff3bd;border-radius:50%;background:#2b2109ed;color:#ffe68a;
+  font:800 13px/1 'Space Grotesk',sans-serif;text-shadow:0 0 7px #ffe781;
+  box-shadow:0 0 12px -2px #ffe781aa;pointer-events:none}
 .coll-tile.is-fresh::after{content:'NOUVEAU';position:absolute;left:5px;bottom:5px;z-index:8;padding:2px 6px;border-radius:99px;
   background:#f472b6;color:#2a0a1f;font:700 8px 'Space Grotesk',sans-serif;letter-spacing:.06em;animation:pulse-dot 1.4s ease-in-out infinite}
 .coll-tile.is-locked{display:grid;place-content:center;justify-items:center;gap:4px;cursor:default;box-shadow:none;

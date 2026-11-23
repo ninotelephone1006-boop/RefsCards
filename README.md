@@ -249,8 +249,13 @@ Ces probabilités sont conditionnelles à la rareté déjà choisie, sans boost 
 pack rare. Les poids et l'équilibrage actuels des cartes restent inchangés
 (les poids de rareté du jeu sont appliqués par carte, pas par palier).
 La rareté, le nom, la description et les valeurs d'origine ne sont pas écrasés.
-Shiny ajoute un badge et un reflet irisé, y compris dans la collection, le récap,
-l'inspection et les collections d'amis. Un filtre « Shiny » est disponible.
+Toutes les cartes du catalogue, y compris les cartes vidéo, peuvent être Shiny.
+Shiny ajoute un badge et un reflet irisé à la carte éclairée (récap, inspection
+d'une révélation, échanges). Dans l'inventaire (le sien comme celui d'un ami), les Shiny ne forment
+**pas une entrée séparée** : chaque carte n'a qu'une seule tuile, avec une
+petite étoile ✦ dès qu'au moins un exemplaire est Shiny. Ouvrir la tuile montre
+la carte normale accompagnée des compteurs « Normal ×… » et « Shiny ×… ».
+Le filtre « Shiny » affiche uniquement les cartes dont un exemplaire est Shiny.
 L'animation respecte `prefers-reduced-motion`.
 
 Aucun multiplicateur économique Shiny n'ayant été spécifié, les multiplicateurs
@@ -263,8 +268,9 @@ valent **1**. Les prix du marché restent fixés librement par le vendeur.
 - Une variante est sérialisée sous forme `baseId::mutationId`, par exemple
   `chasseur-royer::shiny`. En mémoire, elle expose également `baseId` et `mutation`.
 - Les sauvegardes existantes restent lisibles sans migration ni tirage rétroactif.
-- Les quantités normales/Shiny sont distinctes, tout comme les annonces de marché.
-  La variante reste attachée à la carte lors des transferts.
+- Les quantités normales/Shiny restent distinctes dans les sauvegardes et les
+  annonces de marché ; la variante reste attachée à la carte lors des transferts.
+  Seul l'affichage de l'inventaire les regroupe sous la carte d'origine.
 - Une fusion exige deux copies de la **même variante**, les consomme et crée une
   nouvelle carte de rareté supérieure avec son propre tirage de mutation : la
   mutation des ingrédients n'est pas transmise automatiquement.
