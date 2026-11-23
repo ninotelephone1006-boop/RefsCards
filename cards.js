@@ -395,7 +395,7 @@ const cardsDatabase = [
     description: 'Hava Nagila',
     rarity: 'secret',
     emoji: '✡️',
-    image: 'assets/Cartes/kipa-demachy.jpg',
+    image: 'assets/Cartes/kipa-demachy.jpeg',
     color: '#e6c8ff'
   }
 ];
