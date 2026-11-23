@@ -356,7 +356,7 @@ const cardsDatabase = [
     id: 'le-cul-de-mathis',
     name: 'Le cul de mathis',
     description: 'joli fessier',
-    rarity: 'divine',
+    rarity: 'secret',
     emoji: '🍑',
     image: 'assets/Cartes/Mathiscul.jpeg',
     color: '#bff3ff'
