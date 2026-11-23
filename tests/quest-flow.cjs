@@ -1,6 +1,6 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/quest-flow.cjs
 // Vérifie le système de quêtes / succès / niveau / notifications :
-// - quests.js : 20 quêtes, 30 succès, progression relative au baseline, XP.
+// - quests.js : 20 quêtes, 30 succès, progression à vie (rétroactive), XP.
 // - intégration : onglet Quêtes, quête active verrouillée tant qu'elle n'est
 //   pas réclamée, récompenses (pièces + XP), déblocage séquentiel, badges,
 //   succès qui se débloquent, panneau de notifications et persistance.
@@ -129,7 +129,7 @@ const freshSave = () => ({
 });
 
 (async () => {
-  /* ---------- 1. Données pures : 20 quêtes, 30 succès, XP, baseline. ---------- */
+  /* ---------- 1. Données pures : 20 quêtes, 30 succès, XP, rétroactivité. ---------- */
   {
     const dom = new JSDOM('<!DOCTYPE html><body></body>', { url: 'https://refs-cards.test/', runScripts: 'outside-only' });
     const context = dom.getInternalVMContext();
@@ -143,16 +143,25 @@ const freshSave = () => ({
       'chaque quête a un titre, un objectif et une récompense');
     assert.ok(Q.ACHIEVEMENTS.every((a) => a.title && a.desc && a.metric && a.target >= 1 && a.xp > 0),
       'chaque succès a un titre, un objectif et de l’XP');
-    /* Progression relative au baseline. */
+    /* Progression à vie : les compteurs absolus comptent, sans remise à zéro. */
     const q1 = Q.QUESTS[0];
-    const prog = (ctx, base) => Q.questProgress(q1, ctx, base);
-    assert.equal(prog({ packsOpened: 0 }, {}).done, false);
-    assert.equal(prog({ packsOpened: 0 }, {}).value, 0);
-    assert.equal(prog({ packsOpened: 1 }, {}).done, true);
-    assert.equal(prog({ packsOpened: 1 }, {}).value, 1);
-    /* Un joueur qui a déjà 100 boosters ne recommence pas la quête à zéro. */
-    assert.equal(prog({ packsOpened: 101 }, { packsOpened: 100 }).done, true);
-    assert.equal(prog({ packsOpened: 100 }, { packsOpened: 100 }).done, false);
+    const prog = (ctx) => Q.questProgress(q1, ctx);
+    assert.equal(prog({}).done, false, 'aucun booster : quête 1 à faire');
+    assert.equal(prog({ packsOpened: 0 }).value, 0);
+    assert.equal(prog({ packsOpened: 1 }).done, true);
+    assert.equal(prog({ packsOpened: 1 }).value, 1);
+    /* Un joueur qui avait déjà ouvert 120 boosters avant les quêtes valide
+       l’objectif immédiatement (aucune seconde fois à faire). */
+    assert.equal(prog({ packsOpened: 120 }).done, true, 'quête rétroactive acquise');
+    assert.equal(prog({ packsOpened: 120 }).value, 1, 'progression plafonnée à l’objectif');
+    /* Objectifs de collection : 5 cartes différentes = objectif atteint. */
+    const q2 = Q.QUESTS.find((q) => q.id === 'q02');
+    assert.equal(Q.questProgress(q2, { unique: 5 }).done, true, '5 cartes uniques : objectif atteint');
+    assert.equal(Q.questProgress(q2, { unique: 4 }).done, false, '4 cartes uniques : encore à faire');
+    assert.equal(Q.questProgress(q2, { unique: 4 }).value, 4);
+    /* La signature n’utilise plus de baseline (3ᵉ argument ignoré). */
+    assert.equal(Q.questProgress(q1, { packsOpened: 3 }, { packsOpened: 3 }).done, true,
+      'un ancien baseline ne bloque plus une quête déjà accomplie');
     /* Niveaux : 0 / 100 / 300 / 600… */
     assert.equal(Q.xpForLevel(1), 0);
     assert.equal(Q.xpForLevel(2), 100);
@@ -165,7 +174,7 @@ const freshSave = () => ({
     assert.equal(lvl(250).into, 150);
     assert.equal(lvl(300).level, 3);
     dom.window.close();
-    console.log('PASS données : 20 quêtes, 30 succès, baseline et niveaux cohérents');
+    console.log('PASS données : 20 quêtes, 30 succès, progression rétroactive et niveaux cohérents');
   }
 
   /* ---------- 2. Page Quêtes : onglet, quête active, verrouillage. ---------- */
@@ -239,24 +248,22 @@ const freshSave = () => ({
     console.log('PASS réclamation : pièces, XP, niveau 2, déblocage séquentiel, verrouillage');
   }
 
-  /* ---------- 4. Succès rétroactifs + baseline d’un joueur existant. ---------- */
+  /* ---------- 4. Joueur existant : quêtes ET succès rétroactifs. ---------- */
   {
-    /* Joueur déjà avancé AVANT le système : ses compteurs sont sauvegardés
-       sans le moindre champ quête → le baseline doit figer la situation pour
-       que les quêtes restent à faire. */
+    /* Joueur déjà avancé AVANT le système : sa sauvegarde ne contient aucun
+       champ quête. Ses compteurs doivent compter tels quels : une quête déjà
+       accomplie est réclamable immédiatement, sans rien refaire. */
     const ids = cardIds();
     const save = Object.assign(freshSave(), {
       coins: 5000,
       packsOpened: 120,
-      collection: [...ids, ...ids.slice(0, 14)], // 40 exemplaires, ids.length uniques
+      collection: [...ids, ...ids.slice(0, 14)], // 40 exemplaires, 25 uniques
       friends: ['u1', 'u2', 'u3']
     });
-    const { w, doc } = await boot(save);
+    const { w, doc, store } = await boot(save);
     const hook = w.__quest;
-    assert.equal(hook.questState.baseline.packsOpened, 120, 'baseline figé sur les compteurs existants');
-    assert.equal(hook.questState.baseline.unique, ids.length, 'baseline figé sur la collection existante');
-    /* Les succès, eux, sont absolus : la collection débloquera les succès de
-       collection et d'amis, y compris s'ils étaient déjà faits avant. */
+    assert.equal(hook.questState.baseline, undefined, 'plus de baseline dans l’état des quêtes');
+    /* Succès rétroactifs (absolus). */
     assert.ok(hook.questState.achievements.includes('a03'), 'succès « Collectionneur » (15 uniques) rétroactif');
     assert.ok(hook.questState.achievements.includes('a13'), 'succès « Premier ami » rétroactif');
     assert.ok(hook.questState.achievements.includes('a14'), 'succès « Sociable » (3 amis) rétroactif');
@@ -266,17 +273,72 @@ const freshSave = () => ({
     const unlocked = Number(doc.getElementById('ach-count').textContent.split(' ')[0]);
     assert.ok(unlocked >= 3, `au moins 3 succès rétroactifs, vu ${unlocked}`);
     assert.equal(doc.querySelectorAll('.ach-tile.is-unlocked').length, unlocked, 'tuiles débloquées accordées avec le compteur');
-    /* La quête 1 exige 1 booster SUPPLÉMENTAIRE (baseline 120). */
-    hook.setPackOpened(120);
-    hook.track();
-    await wait(20);
-    assert.equal(doc.querySelector('.quest-claim').disabled, true, '120 = baseline : rien de neuf, verrouillé');
-    hook.setPackOpened(121);
-    hook.track();
-    await wait(20);
-    assert.equal(doc.querySelector('.quest-claim').disabled, false, '121 = 1 ouverture de plus : réclamable');
+
+    /* Quête 1 « Ouvre ton premier booster » : 120 boosters déjà ouverts →
+       récompense disponible tout de suite. */
+    assert.equal(doc.querySelector('.quest-claim').disabled, false, 'quête 1 rétroactive : réclamable sans rien refaire');
+    assert.ok(doc.querySelector('.quest-card').classList.contains('is-ready'), 'carte marquée « prête »');
+    assert.match(doc.getElementById('quests-count').textContent, /Quête 1 \/ 20 · récompense prête/);
+    assert.equal(doc.getElementById('tab-badge-quests').hidden, false, 'badge de l’onglet allumé');
+
+    /* Réclamation : +100 🪙, puis la quête 2 « 5 cartes différentes » est
+       elle aussi déjà accomplie (25 uniques). */
+    const coins = hook.state.coins;
+    doc.querySelector('.quest-claim').click();
+    await wait(40);
+    assert.equal(hook.state.coins, coins + 100, 'récompense rétroactive versée');
+    assert.equal(hook.questState.completed[0], 'q01');
+    assert.equal(doc.querySelector('.quest-title').textContent, 'Petite collection');
+    assert.match(doc.querySelector('.quest-progress-top').textContent, /5 \/ 5/);
+    assert.equal(doc.querySelector('.quest-claim').disabled, false, 'quête 2 rétroactive : réclamable aussi');
+    assert.equal(doc.getElementById('tab-badge-quests').hidden, false, 'badge toujours allumé pour la quête suivante prête');
+
+    doc.querySelector('.quest-claim').click();
+    await wait(40);
+    assert.equal(hook.questState.completed[1], 'q02');
+    assert.equal(hook.questState.completed.length, 2, 'deux quêtes rétroactives réclamées');
+    /* La 3ᵉ (« récupère un pack gratuit ») n’a jamais été faite : c’est bien
+       elle qui s’affiche, avec un objectif à réaliser. */
+    assert.equal(doc.querySelector('.quest-title').textContent, 'Le gratuit d’abord');
+    assert.equal(doc.querySelector('.quest-claim').disabled, true, 'on s’arrête sur la première quête non accomplie');
+    assert.equal(doc.getElementById('tab-badge-quests').hidden, true, 'plus de récompense en attente');
+
+    /* Persistance : le champ `questBaseline` n’est plus écrit (les anciennes
+       sauvegardes qui en ont un restent lisibles, il est simplement ignoré). */
+    await wait(400);
+    assert.ok(!('questBaseline' in store.playerSaves.me), 'aucun baseline réécrit dans la sauvegarde');
     w.close();
-    console.log('PASS baseline joueur existant + succès rétroactifs');
+    console.log('PASS joueur existant : quêtes et succès rétroactifs, réclamations enchaînées');
+  }
+
+  /* ---------- 4bis. Ancienne sauvegarde avec `questBaseline` : ignoré. ---------- */
+  {
+    const ids = cardIds();
+    const legacy = Object.assign(freshSave(), {
+      coins: 1000,
+      packsOpened: 80,
+      collection: ids.slice(0, 8),
+      quests: ['q01'],
+      questBaseline: { packsOpened: 80, unique: 8, friends: 2 },
+      xp: 150,
+      achievements: ['a01', 'a02', 'a26'],
+      notifications: []
+    });
+    const { w, doc, store } = await boot(legacy);
+    const hook = w.__quest;
+    doc.querySelector('[data-tab="quests"]').click();
+    await wait(30);
+    assert.equal(hook.questState.completed.length, 1, 'quête 1 bien restaurée');
+    assert.equal(doc.querySelector('.quest-title').textContent, 'Petite collection');
+    assert.equal(doc.querySelector('.quest-claim').disabled, false,
+      'quête 2 déjà accomplie (8 cartes) malgré l’ancien baseline');
+    doc.querySelector('.quest-claim').click();
+    await wait(400);
+    assert.deepEqual(store.playerSaves.me.quests, ['q01', 'q02'], 'réclamation persistée');
+    assert.equal(store.playerSaves.me.questBaseline.unique, 8,
+      'ancien champ laissé tel quel par le merge, simplement ignoré');
+    w.close();
+    console.log('PASS ancienne sauvegarde : questBaseline ignoré, quêtes déjà accomplies réclamables');
   }
 
   /* ---------- 5. Notifications : persistance, badge, « tout lire ». ---------- */
@@ -300,13 +362,13 @@ const freshSave = () => ({
     await wait(30);
     assert.equal(doc.getElementById('notif-badge').hidden, true, 'badge éteint après « tout marquer comme lu »');
     assert.equal(doc.querySelectorAll('.notif-row.is-unread').length, 0, 'plus aucune notification non lue');
-    /* Persistance : la sauvegarde porte quêtes, succès, XP, notifications, baseline. */
+    /* Persistance : la sauvegarde porte quêtes, succès, XP, notifications. */
     await wait(400); // sauvegarde différée (250 ms)
     const saved = store.playerSaves.me;
     assert.ok(Array.isArray(saved.quests), 'quêtes persistées');
     assert.ok(Array.isArray(saved.achievements), 'succès persistés');
     assert.equal(typeof saved.xp, 'number', 'XP persistée');
-    assert.ok(saved.questBaseline && typeof saved.questBaseline === 'object', 'baseline persisté');
+    assert.ok(!('questBaseline' in saved), 'pas de baseline inutile dans la sauvegarde');
     assert.ok(Array.isArray(saved.notifications) && saved.notifications.length >= 2, 'notifications persistées');
     assert.ok(saved.notifications.every((n) => n.read === true), 'état « lu » persisté');
     assert.equal(saved.packsOpened, 1, 'compteur de boosters persisté');
@@ -336,14 +398,14 @@ const freshSave = () => ({
     assert.equal(hook2.questState.completed.length, 1, 'quête 1 toujours terminée au rechargement');
     assert.equal(hook2.questState.completed[0], 'q01', 'bonne quête restaurée');
     assert.equal(hook2.questState.xp, saved.xp, 'XP conservée au rechargement');
-    assert.ok(!hook2.questState.baseline.packsOpened, 'baseline reste celui d’origine (vide pour un nouveau joueur)');
+    assert.equal(hook2.questState.baseline, undefined, 'aucun baseline à restaurer');
     second.doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
     assert.equal(second.doc.getElementById('quests-count').textContent, 'Quête 2 / 20', 'on reprend à la quête 2');
     assert.equal(second.doc.querySelector('.quest-title').textContent, 'Petite collection', 'pas de retour en arrière');
     assert.ok(hook2.questState.notifications.length >= 1, 'notifications rechargées');
     second.w.close();
-    console.log('PASS rechargement : quêtes, XP, notifications et baseline restaurés');
+    console.log('PASS rechargement : quêtes, XP et notifications restaurés');
   }
 
   console.log('PASS quest flow (quêtes, succès, niveaux, notifications)');
