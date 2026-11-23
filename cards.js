@@ -2,13 +2,13 @@
    Refs Cards — base de données des cartes
    --------------------------------------------------------------------------
    Chaque carte possède :
-   - id          identifiant unique (sert aussi d'ID affiché, en tout petit)
-   - name        titre affiché en haut de la carte
-   - description courte affichée en bas
-   - rarity      clé de rareté (voir RARITIES dans app.js)
-   - emoji       secours visuel si l'image manque
-   - color       fond de secours (dégradé) si l'image manque
-   - image       nom de fichier (sans extension) dans assets/Cartes/
+- id          identifiant unique (sert aussi d'ID affiché, en tout petit)
+- name        titre affiché en haut de la carte
+- description courte affichée en bas
+- rarity      clé de rareté (voir RARITIES dans app.js)
+- emoji       secours visuel si l'image manque
+- color       fond de secours (dégradé) si l'image manque
+- image       nom de fichier (sans extension) dans assets/Cartes/
                    ex. 'pieds-de-rapace' → assets/Cartes/pieds-de-rapace.png
                    On peut aussi y mettre un chemin complet :
                    'assets/Cartes/mon-visuel.jpg'.
@@ -127,7 +127,7 @@ function cardVideoPath(value) {
 }
 
 /* Liste ordonnée des sources à essayer pour une carte vidéo :
-   1. la variante `srcByFps` la plus proche de `fps` (correspondance exacte
+1. la variante `srcByFps` la plus proche de `fps` (correspondance exacte
       d'abord), 2. la source principale `src`. Les chemins sans extension sont
       déclinés en .mp4 puis .webm. */
 function cardVideoSources(card) {
@@ -388,6 +388,15 @@ const cardsDatabase = [
       sound: true,
       loop: true
     }
+  },
+  {
+    id: 'kipa-demachy',
+    name: 'Kipa Demachy',
+    description: 'Hava Nagila',
+    rarity: 'secret',
+    emoji: '✡️',
+    image: 'assets/Cartes/kipa-demachy.jpg',
+    color: '#e6c8ff'
   }
 ];
 
