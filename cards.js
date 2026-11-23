@@ -433,6 +433,15 @@ const cardsDatabase = [
     emoji: '👑',
     image: 'assets/Cartes/king-nino.jpeg',
     color: '#f5d979'
+  },
+  {
+    id: 'daleu-de-gazelle',
+    name: 'Daleu de gazelle',
+    description: 'bonsoir demoiselle',
+    rarity: 'epic',
+    emoji: '🦌',
+    image: 'assets/Cartes/daleu-de-gazelle.jpeg',
+    color: '#c6a0eb'
   }
 ];
 
