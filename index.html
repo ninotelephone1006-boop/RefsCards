@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.23-7">
+  <meta name="app-version" content="2026.11.23-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-5">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-6">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-5" defer></script>
+  <script src="app.js?v=2026.11.23-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -228,13 +228,15 @@
             <div class="free-info">
               <span class="free-gift" aria-hidden="true">🎁</span>
               <div class="free-text">
-                <strong>3 packs classiques gratuits chaque jour</strong>
-                <span id="free-label">Récupère-les ici, un par un.</span>
-                <span class="free-dots" id="free-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <strong>Calendrier de connexion</strong>
+                <span id="free-label">Un cadeau gratuit chaque jour, de mieux en mieux.</span>
               </div>
             </div>
-            <button class="free-claim" id="free-claim" type="button">RÉCUPÉRER · 3 RESTANTS</button>
+            <button class="free-claim" id="free-claim" type="button">RÉCUPÉRER LE CADEAU DU JOUR</button>
             <p class="free-msg" id="free-msg" role="status"></p>
+            <p class="daily-cal-title" id="daily-cal-title"></p>
+            <div class="daily-cal" id="daily-calendar" aria-hidden="true"></div>
+            <div class="daily-track" id="daily-track"></div>
           </div>
 
           <div class="shop-grid">
@@ -357,7 +359,7 @@
 
         <div class="inventory-empty" id="inventory-empty" hidden>
           <p class="inventory-empty-title">Ton inventaire est vide</p>
-          <p class="inventory-empty-sub">Achète des boosters ou récupère tes packs gratuits quotidiens dans le Shop.</p>
+          <p class="inventory-empty-sub">Achète des boosters ou récupère ton cadeau de connexion dans le Shop.</p>
           <button class="inventory-go-shop" id="inventory-go-shop" type="button">Aller au Shop →</button>
         </div>
       </section>
@@ -730,7 +732,7 @@
       <button class="tab" type="button" data-tab="shop">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h7.9a1.5 1.5 0 0 0 1.5-1.2L20.5 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/></svg>
         <span>Shop</span>
-        <i class="tab-badge" id="tab-badge-shop" hidden aria-label="Packs gratuits disponibles"></i>
+        <i class="tab-badge" id="tab-badge-shop" hidden aria-label="Cadeau de connexion disponible"></i>
       </button>
       <button class="tab" type="button" data-tab="inventory">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4.5 8.5 12 4l7.5 4.5v7L12 20l-7.5-4.5z"/><path d="M4.5 8.5 12 13l7.5-4.5"/><path d="M12 13v7"/></svg>

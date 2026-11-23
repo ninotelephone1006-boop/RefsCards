@@ -2484,9 +2484,6 @@ html,body{background:var(--bg)}
 .free-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
 .free-text strong{font-family:'Space Grotesk',sans-serif;font-size:15px;color:#fff}
 .free-text span{font-size:12px;color:#a69cab}
-.free-dots{display:flex;gap:6px;margin-top:4px}
-.free-dots i{width:10px;height:10px;border-radius:50%;border:2px solid #6b4fc4;background:transparent}
-.free-dots i.is-taken{background:#fbbf24;border-color:#fbbf24;box-shadow:0 0 8px #fbbf2488}
 .free-claim{width:100%;margin-top:12px;padding:12px 16px;border:0;border-radius:11px;cursor:pointer;
   background:linear-gradient(100deg,#d97706,#eab308);color:#1c1005;font-size:11px;font-weight:700;letter-spacing:1px;
   box-shadow:0 8px 24px -8px #eab308cc;transition:filter .2s,transform .15s}
@@ -2495,6 +2492,30 @@ html,body{background:var(--bg)}
 .free-claim:disabled{background:#2a2530;color:#6f6785;box-shadow:none;cursor:not-allowed;filter:none}
 .free-msg{min-height:16px;margin:8px 0 0;font-size:12px;color:#fbbf24;text-align:center}
 .free-msg:empty{display:none}
+/* Calendrier de connexion (remplace les 3 gratuits quotidiens). */
+.daily-cal-title{margin:12px 0 6px;font-size:10px;font-weight:700;letter-spacing:1.2px;
+  color:#c9c2d6;text-transform:uppercase;text-align:center}
+.daily-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;max-width:320px;margin:0 auto}
+.daily-cal span{border-radius:8px}
+.daily-cal-dow{font-size:9px;font-weight:700;letter-spacing:.5px;color:#8d84a8;text-align:center;padding:2px 0}
+.daily-cal-cell{display:grid;place-items:center;aspect-ratio:1;font-size:11px;font-variant-numeric:tabular-nums;
+  color:#6f6785;background:#ffffff06;border:1px solid #ffffff0d}
+.daily-cal-cell.is-past{color:#4c4560}
+.daily-cal-cell.is-claimed{color:#1c1005;font-weight:700;background:linear-gradient(150deg,#d97706,#eab308);
+  border-color:#eab308;box-shadow:0 0 10px -2px #eab308aa}
+.daily-cal-cell.is-today{color:#fff;font-weight:700;border-color:#a855f7;
+  box-shadow:0 0 0 1px #a855f7,0 0 12px -2px #a855f7cc}
+.daily-cal-cell.is-claimed.is-today{color:#1c1005;border-color:#fbbf24;
+  box-shadow:0 0 0 1px #fbbf24,0 0 14px -2px #fbbf24cc}
+.daily-track{display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:2px}
+.daily-track-cell{flex:1 0 70px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:8px 4px;border:1px solid #ffffff10;border-radius:10px;background:#ffffff05}
+.daily-track-day{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:.8px;color:#a79fbd}
+.daily-track-reward{font-size:9.5px;line-height:1.3;color:#8d84a8;text-align:center}
+.daily-track-cell.is-next{border-color:#eab308;background:linear-gradient(150deg,#eab30822,#d9770622);
+  box-shadow:0 0 14px -4px #eab308aa}
+.daily-track-cell.is-next .daily-track-day{color:#fbbf24}
+.daily-track-cell.is-next .daily-track-reward{color:#e9d5ff}
 .shop-grid{display:grid;gap:14px;margin-top:16px}
 @media(min-width:640px){.shop-grid{grid-template-columns:1fr 1fr}}
 .shop-card{position:relative;display:flex;gap:14px;padding:14px;border:1px solid #ffffff14;border-radius:18px;

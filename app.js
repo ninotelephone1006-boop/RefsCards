@@ -11,15 +11,29 @@
      pack (classique ≈ 394 🪙, rare ≈ 447 🪙 pour 5 cartes) : à 100 🪙,
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
-     faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
+     faut jouer, fusionner et récupérer le cadeau du calendrier de connexion. */
   const PACK_PRICES = { classic: 500, rare: 1000, legend: 800, video: 1000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
+  /* Calendrier de connexion : un cadeau gratuit chaque jour, de mieux en mieux.
+     Le cycle fait 7 jours (le 7e est le jackpot) puis recommence ; le cran
+     dépend des jours de connexion d'affilée (`streak`) : une journée sans
+     connexion remet le compteur au jour 1. */
+  const DAILY_REWARD_CYCLE = [
+    { packs: { classic: 1 }, coins: 150 },
+    { packs: { classic: 2 }, coins: 200 },
+    { packs: { rare: 1 }, coins: 250 },
+    { coins: 700 },
+    { packs: { rare: 1, classic: 1 }, coins: 300 },
+    { packs: { legend: 1 }, coins: 400 },
+    { packs: { video: 1, legend: 1 }, coins: 1000 }
+  ];
+  const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   // Pack rare : les raretés hautes sont boostées progressivement (plus le rang est
   // élevé, plus le multiplicateur est grand), tandis que commune/inhabituelle sont
   // réduites. Le total reste normalisé pour que les pourcentages affichés restent cohérents.
   const RARE_RANK_FACTOR_BASE = 0.45;
   const RARE_RANK_FACTOR_STEP = 0.32;
-  const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
   const PACK_IMAGES = {
     classic: 'assets/packet.png',
@@ -207,8 +221,10 @@
   const packStockLabel = $('pack-stock-label');
   const freeClaim = $('free-claim');
   const freeLabel = $('free-label');
-  const freeDots = $('free-dots');
   const freeMsg = $('free-msg');
+  const dailyCalendar = $('daily-calendar');
+  const dailyTrack = $('daily-track');
+  const dailyCalTitle = $('daily-cal-title');
   const shopStockClassic = $('shop-stock-classic');
   const shopStockRare = $('shop-stock-rare');
   const qtyClassic = $('qty-classic');
@@ -264,14 +280,16 @@
     fusionOpen: false,
     fusionSelection: null,
     firstPack: true,
-    /* Inventaire de packs (achetés dans le Shop + gratuits quotidiens).
+    /* Inventaire de packs (achetés dans le Shop + cadeaux du calendrier).
        Ouvrir un pack en consomme 1. `currentPackType` = pack choisi dans
-       l'onglet Pack. `freeDate`/`freeUsed` = quota quotidien (date locale
-       AAAA-MM-JJ + nombre déjà récupérés, 0..FREE_PER_DAY). */
+       l'onglet Pack. Calendrier de connexion : `streakDate` = date locale du
+       dernier cadeau récupéré, `streak` = jours de connexion d'affilée,
+       `claimedDays` = dates du mois déjà cochées (affichage du calendrier). */
     packStock: emptyPackStock(),
     currentPackType: 'classic',
-    freeDate: '',
-    freeUsed: 0,
+    streakDate: '',
+    streak: 0,
+    claimedDays: [],
     packsOpened: 0,
     /* Compteurs alimentant les quêtes et les succès (cumuls, persistés).
        Ils comptent toute l'activité du compte, y compris celle d'avant
@@ -373,29 +391,78 @@
      Les packs ne s'achètent plus en un clic depuis le récap : ils vont dans
      l'inventaire (state.packStock) et s'ouvrent depuis l'onglet Pack.
      - Achat : plusieurs d'un coup (quantité 1..MAX_QTY), prix PACK_PRICES.
-     - Gratuit : FREE_PER_DAY packs classiques par jour calendaire local,
-       à récupérer un par un dans le Shop (freeDate/freeUsed persistés).
+     - Calendrier de connexion : un cadeau gratuit par jour, de mieux en mieux
+       (streakDate/streak/claimedDays persistés ; cf. DAILY_REWARD_CYCLE).
      - Ouverture : consomme 1 pack du type choisi (currentPackType). */
 
-  function todayKey() {
+  function pad2(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function dayKey(offset) {
     const now = new Date();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${now.getFullYear()}-${m}-${d}`;
+    now.setDate(now.getDate() + offset);
+    return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
   }
 
-  function refreshFreeQuota() {
-    const today = todayKey();
-    if (state.freeDate !== today) {
-      state.freeDate = today;
-      state.freeUsed = 0;
+  function todayKey() {
+    return dayKey(0);
+  }
+
+  function yesterdayKey() {
+    return dayKey(-1);
+  }
+
+  /* Calendrier de connexion : le cadeau du jour est disponible tant que le
+     dernier cadeau récupéré n'est pas d'aujourd'hui. Une série interrompue
+     (dernier cadeau il y a 2 jours ou plus) repart au jour 1. */
+  function refreshStreak() {
+    if (!state.streakDate
+        || (state.streakDate !== todayKey() && state.streakDate !== yesterdayKey())) {
+      state.streak = 0;
     }
-    state.freeUsed = clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY);
+    state.streak = clamp(Math.floor(Number(state.streak) || 0), 0, 999);
   }
 
-  function freeRemaining() {
-    refreshFreeQuota();
-    return Math.max(0, FREE_PER_DAY - state.freeUsed);
+  function dailyAvailable() {
+    refreshStreak();
+    return state.streakDate !== todayKey();
+  }
+
+  /* Prochain cran du calendrier (1..7, cycle). Quand le cadeau du jour est
+     déjà pris, c'est le cran de demain qui est annoncé. */
+  function nextDailyDay() {
+    refreshStreak();
+    if (!state.streakDate) return 1;
+    return (Math.floor(Number(state.streak) || 0) % DAILY_REWARD_CYCLE.length) + 1;
+  }
+
+  function rewardForDay(day) {
+    const cycle = DAILY_REWARD_CYCLE;
+    return cycle[(Math.max(1, day) - 1) % cycle.length];
+  }
+
+  function rewardParts(reward) {
+    const parts = [];
+    const packs = (reward && reward.packs) || {};
+    PACK_TYPES.forEach((type) => {
+      const n = Number(packs[type]) || 0;
+      if (n > 0) parts.push(`${n} pack${n > 1 ? 's' : ''} ${packLabelFr(type)}${n > 1 ? 's' : ''}`);
+    });
+    if (Number(reward.coins) > 0) parts.push(`${fmt(reward.coins)} 🪙`);
+    return parts;
+  }
+
+  function describeReward(reward) {
+    return rewardParts(reward).join(' + ') || 'cadeau surprise';
+  }
+
+  /* Le calendrier affiché ne garde que le mois en cours (la sauvegarde ne
+     grossit pas avec l'historique des mois passés). */
+  function noteClaimedDay(key) {
+    if (state.claimedDays.indexOf(key) < 0) state.claimedDays.push(key);
+    const prefix = key.slice(0, 7);
+    state.claimedDays = state.claimedDays.filter((k) => k.slice(0, 7) === prefix).slice(-31);
   }
 
   function packTotal() {
@@ -423,24 +490,82 @@
     if (freeMsg) freeMsg.textContent = message || '';
   }
 
+  /* Calendrier du mois en cours : les jours déjà payés sont cochés, la date
+     du jour est entourée (semaine commençant le lundi). */
+  function renderDailyCalendar() {
+    if (!dailyCalendar) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const lead = (new Date(year, month, 1).getDay() + 6) % 7;
+    const today = todayKey();
+    const frag = document.createDocumentFragment();
+    ['L', 'M', 'M', 'J', 'V', 'S', 'D'].forEach((label) => {
+      const cell = document.createElement('span');
+      cell.className = 'daily-cal-dow';
+      cell.textContent = label;
+      frag.append(cell);
+    });
+    for (let i = 0; i < lead; i += 1) frag.append(document.createElement('span'));
+    for (let d = 1; d <= daysInMonth; d += 1) {
+      const key = `${year}-${pad2(month + 1)}-${pad2(d)}`;
+      const cell = document.createElement('span');
+      cell.className = 'daily-cal-cell';
+      if (key === today) cell.classList.add('is-today');
+      else if (key < today) cell.classList.add('is-past');
+      if (state.claimedDays.indexOf(key) >= 0) {
+        cell.classList.add('is-claimed');
+        cell.textContent = '✓';
+        cell.title = 'Cadeau récupéré';
+      } else {
+        cell.textContent = String(d);
+      }
+      frag.append(cell);
+    }
+    dailyCalendar.replaceChildren(frag);
+    if (dailyCalTitle) {
+      dailyCalTitle.textContent = `${MONTHS_FR[month]} ${year} · un cadeau par jour de connexion`;
+    }
+  }
+
+  /* Les 7 crans à venir du cycle, en partant du prochain cadeau. */
+  function renderDailyTrack() {
+    if (!dailyTrack) return;
+    const start = nextDailyDay();
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < DAILY_REWARD_CYCLE.length; i += 1) {
+      const day = ((start - 1 + i) % DAILY_REWARD_CYCLE.length) + 1;
+      const cell = document.createElement('div');
+      cell.className = 'daily-track-cell' + (day === start ? ' is-next' : '');
+      const head = document.createElement('span');
+      head.className = 'daily-track-day';
+      head.textContent = `JOUR ${day}`;
+      const desc = document.createElement('span');
+      desc.className = 'daily-track-reward';
+      desc.textContent = describeReward(rewardForDay(day));
+      cell.append(head, desc);
+      frag.append(cell);
+    }
+    dailyTrack.replaceChildren(frag);
+  }
+
   function renderShop() {
-    refreshFreeQuota();
-    const remaining = freeRemaining();
+    const available = dailyAvailable();
     if (freeClaim) {
-      freeClaim.disabled = remaining <= 0;
-      freeClaim.textContent = remaining > 0
-        ? `RÉCUPÉRER · ${remaining} RESTANT${remaining > 1 ? 'S' : ''}`
-        : 'GRATUITS ÉPUISÉS · REVIENS DEMAIN';
+      freeClaim.disabled = !available;
+      freeClaim.textContent = available
+        ? `RÉCUPÉRER · CADEAU DU JOUR ${nextDailyDay()}`
+        : 'CADEAU DU JOUR RÉCUPÉRÉ · REVIENS DEMAIN';
     }
     if (freeLabel) {
-      freeLabel.textContent = remaining > 0
-        ? `${state.freeUsed}/${FREE_PER_DAY} récupérés aujourd'hui · se réinitialise à minuit.`
-        : `Tu as récupéré tes ${FREE_PER_DAY} packs du jour. Se réinitialise à minuit.`;
+      freeLabel.textContent = available
+        ? `Jour ${nextDailyDay()} du calendrier — ${describeReward(rewardForDay(nextDailyDay()))}. Connecte-toi chaque jour pour améliorer les cadeaux.`
+        : `Cadeau du jour ${state.streak} récupéré. Demain : jour ${nextDailyDay()} — ${describeReward(rewardForDay(nextDailyDay()))}.`;
     }
-    if (freeDots) {
-      [...freeDots.children].forEach((dot, i) => dot.classList.toggle('is-taken', i < state.freeUsed));
-    }
-    if (tabBadgeShop) tabBadgeShop.hidden = remaining <= 0;
+    if (tabBadgeShop) tabBadgeShop.hidden = !available;
+    renderDailyCalendar();
+    renderDailyTrack();
 
     const stockText = (n) => `Tu en as ${n}`;
     if (shopStockClassic) shopStockClassic.textContent = stockText(state.packStock.classic || 0);
@@ -586,21 +711,31 @@
 
   function claimFreePack() {
     SFX.unlock();
-    const remaining = freeRemaining();
-    if (remaining <= 0) {
+    if (!dailyAvailable()) {
       SFX.snap();
-      setFreeMsg('Tu as déjà récupéré tes 3 packs gratuits du jour. Reviens demain !');
+      setFreeMsg('Tu as déjà récupéré le cadeau du jour. Reviens demain pour continuer le calendrier !');
       return;
     }
-    state.freeUsed += 1;
+    const day = nextDailyDay();
+    const reward = rewardForDay(day);
+    const continuing = state.streakDate === yesterdayKey();
+    state.streak = continuing ? (Math.floor(Number(state.streak) || 0) + 1) : 1;
+    state.streakDate = todayKey();
+    const gained = rewardParts(reward);
+    Object.keys(reward.packs || {}).forEach((type) => {
+      state.packStock[type] = (state.packStock[type] || 0) + (Number(reward.packs[type]) || 0);
+    });
+    if (Number(reward.coins) > 0) state.coins += reward.coins;
     state.freePacks = (state.freePacks || 0) + 1;
-    state.packStock.classic = (state.packStock.classic || 0) + 1;
+    noteClaimedDay(todayKey());
     if ((state.packStock[state.currentPackType] || 0) <= 0) {
       selectPackType('classic', { silent: true });
     }
     SFX.chaChing();
-    setFreeMsg(`Pack gratuit ajouté à ton inventaire (${freeRemaining()} restant${freeRemaining() > 1 ? 's' : ''} aujourd'hui).`);
-    showToast('Pack gratuit ajouté à ton inventaire !');
+    const tomorrowDay = (state.streak % DAILY_REWARD_CYCLE.length) + 1;
+    setFreeMsg(`Cadeau du jour ${day} récupéré : ${gained.join(' + ')}. Reviens demain pour le jour ${tomorrowDay} !`);
+    showToast(`Cadeau du jour ${day} : ${gained.join(' + ')} !`);
+    updateCoins();
     save();
     renderShop();
     renderPackInventory();
@@ -2133,7 +2268,7 @@
       const total = packTotal();
       recapMsg.textContent = total > 0
         ? `Tu as ${total} pack${total > 1 ? 's' : ''} en inventaire — ouvre-les dans l'onglet Pack !`
-        : 'Plus de packs ? Le Shop t\'attend (3 gratuits par jour).';
+        : 'Plus de packs ? Le Shop t\'attend (cadeau de connexion quotidien).';
       updateFusionChip();
       if (!fusionChip.hidden) {
         fusionChip.animate?.(
@@ -2793,22 +2928,39 @@
     questReadyNotifiedIds.clear();
     questSeenIds.clear();
     questSeenInitialized = false;
-    /* Inventaire : les anciennes sauvegardes n'ont pas packStock/freeDate/
-       freeUsed (défauts 0). Le premier pack offert (firstPack) devient
-       1 pack classique en inventaire, une seule fois. */
+    /* Inventaire : les anciennes sauvegardes n'ont pas packStock ni le
+       calendrier de connexion (défauts 0). Le premier pack offert (firstPack)
+       devient 1 pack classique en inventaire, une seule fois. */
     const stock = (d && d.packStock) || {};
     state.packStock = packStockFrom(stock);
     if (state.firstPack) {
       state.packStock.classic += 1;
       state.firstPack = false;
     }
-    state.freeDate = typeof (d && d.freeDate) === 'string' ? d.freeDate : '';
-    state.freeUsed = clamp(Number(d && d.freeUsed) || 0, 0, FREE_PER_DAY);
-    const previousFreeDate = state.freeDate;
-    refreshFreeQuota();
-    /* Nouveau jour calendaire : les packs gratuits se réinitialisent — on
-       prévient (une fois par session) pour ne pas les laisser passer. */
-    const newDay = Boolean(previousFreeDate) && previousFreeDate !== state.freeDate;
+    /* Calendrier de connexion (streakDate/streak/claimedDays). Les anciennes
+       sauvegardes « 3 gratuits/jour » migrent : un quota déjà entamé aujourd'hui
+       compte comme cadeau récupéré, sinon la série repart de zéro. */
+    const savedToday = todayKey();
+    state.streakDate = typeof (d && d.streakDate) === 'string' ? d.streakDate : '';
+    state.streak = clamp(Math.floor(Number(d && d.streak) || 0), 0, 999);
+    state.claimedDays = (Array.isArray(d && d.claimedDays) ? d.claimedDays : [])
+      .filter((k) => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k))
+      .slice(-31);
+    if (!state.streakDate && typeof (d && d.freeDate) === 'string') {
+      if (d.freeDate === savedToday && Number(d.freeUsed) > 0) {
+        state.streakDate = d.freeDate;
+        state.streak = clamp(Number(d.freeUsed) || 0, 1, 999);
+        noteClaimedDay(d.freeDate);
+      }
+    }
+    /* L'affichage du calendrier ne garde que le mois en cours. */
+    const monthPrefix = savedToday.slice(0, 7);
+    state.claimedDays = state.claimedDays.filter((k) => k.slice(0, 7) === monthPrefix);
+    const previousStreakDate = state.streakDate;
+    refreshStreak();
+    /* Nouveau jour calendaire : un nouveau cadeau est disponible — on prévient
+       (une fois par session) pour ne pas le laisser passer. */
+    const newDay = Boolean(previousStreakDate) && previousStreakDate !== savedToday;
     state.currentPackType = firstAvailablePackType();
     state.phase = 'pack';
     state.deck = [];
@@ -2845,8 +2997,9 @@
           stock[type] = Math.max(0, Number(state.packStock[type]) || 0);
           return stock;
         }, {}),
-        freeDate: state.freeDate || todayKey(),
-        freeUsed: clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY),
+        streakDate: state.streakDate || '',
+        streak: clamp(Math.floor(Number(state.streak) || 0), 0, 999),
+        claimedDays: (state.claimedDays || []).slice(-31),
         /* Quêtes / succès / niveau / notifications + compteurs alimentant
            leur progression. */
         fusions: Math.max(0, Number(state.fusions) || 0),
@@ -2958,8 +3111,9 @@
     state.marketEarned = 0;
     state.marketBuys = 0;
     state.packStock = emptyPackStock();
-    state.freeDate = '';
-    state.freeUsed = 0;
+    state.streakDate = '';
+    state.streak = 0;
+    state.claimedDays = [];
     state.currentPackType = 'classic';
     shopQty.classic = 1;
     shopQty.rare = 1;
@@ -6211,8 +6365,8 @@
       updateQuestBadges();
     }
     if (newDay) {
-      pushNotification('system', 'Packs gratuits disponibles',
-        'Un nouveau jour : tes 3 packs classiques gratuits t’attendent dans le Shop.');
+      pushNotification('system', 'Cadeau de connexion disponible',
+        'Un nouveau jour du calendrier t’attend dans le Shop : récupère ton cadeau gratuit.');
     }
   }
 
