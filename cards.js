@@ -374,6 +374,20 @@ const cardsDatabase = [
     emoji: '🍑',
     image: 'assets/Cartes/Mathiscul.jpeg',
     color: '#bff3ff'
+  },
+  {
+    id: 'piter-la-br',
+    name: 'Piter la Br',
+    description: "il m'excite beaucoup",
+    rarity: 'rare',
+    emoji: '🎬',
+    color: '#8fc8ef',
+    video: {
+      src: 'assets/Cartes/videos/BrPiter.mp4',
+      fps: 30,
+      sound: true,
+      loop: true
+    }
   }
 ];
 
