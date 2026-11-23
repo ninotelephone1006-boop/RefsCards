@@ -4329,7 +4329,8 @@
         const savedStock = (saveData && saveData.packStock) || {};
         const packStock = {
           classic: Math.max(0, Number(savedStock.classic) || 0),
-          rare: Math.max(0, Number(savedStock.rare) || 0)
+          rare: Math.max(0, Number(savedStock.rare) || 0),
+          legend: Math.max(0, Number(savedStock.legend) || 0)
         };
         /* On utilise la liste d'amis ENREGISTRÉE (celle que vérifient les
            règles Firestore), pas l'état mémoire qui peut être en avance. */
@@ -4400,7 +4401,8 @@
       if (result.packStock) {
         state.packStock = {
           classic: Math.max(0, Number(result.packStock.classic) || 0),
-          rare: Math.max(0, Number(result.packStock.rare) || 0)
+          rare: Math.max(0, Number(result.packStock.rare) || 0),
+          legend: Math.max(0, Number(result.packStock.legend) || 0)
         };
       }
       updateCoins(); renderCollection(); renderShop(); renderAccount(); renderPackInventory(); saveProfileSoon();

@@ -121,8 +121,9 @@ service cloud.firestore {
         return beforeSave().packStock is map && afterSave().packStock is map;
       }
       function stockKeysOk() {
-        return afterSave().packStock.keys().hasOnly(['classic', 'rare'])
+        return afterSave().packStock.keys().hasOnly(['classic', 'rare', 'legend'])
           && afterSave().packStock.classic is int && afterSave().packStock.classic >= 0 && afterSave().packStock.classic <= 100000
+          && afterSave().packStock.legend is int && afterSave().packStock.legend >= 0 && afterSave().packStock.legend <= 100000
           && afterSave().packStock.rare is int && afterSave().packStock.rare >= 0 && afterSave().packStock.rare <= 100000;
       }
       function stockUnchanged() {
@@ -143,6 +144,7 @@ service cloud.firestore {
       }
       function packRemoved(packType) {
         return hasStock() && stockKeysOk()
+          && afterSave().packStock.legend == beforeSave().packStock.get('legend', 0)
           && afterSave().collection == beforeSave().collection
           && (packType == 'classic'
             ? afterSave().packStock.classic == beforeSave().packStock.classic - 1
@@ -152,6 +154,7 @@ service cloud.firestore {
       }
       function packAdded(packType) {
         return hasStock() && stockKeysOk()
+          && afterSave().packStock.legend == beforeSave().packStock.get('legend', 0)
           && afterSave().collection == beforeSave().collection
           && (packType == 'classic'
             ? afterSave().packStock.classic == beforeSave().packStock.classic + 1
