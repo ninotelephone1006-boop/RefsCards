@@ -203,6 +203,15 @@ const cardsDatabase = [
     emoji: '😎',
     image: 'assets/Cartes/chikifagar.PNG',
     color: '#c6a0eb'
+  },
+  {
+    id: 'babault-dancing',
+    name: 'Babault Dancing',
+    description: 'pas de bourré',
+    rarity: 'divine',
+    emoji: '🕺',
+    image: 'babault-dancing',
+    color: '#bff3ff'
   }
 ];
 
