@@ -166,6 +166,12 @@
   const openRare = $('open-rare');
   const shopMsg = $('shop-msg');
   const tabBadgeShop = $('tab-badge-shop');
+  const inventoryView = $('inventory-view');
+  const inventoryGrid = $('inventory-grid');
+  const inventorySummary = $('inventory-summary');
+  const inventoryEmpty = $('inventory-empty');
+  const inventoryGoShop = $('inventory-go-shop');
+  const tabBadgeInventory = $('tab-badge-inventory');
   const shopQty = { classic: 1, rare: 1 };
 
   /* ----------------------------------------------------------------- state */
@@ -343,6 +349,56 @@
       pack.setAttribute('aria-label', `Booster ${type === 'rare' ? 'rare' : 'classique'}. Fais glisser vers la droite pour le déchirer.`);
     }
     renderOdds(type === 'rare');
+    renderInventory();
+  }
+
+  function renderInventory() {
+    const classic = state.packStock.classic || 0;
+    const rare = state.packStock.rare || 0;
+    const total = classic + rare;
+    if (tabBadgeInventory) tabBadgeInventory.hidden = total <= 0;
+    if (inventorySummary) {
+      inventorySummary.textContent = total > 0
+        ? `Tu as ${total} pack${total > 1 ? 's' : ''} prêt${total > 1 ? 's' : ''} à être ouvert${total > 1 ? 's' : ''}.`
+        : 'Aucun pack en inventaire.';
+    }
+    if (inventoryEmpty) inventoryEmpty.hidden = total > 0;
+    if (!inventoryGrid) return;
+    inventoryGrid.hidden = total === 0;
+    if (total === 0) {
+      inventoryGrid.innerHTML = '';
+      return;
+    }
+    const items = [
+      {
+        type: 'classic',
+        count: classic,
+        title: 'Booster Classique',
+        desc: '5 cartes aléatoires · Chances standard de rareté.',
+        img: PACK_IMAGES.classic,
+        rare: false,
+      },
+      {
+        type: 'rare',
+        count: rare,
+        title: 'Booster Rare',
+        desc: '5 cartes aléatoires · +20 % de chances sur les raretés.',
+        img: PACK_IMAGES.rare,
+        rare: true,
+      },
+    ].filter((item) => item.count > 0);
+    const canOpen = state.phase === 'pack' || state.phase === 'done';
+    inventoryGrid.innerHTML = items.map((item) => `
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}" data-pack-type="${item.type}">
+        <span class="inventory-qty-badge">×${item.count}</span>
+        <img class="inventory-card-img" src="${item.img}" alt="${item.title}">
+        <h3 class="inventory-card-title">${item.title}</h3>
+        <p class="inventory-card-desc">${item.desc}</p>
+        <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen ? '' : 'disabled'}>
+          OUVRIR UN PACK →
+        </button>
+      </article>
+    `).join('');
   }
 
   function selectPackType(type) {
@@ -2410,7 +2466,9 @@
       ? collView
       : tab === 'shop'
         ? shopView
-        : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
+        : tab === 'inventory'
+          ? inventoryView
+          : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
     if (view) {
       view.classList.remove('view-in');
       void view.offsetWidth;
@@ -2422,6 +2480,8 @@
       tabBadge.hidden = true;
     } else if (tab === 'shop') {
       renderShop();
+    } else if (tab === 'inventory') {
+      renderInventory();
     } else if (tab === 'pack') {
       renderPackInventory();
       // Les vues Pack étaient masquées : on remesure tout.
@@ -2513,6 +2573,14 @@
   }
   on(openClassic, 'click', () => openFromInventory('classic'));
   on(openRare, 'click', () => openFromInventory('rare'));
+  on(inventoryGoShop, 'click', () => setTab('shop'));
+  if (inventoryGrid) {
+    on(inventoryGrid, 'click', (e) => {
+      const btn = e.target.closest('[data-open-pack]');
+      if (!btn || btn.disabled) return;
+      openFromInventory(btn.dataset.openPack);
+    });
+  }
   if (shopView) {
     on(shopView, 'click', (e) => {
       const qtyBtn = e.target.closest('.qty-btn');
