@@ -2133,6 +2133,27 @@ html,body{background:var(--bg)}
 .chip i{width:6px;height:6px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c)}
 .chip.is-active{background:linear-gradient(100deg,#8b5cf6,#c026d3);border-color:transparent;color:#fff}
 
+/* Tri de la collection : un menu déroulant (9 critères) + un bouton qui
+   inverse le sens. Placé sous les filtres de rareté, au-dessus de la grille. */
+.coll-sort{display:flex;align-items:center;gap:7px;margin-top:7px}
+.coll-sort-field{flex:1 1 auto;display:flex;align-items:center;gap:7px;min-width:0;padding:6px 9px 6px 11px;
+  border:1px solid #2f2745;border-radius:99px;background:#ffffff06;color:#a79fbd;font-size:11.5px;font-weight:700}
+.coll-sort-field>span:first-child{color:#c4a1ff;font-size:13px}
+.coll-sort-field>span:nth-child(2){flex:0 0 auto;color:#8d84a8;font-size:10px;letter-spacing:.6px;text-transform:uppercase}
+.coll-sort-field select{flex:1 1 auto;min-width:0;padding:2px 4px;border:0;background:transparent;color:#fff;
+  font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;appearance:none;-webkit-appearance:none;
+  text-overflow:ellipsis}
+.coll-sort-field select:focus-visible{outline:2px solid #a78bfa;outline-offset:2px;border-radius:6px}
+.coll-sort-field select option{background:#160f20;color:#fff;font-weight:600}
+.coll-sort-field:focus-within{border-color:#6b4fc4}
+.coll-sort-dir{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;
+  padding:0;border:1px solid #2f2745;border-radius:50%;background:#ffffff06;color:#c4a1ff;font-size:14px;
+  font-weight:700;cursor:pointer;transition:transform .15s,color .2s,border-color .2s,background .2s}
+.coll-sort-dir:hover{border-color:#6b4fc4;color:#fff}
+.coll-sort-dir:active{transform:scale(.92)}
+.coll-sort-dir.is-flipped{color:#e9d4ff;background:#ffffff12}
+.coll-sort-dir.is-flipped span{display:inline-block;transform:rotate(180deg)}
+
 /* Demande de fusion : accessible depuis la Collection, là où vivent les doublons. */
 .coll-fusion{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:9px;padding:10px 14px;
   border:1px solid #5b3fa8;border-radius:12px;background:linear-gradient(100deg,#2a1a4d,#3a1f5e);

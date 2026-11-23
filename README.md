@@ -91,6 +91,10 @@ node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouve
 node tests/quest-flow.cjs            # 70 quêtes (récompenses en packs), 5 en parallèle, succès, niveaux, notifications
 ```
 
+## Tri de la collection
+
+L'onglet **Collection** se trie selon plusieurs critères, juste sous les filtres de rareté : **numéro de carte**, **rareté**, **exemplaires possédés**, **valeur des exemplaires**, **nom**, **shiny** ou **ajout récente** (dernière carte obtenue). Chaque critère a un sens naturel (numéro croissant, rareté de la plus rare à la plus commune, exemplaires du plus au moins…) ; le bouton rond **⇅** inverse ce sens d'un clic. Les filtres (possédées, shiny, rareté) et le tri se combinent, et le choix est mémorisé dans le navigateur (`localStorage`, clé `refs-cards:collection-sort`) : la collection se rouvre triée comme la dernière fois. Les cartes verrouillées suivent le même tri et affichent toujours leur numéro de carte (`N° 007`), pas leur position à l'écran.
+
 ## Page Shop (boutique + inventaire)
 
 La barre de navigation compte sept onglets : **Pack**, **Shop**, **Inventaire**, **Collection**, **En ligne**, **Quêtes** et **Compte**.
