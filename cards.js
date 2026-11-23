@@ -127,7 +127,7 @@ function cardVideoPath(value) {
 }
 
 /* Liste ordonnée des sources à essayer pour une carte vidéo :
-   1. la variante `srcByFps` la plus proche de `fps` (correspondance exacte
+1. la variante `srcByFps` la plus proche de `fps` (correspondance exacte
       d'abord), 2. la source principale `src`. Les chemins sans extension sont
       déclinés en .mp4 puis .webm. */
 function cardVideoSources(card) {
@@ -360,11 +360,20 @@ const cardsDatabase = [
     emoji: '🎄',
     color: '#8fc8ef',
     video: {
-      src: 'GeorgeSapin',
+      src: 'assets/Cartes/videos/GeorgeSapin.mp4',
       fps: 30,
       sound: true,
       loop: true
     }
+  },
+  {
+    id: 'le-cul-de-mathis',
+    name: 'Le cul de mathis',
+    description: 'joli fessier',
+    rarity: 'divine',
+    emoji: '🍑',
+    image: 'assets/Cartes/Mathiscul.jpeg',
+    color: '#bff3ff'
   }
 ];
 
