@@ -1554,8 +1554,11 @@
     const inner = el('span', 'card-inner');
     const tilt = el('span', 'card-tilt');
 
-    /* dos */
+    /* dos : derriere.png (bleu) recolore selon la couleur de la carte
+       (voir .card-back[data-back=...] dans styles.css et assets/derriere-*.jpg).
+       Une carte video a toujours le dos vert, quelle que soit sa rarete. */
     const back = el('span', 'card-face card-back');
+    back.dataset.back = cardVideoInfo(card) ? 'video' : card.rarity;
     const backTop = el('span', 'back-row');
     backTop.append(el('span', null, 'REFS CARDS'), el('span', null, '✳'));
     const emblem = el('span', 'back-emblem');
