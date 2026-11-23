@@ -21,13 +21,25 @@ Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'a
 
 ## Chargement des scripts
 
-`index.html` charge cinq fichiers locaux **comme scripts classiques, en `defer`**, dans cet ordre : `firebase-config.js`, `cards.js`, `quests.js`, `audio.js`, puis `app.js`.
+`index.html` charge six fichiers locaux **comme scripts classiques, en `defer`**, dans cet ordre : `firebase-config.js`, `cards.js`, `quests.js`, `audio.js`, `version-check.js`, puis `app.js`.
 
 - **Pas de `type="module"`** : `cards.js`, `quests.js`, `audio.js` et `app.js` partagent des variables globales (`cardsDatabase`, `RefsQuests`, `Sound`, `demoDraw`, `window.REFS_FIREBASE_CONFIG`). En modules ES, chaque fichier aurait sa propre portée et `app.js` ne verrait plus ces variables. Aucun fichier n'utilise `import`/`export`, donc un script classique est le bon mode de chargement.
 - **`defer`** : les scripts s'exécutent après l'analyse du DOM, sans bloquer l'affichage. `app.js` ajoute en plus un garde-fou (`DOMContentLoaded`) au cas où il serait déplacé dans `<head>` sans `defer`.
-- **`?v=…` sur chaque URL locale** : évite qu'un navigateur rejoue un ancien script resté en cache après une mise à jour. Incrémente le numéro (dans `index.html`) du fichier modifié (`app.js`, `cards.js`, `quests.js` ou `audio.js`) en production.
+- **`?v=…` sur chaque URL locale** : évite qu'un navigateur rejoue un ancien script resté en cache après une mise à jour. Incrémente le numéro (dans `index.html`) du fichier modifié (`app.js`, `cards.js`, `quests.js`, `audio.js`, `version-check.js` ou `styles.css`) en production. Ces `?v=` servent aussi de signature à la détection de mise à jour (voir plus bas).
 - **Aucun `addEventListener` sur un élément nul** : `app.js` passe par les helpers `on()` / `qs()`, qui se contentent d'un avertissement si un élément manque, et l'écran de compte comme le bouton Google restent fonctionnels.
 - **Filet de sécurité** : un petit script inline de `index.html` affiche un message dans l'écran de compte si `app.js` n'a pas démarré (cache obsolète, script bloqué). `app.js` signale son démarrage via `window.REFS_CARDS_READY`.
+
+## Mises à jour : bandeau « Nouvelle version disponible »
+
+Le site est statique : un onglet déjà ouvert continue d'exécuter les fichiers de son ancienne version après un déploiement. `version-check.js` compare donc la version chargée avec celle du `index.html` **en ligne** et, si elles diffèrent, affiche un bandeau en bas de l'écran : **« Nouvelle version disponible »** avec les boutons **Recharger** et **Plus tard**.
+
+- **Ce qui est comparé** : une signature composée du contenu de `<meta name="app-version">` (repère lisible, rappelé dans l'infobulle) et des URL locales de `index.html` (`styles.css?v=…`, `app.js?v=…`, …). Incrémenter n'importe quel `?v=` suffit donc à déclencher le bandeau ; la meta couvre une mise à jour purement HTML. Les URL absolues (SDK Firebase, Google Fonts, scripts d'extensions) sont ignorées, pour éviter les fausses alertes.
+- **Quand** : ~8 s après le chargement, puis toutes les 60 s, au retour sur l'onglet, au retour du focus et à la reconnexion réseau. La requête relit la page avec `cache: 'no-store'` (paramètre `_refs_update` en plus) : un `index.html` gardé en cache par l'hébergeur — Firebase Hosting applique un `max-age` par défaut — ne peut pas masquer un déploiement.
+- **Aucun rechargement automatique** : une ouverture de booster, une révélation ou une saisie en cours ne sont jamais interrompues. C'est le joueur qui clique sur **Recharger** (`location.reload()`, donc avec revalidation des fichiers et conservation de l'URL, `?demo=…` compris).
+- **Plus tard** : masque le bandeau pour cette version pendant la session (`sessionStorage`, clé `refs-cards:update-dismissed`). Un déploiement plus récent le réaffiche ; au prochain chargement de page, la vérification repart de zéro.
+- **Silencieux en cas de problème** : hors ligne, `fetch` indisponible (fichier local), réponse non-HTML ou page vide → aucune alerte, la page continue de fonctionner. Le bandeau s'affiche aussi par-dessus l'écran de compte (z-index 110), et le toast remonte (`body.has-update-banner`) pour ne pas être masqué.
+- **En déploiement** : à chaque mise en production, incrémente les `?v=` des fichiers modifiés **et** `<meta name="app-version">` dans `index.html`. Le bandeau n'apparaît que chez les onglets déjà ouverts : c'est exactement son rôle — les visiteurs qui arrivent après le déploiement reçoivent directement la nouvelle version.
+- **Réglages** : les constantes `FIRST_CHECK_DELAY`, `CHECK_INTERVAL` et `MIN_GAP` sont en tête de `version-check.js`. L'API `window.REFS_CARDS_VERSION_CHECK` expose `check(force)`, `state()`, `dismiss()` et `reload()` (utilisée par les tests et par les boutons).
 
 ## Dépannage : « je clique sur Se connecter avec Google et rien ne se passe »
 
@@ -53,6 +65,7 @@ npm install --no-save jsdom          # uniquement pour les tests
 npm test                             # toute la suite
 node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
+node tests/version-update.cjs        # bandeau « nouvelle version » : détection, Plus tard, Recharger
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/social-flow.cjs           # page Compte / En ligne (amis, profil, achat marché)
 node tests/market-flow.cjs           # ventes de cartes et de packs, cadeaux, récupération
