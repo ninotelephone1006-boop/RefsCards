@@ -90,6 +90,7 @@ function todayKey() {
   /* 0. Fichiers de packs présents + prix dans le HTML. */
   assert.ok(fs.existsSync('assets/packet.png'), 'packet.png doit exister');
   assert.ok(fs.existsSync('assets/packetrare.png'), 'packetrare.png doit exister');
+  assert.ok(fs.existsSync('assets/packetlegende.png'), 'packetlegende.png doit exister');
   const html = fs.readFileSync('index.html', 'utf8');
   assert.match(html, /data-tab="shop"/, 'onglet Shop présent');
   assert.match(html, /id="shop-view"/, 'vue Shop présente');
@@ -100,6 +101,7 @@ function todayKey() {
   const appSrc = fs.readFileSync('app.js', 'utf8');
   assert.match(appSrc, /classic:\s*500/, 'pack classique à 500');
   assert.match(appSrc, /rare:\s*1000/, 'pack rare à 1000');
+  assert.match(appSrc, /legend:\s*800/, 'pack légende à 800');
   assert.match(appSrc, /FREE_PER_DAY\s*=\s*3/, '3 gratuits par jour');
   assert.match(appSrc, /RARE_BOOST\s*=\s*1\.2/, 'pack rare +20 %');
   console.log('PASS prix boutique (500 / 1 000), 3 gratuits, rare +20 %');
@@ -183,7 +185,33 @@ function todayKey() {
     console.log('PASS pack rare : image dorée, chances +20 %, achat 1 000');
   }
 
-  /* 5. Inventaire vide : bouton « Aller au Shop » visible dans l'onglet Pack. */
+  /* 5. Pack légendaire : 10 cartes, 800 🪙, pas de boost de rareté. */
+  {
+    const { w, doc, store } = await boot({
+      coins: 1600, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      packStock: { classic: 0, rare: 0, legend: 0 }, freeDate: todayKey(), freeUsed: 0
+    });
+    doc.querySelector('.qty-chip[data-pack="legend"][data-qty="1"]').click();
+    await wait(20);
+    assert.equal(doc.getElementById('qty-legend').textContent, '1');
+    assert.match(doc.getElementById('buy-legend').textContent.replace(/\s/g, ' '), /800/);
+    doc.getElementById('buy-legend').click();
+    await wait(400);
+    assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '800');
+    assert.match(doc.getElementById('open-legend').textContent, /×1/);
+    assert.match(doc.getElementById('shop-stock-legend').textContent, /1/);
+    assert.equal(store.playerSaves.me.packStock.legend, 1, 'inventaire légende persisté');
+    assert.equal(store.playerSaves.me.coins, 800, 'solde persisté');
+    // Sélection du pack légende : image légende, pas de note +20 %.
+    doc.getElementById('open-legend').click();
+    await wait(20);
+    assert.match(doc.getElementById('pack-img-main').getAttribute('src'), /packetlegende\.png/);
+    assert.equal(doc.getElementById('pack-odds').textContent.indexOf('+20 %'), -1, 'pas de boost rare sur le pack légende');
+    w.close();
+    console.log('PASS pack légende : image, 800 🪙, stock, pas de boost de rareté');
+  }
+
+  /* 6. Inventaire vide : bouton « Aller au Shop » visible dans l'onglet Pack. */
   {
     const { w, doc } = await boot({
       coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,

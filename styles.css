@@ -1144,7 +1144,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   gap: 6px;
   justify-content: center;
   overflow: hidden;
-  max-height: 120px;
+  max-height: 560px;
   transition: max-height 0.42s var(--ease-out), opacity 0.28s ease, margin 0.4s;
 }
 .recap.is-collapsed .recap-slots {
