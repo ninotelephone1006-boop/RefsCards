@@ -185,12 +185,19 @@ function todayKey() {
     console.log('PASS pack rare : image dorée, chances +20 %, achat 1 000');
   }
 
-  /* 5. Pack légendaire : 10 cartes, 800 🪙, pas de boost de rareté. */
+  /* 5. Pack légendaire : 10 cartes, 800 🪙, visible immédiatement dans l'onglet Inventaire et Pack sans recharger la page. */
   {
     const { w, doc, store } = await boot({
       coins: 1600, firstPack: false, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0, legend: 0 }, freeDate: todayKey(), freeUsed: 0
     });
+    // Avant achat : inventaire vide et badge caché.
+    assert.equal(doc.getElementById('tab-badge-inventory').hidden, true);
+    assert.equal(doc.getElementById('inventory-empty').hidden, false);
+    assert.equal(doc.getElementById('inventory-grid').hidden, true);
+
+    doc.querySelector('[data-tab="shop"]').click();
+    await wait(20);
     doc.querySelector('.qty-chip[data-pack="legend"][data-qty="1"]').click();
     await wait(20);
     assert.equal(doc.getElementById('qty-legend').textContent, '1');
@@ -202,13 +209,29 @@ function todayKey() {
     assert.match(doc.getElementById('shop-stock-legend').textContent, /1/);
     assert.equal(store.playerSaves.me.packStock.legend, 1, 'inventaire légende persisté');
     assert.equal(store.playerSaves.me.coins, 800, 'solde persisté');
-    // Sélection du pack légende : image légende, pas de note +20 %.
-    doc.getElementById('open-legend').click();
+
+    // Sans recharger la page, l'onglet Inventaire affiche immédiatement le pack Légende.
+    doc.querySelector('[data-tab="inventory"]').click();
     await wait(20);
+    assert.equal(doc.getElementById('tab-badge-inventory').hidden, false, 'badge Inventaire affiché pour un pack légende');
+    assert.equal(doc.getElementById('inventory-empty').hidden, true, 'message vide masqué');
+    assert.equal(doc.getElementById('inventory-grid').hidden, false, 'grille Inventaire visible');
+    assert.match(doc.getElementById('inventory-summary').textContent, /1 pack prêt/);
+    const legendCard = doc.querySelector('.inventory-card[data-pack-type="legend"]');
+    assert.ok(legendCard, 'carte Booster Légende présente dans l\'inventaire');
+    assert.match(legendCard.textContent, /×1/);
+    assert.match(legendCard.textContent, /Booster Légende/);
+
+    // Ouvrir depuis l'onglet Inventaire sélectionne et affiche le pack Légende (10 cartes).
+    legendCard.querySelector('[data-open-pack="legend"]').click();
+    await wait(20);
+    assert.equal(doc.getElementById('app').dataset.tab, 'pack');
+    assert.equal(doc.getElementById('pack-area').hidden, false, 'booster légende visible sans reload');
     assert.match(doc.getElementById('pack-img-main').getAttribute('src'), /packetlegende\.png/);
+    assert.equal(doc.querySelectorAll('.gap-cards i').length, 10, '10 cartes dans le booster légende');
     assert.equal(doc.getElementById('pack-odds').textContent.indexOf('+20 %'), -1, 'pas de boost rare sur le pack légende');
     w.close();
-    console.log('PASS pack légende : image, 800 🪙, stock, pas de boost de rareté');
+    console.log('PASS pack légende : visible immédiatement dans Inventaire et Pack sans reload, 800 🪙, 10 cartes');
   }
 
   /* 6. Inventaire vide : bouton « Aller au Shop » visible dans l'onglet Pack. */
