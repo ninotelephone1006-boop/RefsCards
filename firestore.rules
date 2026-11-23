@@ -171,11 +171,21 @@ service cloud.firestore {
         && request.resource.data.status == 'pending' && request.resource.data.createdAt is timestamp
         && afterSave().coins == beforeSave().coins - request.resource.data.amount
         && afterSave().collection == beforeSave().collection;
-      allow update: if signedIn() && resource.data.toUid == request.auth.uid
-        && resource.data.status == 'pending' && request.resource.data.status == 'claimed'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && afterSave().coins == beforeSave().coins + resource.data.amount
-        && afterSave().collection == beforeSave().collection;
+      allow update: if signedIn() && (
+        // Le destinataire encaisse le cadeau une seule fois.
+        (resource.data.toUid == request.auth.uid
+          && resource.data.status == 'pending' && request.resource.data.status == 'claimed'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && afterSave().coins == beforeSave().coins + resource.data.amount
+          && afterSave().collection == beforeSave().collection)
+        ||
+        // L'expéditeur annule un cadeau pas encore récupéré : il est remboursé.
+        (resource.data.fromUid == request.auth.uid
+          && resource.data.status == 'pending' && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && afterSave().coins == beforeSave().coins + resource.data.amount
+          && afterSave().collection == beforeSave().collection)
+      );
       allow delete: if false;
     }
 

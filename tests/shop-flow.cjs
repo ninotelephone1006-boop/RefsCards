@@ -15,7 +15,9 @@ function makeStore(save) {
     playerProfiles: {},
     friendCodes: {},
     friendRequests: {},
-    trades: {}
+    trades: {},
+    marketListings: {},
+    coinGifts: {}
   };
 }
 

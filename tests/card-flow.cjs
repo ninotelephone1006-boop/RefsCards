@@ -25,11 +25,16 @@ const assert = require('node:assert/strict');
     const present = sources.filter((src) => fs.existsSync(src));
     assert.ok(present.length >= cardCount - 1, 'presque toutes les images doivent exister');
     // Start the reveal directly; the pack tear is unrelated to this regression.
-    vm.runInContext(fs.readFileSync('app.js', 'utf8').replace('  boot();', '  boot(); showReveal();'), context);
+    /* `boot();` est appelé dans start() (garde-fou DOMContentLoaded) : on
+       choisit l'indentation réelle pour lancer aussi la révélation. */
+    vm.runInContext(fs.readFileSync('app.js', 'utf8').replace(/(^\s*)boot\(\);$/m, '$1boot(); showReveal();'), context);
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     await wait(30);
     const next = w.document.getElementById('next-card');
     assert.ok(next.hidden);
+    /* La pile est montée juste après le démarrage (délai/animation) : on
+       attend la première carte plutôt qu'un délai fixe trop court. */
+    for (let tries = 0; tries < 40 && !w.document.querySelector('.card.is-top'); tries++) await wait(25);
     for (let i = 0; i < 5; i++) {
       const card = w.document.querySelector('.card.is-top');
       assert.ok(card);

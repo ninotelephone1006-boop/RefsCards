@@ -100,7 +100,10 @@ async function collectPack(doc) {
     const save = {
       coins: 0, firstPack: false, packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, freeDate: null, freeUsed: 0,
-      collection: ['chasseur-royer', 'chasseur-royer', 'toilet-call', 'gros-plan-royer'],
+      /* Aucune carte de rareté « supérieure » (uncommon) n'est possédée : le
+         résultat aléatoire de la fusion ne peut donc pas recréer un doublon
+         (sinon le test échouait une fois sur trois, au hasard). */
+      collection: ['chasseur-royer', 'chasseur-royer', 'petite-degustation', 'gros-plan-royer'],
       friends: []
     };
     const { w, doc, store } = await boot({ save });
@@ -126,7 +129,7 @@ async function collectPack(doc) {
     const saved = store.playerSaves.me.collection;
     assert.equal(saved.length, 3, 'deux exemplaires consommés, un résultat ajouté');
     assert.equal(saved.filter((id) => id === 'chasseur-royer').length, 0, 'les deux Chasseur Royer ont fusionné');
-    assert.ok(saved.includes('toilet-call') && saved.includes('gros-plan-royer'), 'les autres cartes restent');
+    assert.ok(saved.includes('petite-degustation') && saved.includes('gros-plan-royer'), 'les autres cartes restent');
     await wait(400);
     assert.equal(doc.getElementById('coll-fusion').hidden, true, 'plus de doublon = bouton masqué');
     w.close();

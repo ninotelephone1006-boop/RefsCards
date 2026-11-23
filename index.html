@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-2" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-5" defer></script>
+  <script src="app.js?v=2026.11.24-1" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -386,9 +386,12 @@
               <button class="mini-btn primary" id="market-submit" type="submit">Mettre en vente</button>
             </form>
             <div id="my-listings" class="trades-list"></div>
-            <h3>Pièces à récupérer</h3>
-            <p class="online-empty">Les ventes et cadeaux reçus restent ici, même si tu étais hors ligne.</p>
+            <h3>Pièces à récupérer <span class="friends-count" id="market-inbox-count">0</span></h3>
+            <p class="online-empty">Les ventes et cadeaux reçus restent ici, même si tu étais hors ligne. Ils arrivent aussi tout seuls : la page se met à jour dès qu’un ami t’envoie des pièces.</p>
             <div id="market-inbox" class="trades-list"></div>
+            <h3>Cadeaux envoyés</h3>
+            <p class="online-empty">Les pièces envoyées restent réservées jusqu’à ce que ton ami les récupère. Tu peux annuler un cadeau encore en attente : les pièces te sont alors rendues.</p>
+            <div id="market-sent" class="trades-list"></div>
             <button id="market-refresh" class="mini-btn" type="button">Actualiser les ventes et cadeaux</button>
             <p id="market-message" class="online-msg" role="status"></p>
           </section>
