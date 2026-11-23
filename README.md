@@ -82,17 +82,31 @@ service cloud.firestore {
     // la demande, le destinataire l'accepte ou la refuse (« on ne devient ami
     // que si l'autre accepte »). Les deux parties peuvent lire et mettre à jour
     // la demande ; personne d'autre.
+    //
+    // L'identifiant du document porte les deux uids ({fromUid}__{toUid}) :
+    // on s'en sert pour autoriser la lecture, y compris quand le document
+    // N'EXISTE PAS (resource == null). Sans cela, « ai-je déjà reçu une
+    // demande de ce joueur ? » renvoyait permission-denied au lieu de « non ».
     match /friendRequests/{requestId} {
+      function uidInId() {
+        return request.auth != null
+          && (requestId.matches('^' + request.auth.uid + '__.+$')
+              || requestId.matches('^.+__' + request.auth.uid + '$'));
+      }
       function isParty() {
         return request.auth != null
+          && resource != null
           && (request.auth.uid == resource.data.fromUid
               || request.auth.uid == resource.data.toUid);
       }
-      allow read: if isParty();
+      allow get: if uidInId() || isParty();
+      allow list: if isParty();
       allow create: if request.auth != null
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.toUid != request.auth.uid
         && request.resource.data.toUid is string
+        && request.resource.data.toUid.size() > 0
+        && requestId == request.resource.data.fromUid + '__' + request.resource.data.toUid
         && request.resource.data.status == 'pending';
       allow update: if isParty()
         && request.resource.data.fromUid == resource.data.fromUid
@@ -193,7 +207,7 @@ La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**,
 
 ### Page En ligne
 
-- **Demande d'ami par code** : saisis le code ami d'un joueur (`REFS-XXXXXX`, le préfixe, les tirets et la casse sont tolérés), l'annuaire retrouve son uid et une **demande d'ami** est créée (`friendRequests/{moi}__{lui}`, statut `pending`). Personne n'est ajouté d'office : le destinataire doit **accepter**.
+- **Demande d'ami par code** : saisis le code ami d'un joueur (`REFS-XXXXXX`, le préfixe, les tirets et la casse sont tolérés), l'annuaire retrouve son uid et une **demande d'ami** est créée (`friendRequests/{moi}__{lui}`, statut `pending`). Personne n'est ajouté d'office : le destinataire doit **accepter**. Dès que le code est reconnu, un aperçu (photo de profil + pseudo) du joueur s'affiche sous le champ.
 - **Demandes reçues / envoyées** : la page En ligne liste les demandes reçues avec **Accepter** / **Refuser** et les demandes envoyées en attente (avec **Annuler**). Quand le destinataire accepte, **les deux joueurs deviennent amis** : chacun enregistre l'autre dans sa propre liste (`friends` de sa sauvegarde privée) — immédiatement si l'expéditeur est en ligne (temps réel), sinon à sa prochaine connexion. Une demande refusée n'ajoute aucun ami.
 - **Profil d'un ami** : photo, pseudo, code ami, stats (pièces, cartes, uniques, meilleure rareté) et **ses cartes** avec leurs exemplaires, montrées dans une grille régulière (ratio 5:7) avec les boutons Échanger / Acheter sous chaque carte.
 - **Échanger** : sur une carte d'un ami, choisis une de tes cartes à lui donner ; une proposition d'échange est créée (`trades/{id}`, statut `pending`). L'ami la voit dans « Échanges reçus » et peut accepter ou refuser.
