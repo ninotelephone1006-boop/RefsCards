@@ -424,6 +424,15 @@ const cardsDatabase = [
     emoji: '🐷',
     image: 'assets/Cartes/cochon-bierry.jpeg',
     color: '#ffb372'
+  },
+  {
+    id: 'king-nino',
+    name: 'King Nino',
+    description: 'il est de droite (encore plus)',
+    rarity: 'legendary',
+    emoji: '👑',
+    image: 'assets/Cartes/king-nino.jpeg',
+    color: '#f5d979'
   }
 ];
 
