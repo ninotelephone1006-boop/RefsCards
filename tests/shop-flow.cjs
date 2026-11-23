@@ -1,6 +1,6 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/shop-flow.cjs
 // Vérifie la boutique : prix équilibrés (500 / 1 000), achats multiples dans
-// l'inventaire, 3 packs gratuits par jour, pack rare (+20 %) et navigation
+// l'inventaire, 3 packs gratuits par jour, pack rare (raretés élevées boostées) et navigation
 // « Aller au Shop » depuis le récap (plus d'achat direct à 100 🪙).
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
@@ -104,8 +104,10 @@ function todayKey() {
   assert.match(appSrc, /rare:\s*1000/, 'pack rare à 1000');
   assert.match(appSrc, /legend:\s*800/, 'pack légende à 800');
   assert.match(appSrc, /FREE_PER_DAY\s*=\s*3/, '3 gratuits par jour');
-  assert.match(appSrc, /RARE_BOOST\s*=\s*1\.2/, 'pack rare +20 %');
-  console.log('PASS prix boutique (500 / 1 000), 3 gratuits, rare +20 %');
+  assert.match(appSrc, /RARE_RANK_FACTOR_BASE/, 'pack rare : boost par rang (base)');
+  assert.match(appSrc, /RARE_RANK_FACTOR_STEP/, 'pack rare : boost par rang (step)');
+  assert.doesNotMatch(appSrc, /RARE_BOOST\s*=\s*1\.2/, 'ancien boost plat +20 % supprimé');
+  console.log('PASS prix boutique (500 / 1 000), 3 gratuits, rare boost par rang');
 
   /* 1. Achat multiple : quantité 5 classique = 2 500 🪙, inventaire +5. */
   {
@@ -176,14 +178,26 @@ function todayKey() {
     assert.equal(doc.getElementById('app').dataset.tab, 'pack');
     await wait(20);
     assert.match(doc.getElementById('pack-img-main').getAttribute('src'), /packetrare\.png/);
-    assert.match(doc.getElementById('pack-odds').textContent, /\+20 %/);
+    const oddsText = doc.getElementById('pack-odds').textContent;
+    assert.match(oddsText, /RARETÉS ÉLEVÉES PLUS FRÉQUENTES/);
+    assert.doesNotMatch(oddsText, /\+20 %/);
+    const pct = (key) => {
+      const row = doc.querySelector(`#pack-odds .odds-${key}`);
+      assert.ok(row, `ligne odds manquante: ${key}`);
+      const m = row.textContent.match(/([0-9]+(?:[.,][0-9]+)?)\s*%/);
+      assert.ok(m, `pourcentage introuvable pour ${key}`);
+      return parseFloat(m[1].replace(',', '.'));
+    };
+    assert.ok(pct('rare') > pct('common'), 'rare doit être plus fréquent que commune en pack rare');
+    assert.ok(pct('divine') > 1.5, 'divine doit être un peu plus fréquente en pack rare');
+    assert.ok(pct('secret') > 0.5, 'secrète doit être un peu plus fréquente en pack rare');
     // Achat rare ×1 = 1 000 🪙.
     doc.getElementById('buy-rare').click();
     await wait(400);
     assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '4 000');
     assert.match(doc.getElementById('open-rare').textContent, /×2/);
     w.close();
-    console.log('PASS pack rare : image dorée, chances +20 %, achat 1 000');
+    console.log('PASS pack rare : image dorée, raretés élevées boostées, achat 1 000');
   }
 
   /* 5. Pack légendaire : 10 cartes, 800 🪙, visible immédiatement dans l'onglet Inventaire et Pack sans recharger la page. */
