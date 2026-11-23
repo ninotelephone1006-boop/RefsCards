@@ -358,7 +358,6 @@ const cardsDatabase = [
     description: 'skibidi sapin',
     rarity: 'rare',
     emoji: '🎄',
-    image: 'assets/Cartes/sapin-george.jpg',
     color: '#8fc8ef',
     video: {
       src: 'GeorgeSapin',
@@ -375,7 +374,9 @@ const cardsDatabase = [
    `video` dans cardsDatabase (voir l'en-tête de ce fichier) et fichiers dans
    assets/Cartes/videos/. Le Pack Vidéo tire alors automatiquement toutes les
    cartes ainsi configurées — et uniquement elles : ces cartes ne sortent pas
-   des autres boosters. */
+   des autres boosters. Sans `image` ni `poster`, la vidéo est elle-même la
+   couverture de la carte (l'emoji de secours reste affiché le temps du
+   chargement). */
 
 /* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */
