@@ -165,8 +165,17 @@ const cardsDatabase = [
     description: 'un gay refouler',
     rarity: 'uncommon',
     emoji: '💘',
-    image: 'assets/Cartes/mathis date.jpg',
+    image: 'assets/Cartes/mathis-date.jpg',
     color: '#9dbfc4'
+  },
+  {
+    id: 'sigma-babault',
+    name: 'Sigma Babault',
+    description: 'CowBoy amaury',
+    rarity: 'legendary',
+    emoji: '🤠',
+    image: 'assets/Cartes/sigma babault.jpg',
+    color: '#f5d979'
   }
 ];
 
