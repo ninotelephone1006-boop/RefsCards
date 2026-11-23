@@ -176,6 +176,15 @@ const cardsDatabase = [
     emoji: '🤠',
     image: 'assets/Cartes/sigma babault.jpg',
     color: '#f5d979'
+  },
+  {
+    id: 'fagar-gros-plan',
+    name: 'Fagar gros plan',
+    description: 'skibidi gros plan de fagar',
+    rarity: 'rare',
+    emoji: '🔍',
+    image: 'assets/Cartes/fagarzoom.jpeg',
+    color: '#8fc8ef'
   }
 ];
 
