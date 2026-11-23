@@ -197,7 +197,7 @@
        Ouvrir un pack en consomme 1. `currentPackType` = pack choisi dans
        l'onglet Pack. `freeDate`/`freeUsed` = quota quotidien (date locale
        AAAA-MM-JJ + nombre déjà récupérés, 0..FREE_PER_DAY). */
-    packStock: { classic: 0, rare: 0 },
+    packStock: { classic: 0, rare: 0, legend: 0 },
     currentPackType: 'classic',
     freeDate: '',
     freeUsed: 0,
@@ -365,7 +365,8 @@
   function renderInventory() {
     const classic = state.packStock.classic || 0;
     const rare = state.packStock.rare || 0;
-    const total = classic + rare;
+    const legend = state.packStock.legend || 0;
+    const total = classic + rare + legend;
     if (tabBadgeInventory) tabBadgeInventory.hidden = total <= 0;
     if (inventorySummary) {
       inventorySummary.textContent = total > 0
@@ -398,9 +399,9 @@
       },
       {
         type: 'legend',
-        count: state.packStock.legend || 0,
+        count: legend,
         title: 'Booster Légende',
-        desc: '10 cartes aléatoires · chances standard de rareté.',
+        desc: '10 cartes aléatoires · Chances standard de rareté.',
         img: PACK_IMAGES.legend,
         rare: false,
       },
@@ -419,13 +420,13 @@
     `).join('');
   }
 
-  function selectPackType(type) {
+  function selectPackType(type, { silent = false } = {}) {
     if (type !== 'classic' && type !== 'rare' && type !== 'legend') return;
     state.currentPackType = type;
     const src = PACK_IMAGES[type];
     if (packImgMain) packImgMain.src = src;
     if (packImgFlap) packImgFlap.src = src;
-    SFX.tick();
+    if (!silent) SFX.tick();
     renderPackInventory();
     const gapCards = document.querySelector('.gap-cards');
     if (gapCards) {
@@ -444,6 +445,9 @@
     }
     state.freeUsed += 1;
     state.packStock.classic = (state.packStock.classic || 0) + 1;
+    if ((state.packStock[state.currentPackType] || 0) <= 0) {
+      selectPackType('classic', { silent: true });
+    }
     SFX.chaChing();
     setFreeMsg(`Pack gratuit ajouté à ton inventaire (${freeRemaining()} restant${freeRemaining() > 1 ? 's' : ''} aujourd'hui).`);
     showToast('Pack gratuit ajouté à ton inventaire !');
@@ -462,57 +466,89 @@
       return;
     }
     SFX.chaChing();
-    addCoins(-total);
     state.packStock[type] = (state.packStock[type] || 0) + qty;
+    if ((state.packStock[state.currentPackType] || 0) <= 0) {
+      selectPackType(type, { silent: true });
+    }
+    addCoins(-total);
     setShopMsg(`${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''} ajouté${qty > 1 ? 's' : ''} à ton inventaire !`);
     showToast(`${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''} dans l'inventaire !`);
-    save();
     renderShop();
     renderPackInventory();
   }
 
   /* --------------------------------------------------------------- tirage */
 
-  /* Pourcentage effectif d'une rareté pour un type de pack. Pack rare : la
-     chance d'obtenir chaque rareté Rare et plus (rank >= 2) est réellement
-     multipliée par RARE_BOOST (1,2 = +20 % de chances, ex. Légendaire 2,5 %
-     → 3 %). Le surplus est pris sur les Communes/Inhabituelles, dont les
-     pourcentages sont réduits au prorata : le total reste égal à 100 %. */
+  /* Poids unitaire d'une carte selon sa rareté. Chaque carte porte le poids de
+     sa rareté (plutôt que de répartir tout le palier entre ses cartes) : sinon,
+     une rareté ne comptant qu'une seule carte — comme Commune avec « Chasseur
+     Royer » — raflerait à elle seule 30 % de tous les tirages.
+     En pack rare (boosted) : chaque carte Rare et plus (rank >= 2) gagne +20 %
+     de chances relatives (×1,2), compensées sur les Communes/Inhabituelles afin
+     que le total reste identique. Dans un même booster, un 2e exemplaire d'une
+     carte déjà tirée est atténué (×0,5) et plafonné à 2 copies identiques. */
   const HIGH_RANK = RARITIES.rare.rank;
-  const LOW_BASE = Object.values(RARITIES).filter((r) => r.rank < HIGH_RANK).reduce((s, r) => s + r.weight, 0);
-  const HIGH_BASE = Object.values(RARITIES).filter((r) => r.rank >= HIGH_RANK).reduce((s, r) => s + r.weight, 0);
-  const LOW_BOOSTED_FACTOR = (LOW_BASE + HIGH_BASE - HIGH_BASE * RARE_BOOST) / LOW_BASE;
+  const MAX_SAME_CARD_PER_PACK = 2;
+  const SECOND_COPY_WEIGHT_FACTOR = 0.5;
 
-  function rarityWeight(key, boosted) {
-    const info = RARITIES[key];
+  function cardBaseWeight(card, boosted) {
+    const info = card && RARITIES[card.rarity];
     if (!info) return 0;
     if (!boosted) return info.weight;
-    return info.rank >= HIGH_RANK ? info.weight * RARE_BOOST : info.weight * LOW_BOOSTED_FACTOR;
+    let lowBase = 0;
+    let highBase = 0;
+    for (const c of cardsDatabase) {
+      const r = RARITIES[c.rarity];
+      if (!r) continue;
+      if (r.rank < HIGH_RANK) lowBase += r.weight;
+      else highBase += r.weight;
+    }
+    if (lowBase <= 0 || highBase <= 0) return info.weight;
+    const totalBase = lowBase + highBase;
+    const boostedHigh = Math.min(totalBase, highBase * RARE_BOOST);
+    const highFactor = boostedHigh / highBase;
+    const lowFactor = (totalBase - boostedHigh) / lowBase;
+    return info.weight * (info.rank >= HIGH_RANK ? highFactor : lowFactor);
   }
 
-  function pickCard(forcedRarity, boosted) {
-    const available = Object.keys(RARITIES).filter((r) => cardsDatabase.some((c) => c.rarity === r));
-    if (!available.length) return null;
-    let rarity = forcedRarity;
-    if (!rarity || !available.includes(rarity)) {
-      // Tirage pondéré : chaque rareté garde exactement son pourcentage annoncé,
-      // puis la carte est tirée au hasard à l'intérieur de la rareté.
-      const total = available.reduce((sum, r) => sum + rarityWeight(r, boosted), 0);
-      let roll = Math.random() * total;
-      rarity = available[available.length - 1];
-      for (const r of available) {
-        if ((roll -= rarityWeight(r, boosted)) < 0) {
-          rarity = r;
-          break;
-        }
-      }
+  function rarityWeight(key, boosted) {
+    const cards = cardsDatabase.filter((c) => c.rarity === key);
+    if (!cards.length) return 0;
+    return cards.reduce((sum, c) => sum + cardBaseWeight(c, boosted), 0);
+  }
+
+  function pickCard(forcedRarity, boosted, packCounts) {
+    const validCards = cardsDatabase.filter((c) => RARITIES[c.rarity]);
+    if (!validCards.length) return null;
+    let candidates = forcedRarity
+      ? validCards.filter((c) => c.rarity === forcedRarity)
+      : validCards;
+    if (!candidates.length) candidates = validCards;
+    if (packCounts) {
+      const underCap = candidates.filter((c) => (packCounts.get(c.id) || 0) < MAX_SAME_CARD_PER_PACK);
+      if (underCap.length) candidates = underCap;
     }
-    const pool = cardsDatabase.filter((c) => c.rarity === rarity);
-    return pool[Math.floor(Math.random() * pool.length)];
+    const weights = candidates.map((c) => {
+      const copies = packCounts ? (packCounts.get(c.id) || 0) : 0;
+      const dupFactor = copies >= 1 ? SECOND_COPY_WEIGHT_FACTOR : 1;
+      return cardBaseWeight(c, boosted) * dupFactor;
+    });
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    if (total <= 0) return candidates[Math.floor(Math.random() * candidates.length)];
+    let roll = Math.random() * total;
+    for (let i = 0; i < candidates.length; i++) {
+      if ((roll -= weights[i]) < 0) return candidates[i];
+    }
+    return candidates[candidates.length - 1];
   }
 
   function drawPack(boosted) {
     const drawn = [];
+    const packCounts = new Map();
+    const record = (card) => {
+      drawn.push(card);
+      packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
+    };
     const params = new URLSearchParams(window.location.search);
     const demoMode = params.get('demo') || sessionStorage.getItem('refs-demo');
     const wantsDemo = demoMode === '1' || demoMode === 'fusion';
@@ -523,13 +559,13 @@
         : (typeof demoDraw !== 'undefined' ? demoDraw : []);
       demoList.slice(0, cardCountFor(state.currentPackType)).forEach((id) => {
         const found = cardsDatabase.find((c) => c.id === id);
-        if (found) drawn.push(found);
+        if (found) record(found);
       });
     }
     while (drawn.length < cardCountFor(state.currentPackType)) {
-      const card = pickCard(null, boosted);
+      const card = pickCard(null, boosted, packCounts);
       if (!card) break;
-      drawn.push(card);
+      record(card);
     }
     // Tri croissant : la carte la moins rare est révélée en premier, la plus
     // rare reste au fond de la pile pour faire monter la tension.
@@ -996,6 +1032,7 @@
         state.packStock[type] -= 1;
         state.packsOpened = (state.packsOpened || 0) + 1;
         save();
+        renderShop();
         renderPackInventory();
       }
     }
@@ -1184,9 +1221,10 @@
     backTop.append(el('span', null, 'REFS CARDS'), el('span', null, '✳'));
     const emblem = el('span', 'back-emblem');
     emblem.append(el('i'), el('i'), el('span', 'back-star', '✳'));
+    const numStr = String(index + 1).padStart(2, '0');
     const backBottom = el('span', 'back-row bottom');
-    backBottom.append(el('span', null, 'UNE SURPRISE T\'ATTEND'), el('span', null, `0${index + 1}`));
-    const backNum = el('span', 'back-num', `0${index + 1}`);
+    backBottom.append(el('span', null, 'UNE SURPRISE T\'ATTEND'), el('span', null, numStr));
+    const backNum = el('span', 'back-num', numStr);
     back.append(backTop, emblem, backBottom, backNum);
 
     /* face : le visuel plein cadre + les surcouches titre / description / id */
@@ -1905,7 +1943,8 @@
   }
 
   function renderRecapFromCollection() {
-    const last = state.collection.slice(-CARD_COUNT);
+    const slotCount = recapSlots.children.length || CARD_COUNT;
+    const last = state.collection.slice(-slotCount);
     [...recapSlots.children].forEach((s, i) => {
       s.className = 'slot';
       s.style.removeProperty('--slot-color');
@@ -2077,10 +2116,8 @@
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const pct = boosted ? (rarityWeight(key, true) / total) * 100 : r.weight;
-      const label = boosted
-        ? `${r.label} ${pct.toFixed(1).replace('.', ',')} %`
-        : `${r.label} ${String(r.weight).replace('.', ',')} %`;
+      const pct = total > 0 ? (rarityWeight(key, boosted) / total) * 100 : r.weight;
+      const label = `${r.label} ${pct.toFixed(1).replace(/\.0$/, '').replace('.', ',')} %`;
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
@@ -2512,6 +2549,9 @@
 
   function setTab(tab) {
     if (app.dataset.tab === tab) return;
+    if (tab === 'pack' && state.phase === 'done' && packTotal() > 0) {
+      resetToPack();
+    }
     app.dataset.tab = tab;
     tabs.forEach((t) => {
       const on = t.dataset.tab === tab;
@@ -4404,6 +4444,9 @@
           rare: Math.max(0, Number(result.packStock.rare) || 0),
           legend: Math.max(0, Number(result.packStock.legend) || 0)
         };
+        if ((state.packStock[state.currentPackType] || 0) <= 0 && packTotal() > 0) {
+          selectPackType(state.packStock.classic > 0 ? 'classic' : state.packStock.rare > 0 ? 'rare' : 'legend', { silent: true });
+        }
       }
       updateCoins(); renderCollection(); renderShop(); renderAccount(); renderPackInventory(); saveProfileSoon();
     };

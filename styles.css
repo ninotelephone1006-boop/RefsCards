@@ -1141,6 +1141,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .recap-slots {
   grid-area: slots;
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
   overflow: hidden;
@@ -1700,7 +1701,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
     grid-template-areas: 'head head' 'slots actions';
     align-items: center;
   }
-  .recap-slots { justify-content: flex-start; max-width: 440px; gap: 7px; }
+  .recap-slots { justify-content: flex-start; max-width: 520px; gap: 7px; }
   .slot { height: 58px; }
   .slot-mini .mini-emoji { font-size: 22px; }
   .slot-mini .mini-name { display: block; }

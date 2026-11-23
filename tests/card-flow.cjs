@@ -52,4 +52,50 @@ const assert = require('node:assert/strict');
     dom.window.close();
     console.log(`PASS card flow and image paths at viewport width ${width} (DOM simulation)`);
   }
+
+  /* Vérifie l'équilibrage du tirage hors démo : Chasseur Royer (seule carte
+     commune) ne doit plus monopoliser ~30 % des cartes ni sortir en 3+ copies
+     dans un même booster (classique 5 cartes ou légende 10 cartes). */
+  {
+    const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
+      url: 'https://example.test/', runScripts: 'outside-only', pretendToBeVisual: true
+    });
+    const w = dom.window;
+    w.matchMedia = () => ({ matches: true, addEventListener() {} });
+    const noop = () => {};
+    const ctx = new Proxy({}, { get: () => noop, set: () => true });
+    w.HTMLCanvasElement.prototype.getContext = () => ctx;
+    w.Sound = new Proxy({}, { get: () => noop });
+    const context = dom.getInternalVMContext();
+    vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+    vm.runInContext(
+      fs.readFileSync('app.js', 'utf8').replace(
+        /\}\)\(\);\s*$/,
+        '  window.__testDraw = (type, boosted) => { state.currentPackType = type; return drawPack(boosted); };\n})();\n'
+      ),
+      context
+    );
+    let totalCards = 0;
+    let chasseurCount = 0;
+    for (let i = 0; i < 600; i++) {
+      const pack = w.__testDraw('classic', false);
+      assert.equal(pack.length, 5);
+      const inPack = pack.filter((c) => c.id === 'chasseur-royer').length;
+      assert.ok(inPack <= 2, `pas plus de 2 Chasseur Royer dans un pack classique (eu ${inPack})`);
+      totalCards += pack.length;
+      chasseurCount += inPack;
+    }
+    const classicRate = chasseurCount / totalCards;
+    assert.ok(classicRate < 0.17, `taux de Chasseur Royer trop élevé : ${(classicRate * 100).toFixed(1)} %`);
+    assert.ok(classicRate > 0.06, `Chasseur Royer doit rester tirable : ${(classicRate * 100).toFixed(1)} %`);
+
+    for (let i = 0; i < 300; i++) {
+      const pack = w.__testDraw('legend', false);
+      assert.equal(pack.length, 10);
+      const inPack = pack.filter((c) => c.id === 'chasseur-royer').length;
+      assert.ok(inPack <= 2, `pas plus de 2 Chasseur Royer dans un pack légende (eu ${inPack})`);
+    }
+    dom.window.close();
+    console.log(`PASS tirage équilibré : Chasseur Royer = ${(classicRate * 100).toFixed(1)} % (≤ 2 par pack)`);
+  }
 })().catch(error => { console.error(error); process.exitCode = 1; });
