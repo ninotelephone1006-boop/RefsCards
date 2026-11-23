@@ -34,7 +34,7 @@ function makeStore() {
     },
     friendCodes: { 'REFS-ABC123': { uid: 'friend1' } },
     friendRequests: {},
-    trades: {}
+    trades: {}, marketListings: {}, coinGifts: {}
   };
 }
 
@@ -160,12 +160,11 @@ function buttonByText(root, text) {
   /* 3 bis. L'AUTRE joueur accepte la demande : je deviens ami chez moi aussi
      (temps réel : l'abonnement onSnapshot pousse la mise à jour). */
   store.friendRequests[requestId].status = 'accepted';
-  store.friendRequests[requestId].applied = { friend1: true };
+  store.friendRequests[requestId].applied = { me: true, friend1: true }; // ancien client : marqué trop tôt
   db.refresh('friendRequests');
   await wait(150);
   assert.equal(doc.querySelectorAll('.friend-row').length, 1, 'ami ajouté après acceptation');
   assert.match(doc.querySelector('.friend-row').textContent, /AmiJoueur/);
-  assert.equal(store.friendRequests[requestId].applied.me, true, 'ma moitié est marquée appliquée');
   await wait(400); // save() est différé de 250 ms
   assert.ok(store.playerSaves.me.friends.includes('friend1'), 'ami enregistré dans ma sauvegarde');
   console.log('PASS acceptation par l’autre joueur = amis des deux côtés');
@@ -175,9 +174,8 @@ function buttonByText(root, text) {
   assert.equal(doc.getElementById('friend-detail').hidden, false);
   assert.equal(doc.getElementById('friend-pseudo').textContent, 'AmiJoueur');
   assert.equal(doc.querySelectorAll('.friend-card').length, 1);
-  const buyBtn = buttonByText(doc.querySelector('.friend-card'), 'Acheter');
-  assert.match(buyBtn.textContent, /40/, 'Commune = 20 🪙 de récompense x2');
-  console.log('PASS profil d’ami = stats et cartes avec prix d’achat');
+  assert.equal(buttonByText(doc.querySelector('.friend-card'), 'Acheter'), undefined, 'seules les annonces sont vendues');
+  console.log('PASS profil d’ami = stats et cartes à échanger');
 
   /* 5. Échange : choix d'une de mes cartes, confirmation, document trades/. */
   buttonByText(doc.querySelector('.friend-card'), 'Échanger').click();
@@ -199,20 +197,6 @@ function buttonByText(root, text) {
   assert.equal(trade.price, 0);
   assert.equal(trade.status, 'pending');
   console.log('PASS proposition d’échange = trades/ pending avec give/receive');
-
-  /* 6. Achat : prix = récompense x2, document trades/ avec price. */
-  buyBtn.click();
-  await wait(30);
-  assert.equal(doc.getElementById('confirm-sheet').hidden, false);
-  doc.getElementById('confirm-ok').click();
-  await wait(80);
-  assert.equal(Object.keys(store.trades).length, 2);
-  const purchase = Object.values(store.trades).find((t) => t.price > 0);
-  assert.ok(purchase, 'un achat doit exister');
-  assert.equal(purchase.price, 40);
-  assert.equal(purchase.receiveId, 'chasseur-royer');
-  assert.equal(purchase.giveId, null);
-  console.log('PASS proposition d’achat = trades/ avec prix 40 🪙');
 
   w.close();
   console.log('PASS social-flow : compte, amis, échange et achat');

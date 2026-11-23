@@ -8,121 +8,10 @@ Il faut un projet Firebase partagé par toutes les versions du jeu. Le plan Spar
 
 1. Crée un projet sur [Firebase Console](https://console.firebase.google.com/).
 2. Dans **Authentication → Sign-in method**, active le fournisseur **Google**. Note : `localhost` est autorisé par défaut ; pour la mise en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains** (étape 5).
-3. Dans **Firestore Database**, crée la base (choisis la région proche de tes joueurs) et ouvre **Rules**. Publie ces règles : chaque personne ne peut modifier que sa propre sauvegarde, les profils publics sont lisibles par tout joueur connecté, et les échanges sont réservés aux deux parties concernées :
+3. Dans **Firestore Database**, crée la base, ouvre **Rules**, puis publie le contenu complet de [`firestore.rules`](firestore.rules). Ce fichier est la référence pour les sauvegardes, les amis, les échanges, les ventes et les cadeaux. Il faut le republier après toute mise à jour des règles.
 
-```text
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs,
-    // inventaire de packs (Shop) et quota de packs gratuits quotidiens.
-    match /playerSaves/{userId} {
-      function ownsSave() {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      allow read: if ownsSave();
-      allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'freeDate', 'freeUsed', 'updatedAt'])
-        && request.resource.data.coins is int
-        && request.resource.data.coins >= 0
-        && request.resource.data.coins <= 1000000000
-        && request.resource.data.firstPack is bool
-        && request.resource.data.collection is list
-        && request.resource.data.collection.size() <= 10000
-        && request.resource.data.friends is list
-        && request.resource.data.friends.size() <= 500
-        && request.resource.data.packsOpened is int
-        && request.resource.data.packsOpened >= 0
-        && (!('packStock' in request.resource.data)
-            || (request.resource.data.packStock is map
-                && request.resource.data.packStock.keys().hasOnly(['classic', 'rare'])
-                && request.resource.data.packStock.classic is int
-                && request.resource.data.packStock.classic >= 0
-                && request.resource.data.packStock.classic <= 100000
-                && request.resource.data.packStock.rare is int
-                && request.resource.data.packStock.rare >= 0
-                && request.resource.data.packStock.rare <= 100000))
-        && (!('freeDate' in request.resource.data)
-            || (request.resource.data.freeDate is string
-                && request.resource.data.freeDate.size() <= 10))
-        && (!('freeUsed' in request.resource.data)
-            || (request.resource.data.freeUsed is int
-                && request.resource.data.freeUsed >= 0
-                && request.resource.data.freeUsed <= 3))
-        && request.resource.data.updatedAt is timestamp;
-      allow delete: if false;
-    }
-
-    // Profil public (pseudo, avatar, code ami, stats, collection) : lisible par
-    // tout joueur connecté (c'est ce que voient les amis), modifiable uniquement
-    // par son propriétaire.
-    match /playerProfiles/{userId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.data.pseudo is string
-        && request.resource.data.pseudo.size() <= 24
-        && request.resource.data.avatar is string
-        && request.resource.data.avatar.size() <= 300000
-        && request.resource.data.friendCode is string
-        && request.resource.data.friendCode.matches('^REFS-[A-Z0-9]{6}$');
-      allow delete: if false;
-    }
-
-    // Annuaire code ami -> uid (recherche d'amis par code).
-    match /friendCodes/{code} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-      allow delete: if false;
-    }
-
-    // Demandes d'ami : friendRequests/{fromUid}__{toUid}. L'expéditeur crée
-    // la demande, le destinataire l'accepte ou la refuse (« on ne devient ami
-    // que si l'autre accepte »). Les deux parties peuvent lire et mettre à jour
-    // la demande ; personne d'autre.
-    match /friendRequests/{requestId} {
-      function isParty() {
-        return request.auth != null
-          && (request.auth.uid == resource.data.fromUid
-              || request.auth.uid == resource.data.toUid);
-      }
-      allow read: if isParty();
-      allow create: if request.auth != null
-        && request.resource.data.fromUid == request.auth.uid
-        && request.resource.data.toUid != request.auth.uid
-        && request.resource.data.toUid is string
-        && request.resource.data.status == 'pending';
-      allow update: if isParty()
-        && request.resource.data.fromUid == resource.data.fromUid
-        && request.resource.data.toUid == resource.data.toUid;
-      allow delete: if false;
-    }
-
-    // Échanges / achats entre deux joueurs : seules les deux parties peuvent
-    // lire et modifier la proposition. Chaque joueur applique sa moitié dans
-    // sa propre sauvegarde (playerSaves reste « propriétaire uniquement »).
-    match /trades/{tradeId} {
-      function isParty() {
-        return request.auth != null
-          && (request.auth.uid == resource.data.fromUid
-              || request.auth.uid == resource.data.toUid);
-      }
-      allow read: if isParty();
-      allow create: if request.auth != null
-        && request.resource.data.fromUid == request.auth.uid
-        && request.resource.data.toUid != request.auth.uid
-        && request.resource.data.status == 'pending';
-      allow update: if isParty();
-      allow delete: if false;
-    }
-  }
-}
-```
-
-4. Dans **Project settings → Your apps**, crée une application Web. Sa configuration est déjà renseignée dans `firebase-config.js` (exposition via `window.REFS_FIREBASE_CONFIG`) ; si tu recrées le projet, remplace simplement les valeurs de ce fichier par celles de ta nouvelle application. Ces paramètres Firebase pour le navigateur sont publics (ce ne sont pas des mots de passe) ; **les règles Firestore ci-dessus sont la protection des données**.
-5. Les règles équivalentes sont aussi dans `firestore.rules`. Pour les publier avec le CLI et mettre le jeu en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains**, installe `firebase-tools`, puis lance `firebase login`, `firebase use --add` et `firebase deploy --only hosting,firestore:rules`. `firebase.json` est déjà configuré pour Firebase Hosting. N'importe quel hébergeur statique HTTPS convient aussi, tant qu'il utilise le même projet Firebase et que les règles sont publiées.
+4. Dans **Project settings → Your apps**, crée une application Web. Sa configuration est déjà renseignée dans `firebase-config.js` (exposition via `window.REFS_FIREBASE_CONFIG`) ; si tu recrées le projet, remplace simplement les valeurs de ce fichier par celles de ta nouvelle application. Ces paramètres Firebase pour le navigateur sont publics (ce ne sont pas des mots de passe) ; **les règles Firestore protègent l’accès aux données**.
+5. Les règles sont dans `firestore.rules`. Pour les publier avec le CLI et mettre le jeu en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains**, installe `firebase-tools`, puis lance `firebase login`, `firebase use --add` et `firebase deploy --only hosting,firestore:rules`. `firebase.json` est déjà configuré pour Firebase Hosting. N'importe quel hébergeur statique HTTPS convient aussi, tant qu'il utilise le même projet Firebase et que les règles sont publiées.
 
 ## Lancer en local
 
@@ -164,7 +53,8 @@ npm test                             # toute la suite
 node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
-node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges, achats)
+node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges)
+node tests/market-flow.cjs           # ventes, cadeaux, récupération
 node tests/friend-requests.cjs       # demandes d'ami : acceptation/refus, fiche ami
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
@@ -194,13 +84,16 @@ La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**,
 ### Page En ligne
 
 - **Demande d'ami par code** : saisis le code ami d'un joueur (`REFS-XXXXXX`, le préfixe, les tirets et la casse sont tolérés), l'annuaire retrouve son uid et une **demande d'ami** est créée (`friendRequests/{moi}__{lui}`, statut `pending`). Personne n'est ajouté d'office : le destinataire doit **accepter**.
-- **Demandes reçues / envoyées** : la page En ligne liste les demandes reçues avec **Accepter** / **Refuser** et les demandes envoyées en attente (avec **Annuler**). Quand le destinataire accepte, **les deux joueurs deviennent amis** : chacun enregistre l'autre dans sa propre liste (`friends` de sa sauvegarde privée) — immédiatement si l'expéditeur est en ligne (temps réel), sinon à sa prochaine connexion. Une demande refusée n'ajoute aucun ami.
-- **Profil d'un ami** : photo, pseudo, code ami, stats (pièces, cartes, uniques, meilleure rareté) et **ses cartes** avec leurs exemplaires, montrées dans une grille régulière (ratio 5:7) avec les boutons Échanger / Acheter sous chaque carte.
-- **Échanger** : sur une carte d'un ami, choisis une de tes cartes à lui donner ; une proposition d'échange est créée (`trades/{id}`, statut `pending`). L'ami la voit dans « Échanges reçus » et peut accepter ou refuser.
-- **Acheter** : le prix d'une carte vaut **le double de sa récompense de rareté** (Commune 40 🪙, Inhabituelle 70 🪙, Rare 110 🪙, Super Rare 160 🪙, Épique 240 🪙, Ultra épique 350 🪙, Mythique 480 🪙, Légendaire 680 🪙, Divine 1 040 🪙, Secrète 1 800 🪙). Le bouton est désactivé si ton solde est insuffisant.
-- **Acceptation** : quand un joueur accepte, il applique sa moitié dans **sa propre** sauvegarde (il donne sa carte / paie, et reçoit l'autre carte / les pièces), puis marque l'échange comme appliqué de son côté. L'autre joueur applique sa moitié à son tour — immédiatement s'il est en ligne, sinon à sa prochaine connexion (`loadTrades` rejoue les moitiés en attente). Quand les deux moitiés sont appliquées, l'échange passe à `done`. Les échanges reçus/envoyés se mettent à jour en temps réel (`onSnapshot`).
+- **Demandes reçues / envoyées** : la page En ligne liste les demandes reçues avec **Accepter** / **Refuser** et les demandes envoyées en attente (avec **Annuler**). Quand le destinataire accepte, **les deux joueurs deviennent amis** : chacun enregistre l'autre dans sa propre liste (`friends` de sa sauvegarde privée) — immédiatement si l'expéditeur est en ligne (temps réel), sinon à sa prochaine connexion. Une demande refusée n'ajoute aucun ami. Les demandes acceptées servent aussi à réparer automatiquement une liste d'amis manquante, y compris pour les anciens comptes où `applied` avait été marqué trop tôt. Un retrait volontaire est mémorisé sur les demandes afin de ne pas réajouter l'ami. Les retraits effectués avant cette correction n'ayant pas été enregistrés sur les demandes, une ancienne amitié acceptée peut toutefois réapparaître une fois et être retirée à nouveau.
+- **Profil d'un ami** : photo, pseudo, statistiques, collection et propositions d'échange. Ses annonces figurent séparément dans « Ses cartes à vendre ».
+- **Mettre en vente** : dans « Mes cartes à vendre », choisis un exemplaire et un prix entier libre de 0 à 1 milliard de pièces. La carte est retirée de la collection et réservée ; « Retirer de la vente » la rend tant qu'elle n'a pas été achetée.
+- **Acheter** : ouvre le profil d'un ami et confirme une de ses annonces. L'achat débite l'acheteur et lui remet la carte en une transaction. Le vendeur récupère ensuite les pièces dans « Pièces à récupérer », même après une déconnexion. Utilise « Actualiser » pour voir les nouvelles ventes et les cadeaux.
+- **Donner des pièces** : ouvre le profil d'un ami, indique un montant entier positif et confirme. Les pièces sont débitées immédiatement et restent réservées jusqu'à leur récupération par le destinataire. Un solde insuffisant, une carte déjà vendue ou une collection pleine bloque l'opération.
+- **Échanger** : l'ancien système de propositions reste disponible depuis la collection de l'ami ; il ne fait pas partie du nouveau marché.
 
-Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends`, `packsOpened`, `packStock`, `freeDate`, `freeUsed`), `playerProfiles/{uid}` (public pour les joueurs connectés), `friendCodes/{code}` (annuaire), `friendRequests/{fromUid}__{toUid}` (demandes d'ami à accepter, réservées aux deux parties), `trades/{id}` (propositions réservées aux deux parties). Les règles correspondantes sont dans `firestore.rules` — **republie-les** (`firebase deploy --only firestore:rules`) pour activer les nouvelles pages.
+Les annonces (`marketListings`) et cadeaux (`coinGifts`) sont enregistrés dans Firestore. Chaque mise en réserve, achat, annulation ou récupération est une transaction atomique ; les règles limitent les changements d'état aux parties concernées et vérifient la modification de leur sauvegarde. Il faut publier les nouvelles règles avec `firebase deploy --only firestore:rules`. Les transactions nécessitent une connexion Internet. La limite de solde est de 1 milliard de pièces ; si la réception la dépasse, dépense d'abord des pièces puis récupère le montant.
+
+**Limite de sécurité existante :** la logique de jeu et la sauvegarde personnelle restent contrôlées par le client, qui peut modifier ses propres pièces et cartes. Les transactions évitent les achats simultanés et les récupérations répétées dans le fonctionnement normal, mais ne constituent pas une protection anti-triche complète ; une économie fiable exige un serveur de confiance et des règles de sauvegarde plus restrictives. Évite aussi de jouer au même compte sur plusieurs appareils simultanément : les sauvegardes classiques ne sont pas synchronisées entre sessions.
 
 ## Déroulé d'une ouverture
 
