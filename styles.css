@@ -2509,3 +2509,39 @@ html,body{background:var(--bg)}
 .market-row-qty{width:52px;padding:5px 6px;border:1px solid #725598;border-radius:8px;background:#0f0b14;color:#fff;font:inherit;font-size:13px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
 .qty-btn:disabled{opacity:.38;cursor:not-allowed;transform:none}
 .market-busy{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#090510bd;color:#fff;font-weight:700}
+
+/* Mutation Shiny : couche visuelle indépendante des dix cadres de rareté. */
+.cf.mutation-shiny {
+  box-shadow: inset 0 0 0 2px #fff4b0, 0 0 18px #f7dd8466;
+}
+.cf.mutation-shiny::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 15%, #ffe78144 32%, #ffffff88 45%, #9eefff44 58%, transparent 75%);
+  background-size: 250% 100%;
+  mix-blend-mode: screen;
+  animation: mutation-shiny-sweep 5s ease-in-out infinite;
+}
+.cf-mutation {
+  display: inline-block;
+  align-self: flex-start;
+  border: 1px solid #fff0aa;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: #30240def;
+  color: #fff0aa;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+@keyframes mutation-shiny-sweep {
+  0%, 100% { background-position: 100% 0; }
+  50% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf.mutation-shiny::after { animation: none; }
+}

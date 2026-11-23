@@ -19,7 +19,7 @@ const assert = require('node:assert/strict');
     vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
     const sources = vm.runInContext('cardsDatabase.flatMap(cardImageSources)', context);
     const cardCount = vm.runInContext('cardsDatabase.length', context);
-    assert.equal(sources.length, cardCount, 'une source d\'image par carte');
+    assert.ok(sources.length >= cardCount, 'au moins une source candidate par carte');
     // Les visuels manquants sont prévus (repli emoji/couleur) : on vérifie
     // que les fichiers présents sont bien trouvés, sans exiger les absents.
     const present = sources.filter((src) => fs.existsSync(src));

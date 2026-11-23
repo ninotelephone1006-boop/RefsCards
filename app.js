@@ -546,7 +546,7 @@
     const drawn = [];
     const packCounts = new Map();
     const record = (card) => {
-      drawn.push(card);
+      drawn.push(CardMutations.roll(card));
       packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
     };
     const params = new URLSearchParams(window.location.search);
@@ -558,7 +558,7 @@
         ? fusionDemoDraw
         : (typeof demoDraw !== 'undefined' ? demoDraw : []);
       demoList.slice(0, cardCountFor(state.currentPackType)).forEach((id) => {
-        const found = cardsDatabase.find((c) => c.id === id);
+        const found = CardMutations.resolve(id);
         if (found) record(found);
       });
     }
@@ -1155,6 +1155,11 @@
   function cardFrame(card, opts = {}) {
     const info = RARITIES[card.rarity] || RARITIES.common;
     const frame = el('span', 'cf');
+    const mutation = CardMutations.definition(card);
+    if (mutation) {
+      frame.classList.add(mutation.cssClass);
+      frame.dataset.mutation = mutation.id;
+    }
     frame.style.setProperty('--r-color', info.color);
     frame.style.setProperty('--r-ink', info.ink);
     frame.style.setProperty('--r-glow', info.glow);
@@ -1175,6 +1180,7 @@
     const badge = el('span', 'cf-badge', info.label);
     const name = el('span', 'cf-name', card.name);
     top.append(badge, name);
+    if (mutation) top.append(el('span', 'cf-mutation', `${mutation.icon} ${mutation.label}`));
     if (opts.mini) top.classList.add('cf-top-mini');
 
     const bottom = el('span', 'cf-bottom');
@@ -1391,7 +1397,7 @@
     const isNew = !state.collection.some((c) => c.id === card.id);
     state.collection.push(card);
     if (isNew) { fresh.add(card.id); tabBadge.hidden = false; }
-    addCoins(info.reward);
+    addCoins(CardMutations.multiply(card, info.reward, 'reward'));
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${state.deck.length} · RÉVÉLÉE`;
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
@@ -1406,7 +1412,7 @@
   function cardById(id) {
     return (
       state.collection.find((c) => c.id === id) ||
-      cardsDatabase.find((c) => c.id === id) ||
+      CardMutations.resolve(id) ||
       null
     );
   }
@@ -1840,7 +1846,7 @@
       emoji.append(cardFrame(entry.card, { mini: true }));
       const main = el('span', 'fr-main');
       main.append(
-        el('span', 'fr-name', entry.card.name),
+        el('span', 'fr-name', CardMutations.label(entry.card)),
         el('span', 'fr-meta', `2 doublons → 1 ${next.label}`)
       );
       row.append(emoji, main, el('span', 'fr-count', `×${entry.count}`));
@@ -1850,7 +1856,7 @@
         [...fusionGrid.querySelectorAll('.fusion-row')].forEach((r) => r.classList.toggle('is-selected', r === row));
         renderFusionPreview(entry);
         fusionGo.hidden = false;
-        fusionGo.textContent = `FUSIONNER · −2 ${entry.card.name}`;
+        fusionGo.textContent = `FUSIONNER · −2 ${CardMutations.label(entry.card)}`;
       });
       fusionGrid.append(row);
     }
@@ -1894,7 +1900,7 @@
       showToast('Aucune carte de rareté supérieure disponible dans cards.js.');
       return;
     }
-    const result = pool[Math.floor(Math.random() * pool.length)];
+    const result = CardMutations.roll(pool[Math.floor(Math.random() * pool.length)]);
 
     // Retire deux exemplaires de la collection.
     let removed = 0;
@@ -2235,7 +2241,7 @@
     state.coins = Math.max(0, Number(d && d.coins) || 0);
     state.firstPack = !d || d.firstPack !== false;
     state.collection = ((d && d.collection) || [])
-      .map((id) => cardsDatabase.find((c) => c.id === id))
+      .map((id) => CardMutations.resolve(id))
       .filter(Boolean);
     friends = Array.isArray(d && d.friends)
       ? d.friends.filter((u) => typeof u === 'string')
@@ -2599,7 +2605,7 @@
 
   function renderFilters() {
     const rarities = Object.keys(RARITIES).filter((r) => cardsDatabase.some((c) => c.rarity === r));
-    const defs = [['all', 'Toutes'], ['owned', 'Possédées'], ...rarities.map((r) => [r, RARITIES[r].label])];
+    const defs = [['all', 'Toutes'], ['owned', 'Possédées'], ['shiny', '✦ Shiny'], ...rarities.map((r) => [r, RARITIES[r].label])];
     collFilters.replaceChildren(...defs.map(([key, label]) => {
       const b = el('button', key === collFilter ? 'chip is-active' : 'chip');
       b.type = 'button';
@@ -2618,17 +2624,19 @@
   function renderCollection() {
     const owned = countMap();
     const total = cardsDatabase.length;
-    const got = cardsDatabase.filter((c) => owned.has(c.id)).length;
+    const got = new Set(state.collection.map((c) => c.baseId || c.id)).size;
     collCount.textContent = `${got} / ${total}`;
     collFill.style.transform = `scaleX(${total ? got / total : 0})`;
     updateFusionChip();
 
     const frag = document.createDocumentFragment();
     let shown = 0;
-    cardsDatabase.forEach((card, i) => {
+    const variants = CardMutations.owned(collectionIds()).filter((c) => c.mutation);
+    const baseOwned = new Set(state.collection.map((c) => c.baseId || c.id));
+    [...cardsDatabase.filter((c) => owned.has(c.id) || !baseOwned.has(c.id)), ...variants].forEach((card, i) => {
       const n = owned.get(card.id) || 0;
       // Filtre de rareté / possédées : jamais de carte verrouillée, pour ne rien dévoiler.
-      if (collFilter !== 'all' && (!n || (collFilter !== 'owned' && card.rarity !== collFilter))) return;
+      if (collFilter !== 'all' && (!n || (collFilter !== 'owned' && card.rarity !== collFilter && card.mutation !== collFilter))) return;
       shown++;
       if (!n) {
         const t = el('div', 'coll-tile is-locked');
@@ -2645,7 +2653,7 @@
       t.style.setProperty('--i', i);
       t.style.setProperty('--r-color', info.color);
       t.style.setProperty('--r-glow', info.glow);
-      t.setAttribute('aria-label', `${card.name}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}. Voir en grand.`);
+      t.setAttribute('aria-label', `${CardMutations.label(card)}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}. Voir en grand.`);
       t.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
       if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
       if (fresh.has(card.id)) t.classList.add('is-fresh');
@@ -2839,13 +2847,13 @@
     const owned = new Map();
     for (const id of ids) owned.set(id, (owned.get(id) || 0) + 1);
     const total = ids.length;
-    const unique = cardsDatabase.filter((c) => owned.has(c.id)).length;
+    const unique = new Set(CardMutations.owned(ids).map((c) => c.baseId || c.id)).size;
     let value = 0;
     let best = null;
-    for (const card of cardsDatabase) {
+    for (const card of CardMutations.owned(ids)) {
       const n = owned.get(card.id) || 0;
       if (!n) continue;
-      value += (RARITIES[card.rarity] ? RARITIES[card.rarity].reward : 0) * n;
+      value += CardMutations.multiply(card, RARITIES[card.rarity] ? RARITIES[card.rarity].reward : 0) * n;
       if (!best || RARITIES[card.rarity].rank > RARITIES[best.rarity].rank) best = card;
     }
     return {
@@ -3076,7 +3084,7 @@
         .filter(([key]) => cardsDatabase.some((c) => c.rarity === key))
         .sort((a, b) => b[1].rank - a[1].rank)
         .map(([key, info]) => {
-          const n = cardsDatabase
+          const n = CardMutations.owned(collectionIds())
             .filter((c) => c.rarity === key)
             .reduce((sum, c) => sum + (owned.get(c.id) || 0), 0);
           const row = el('div', 'rarity-row');
@@ -3796,7 +3804,7 @@
     if (friendCards) {
       const owned = new Map();
       for (const id of data.collection) owned.set(id, (owned.get(id) || 0) + 1);
-      const ownedCards = cardsDatabase.filter((c) => owned.has(c.id));
+      const ownedCards = CardMutations.owned([...owned.keys()]);
       friendCards.replaceChildren(...ownedCards.map((card, i) => {
         const info = RARITIES[card.rarity] || RARITIES.common;
         const tile = el('div', 'friend-card');
@@ -3941,8 +3949,8 @@
      'classic' | 'rare'). Les anciennes annonces n'ont pas de packType :
      ce sont des cartes. */
   function cardName(id) {
-    const card = cardsDatabase.find((c) => c.id === id);
-    return card ? card.name : 'une carte';
+    const card = CardMutations.resolve(id);
+    return card ? CardMutations.label(card) : 'une carte';
   }
 
   function isPackListing(listing) {
@@ -4087,8 +4095,8 @@
     if (marketCard) {
       const old = marketCard.value;
       const owned = countMap();
-      const options = cardsDatabase.filter((c) => owned.has(c.id)).map((card) => {
-        const option = el('option', '', `${card.name} (x${owned.get(card.id)})`);
+      const options = CardMutations.owned([...owned.keys()]).map((card) => {
+        const option = el('option', '', `${CardMutations.label(card)} (x${owned.get(card.id)})`);
         option.value = card.id;
         return option;
       });
@@ -4437,7 +4445,7 @@
     const applyResult = (result) => {
       if (!result || !currentUser || currentUser.uid !== uid) return;
       state.coins = result.coins;
-      state.collection = result.cards.map((cardId) => cardsDatabase.find((c) => c.id === cardId)).filter(Boolean);
+      state.collection = result.cards.map((cardId) => CardMutations.resolve(cardId)).filter(Boolean);
       if (result.packStock) {
         state.packStock = {
           classic: Math.max(0, Number(result.packStock.classic) || 0),
@@ -4572,7 +4580,7 @@
     e.preventDefault();
     try {
       const cardId = marketCard.value;
-      if (!cardId || !cardsDatabase.some((c) => c.id === cardId)) throw new Error('Choisis une carte à vendre.');
+      if (!cardId || !CardMutations.resolve(cardId)) throw new Error('Choisis une carte à vendre.');
       const ownedCount = countMap().get(cardId) || 0;
       if (ownedCount < 1) throw new Error('Tu ne possèdes plus cette carte.');
       const quantity = marketQty ? marketQuantity(marketQty, ownedCount) : 1;

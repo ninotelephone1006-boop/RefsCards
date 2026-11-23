@@ -160,3 +160,71 @@ Le tirage est pondéré par `weight` dans `RARITIES` (`app.js`) : si une rareté
 L'image `assets/packet.png` fournie ici est un visuel temporaire créé pour le prototype : remplacez-la par votre propre image en conservant le même chemin.
 
 > **Visuels de démonstration** : le dossier `assets/Cartes/` contient pour l'instant des images de substitution aux bonnes dimensions (500 × 700, soit 5:7) et aux bons noms de fichiers. Remplacez chaque fichier par le vrai visuel en gardant le même nom, sans rien changer au code.
+
+## Mutations de cartes
+
+Le module `CardMutations` (section dédiée dans `cards.js`) est indépendant du
+catalogue et des poids de rareté. Chaque carte de booster reçoit **un seul tirage
+de mutation après sa sélection** ; les créations par fusion aussi. Recharger une
+sauvegarde, inspecter une carte, acheter, offrir ou récupérer une carte du marché
+ne déclenche jamais de nouveau tirage.
+
+### Shiny
+
+| Rareté de la carte | Chance conditionnelle Shiny |
+| --- | ---: |
+| Commune | 1 % |
+| Inhabituelle | 0,8 % |
+| Rare | 0,6 % |
+| Super Rare | 0,45 % |
+| Épique | 0,3 % |
+| Ultra épique | 0,2 % |
+| Mythique | 0,12 % |
+| Légendaire | 0,08 % |
+| Divine | 0,05 % |
+| Secrète | 0,02 % |
+
+Ces probabilités sont conditionnelles à la rareté déjà choisie, sans boost du
+pack rare. Les poids et l'équilibrage actuels des cartes restent inchangés
+(les poids de rareté du jeu sont appliqués par carte, pas par palier).
+La rareté, le nom, la description et les valeurs d'origine ne sont pas écrasés.
+Shiny ajoute un badge et un reflet irisé, y compris dans la collection, le récap,
+l'inspection et les collections d'amis. Un filtre « Shiny » est disponible.
+L'animation respecte `prefers-reduced-motion`.
+
+Aucun multiplicateur économique Shiny n'ayant été spécifié, les multiplicateurs
+`valueMultiplier` (valeur de collection) et `rewardMultiplier` (pièces de révélation)
+valent **1**. Les prix du marché restent fixés librement par le vendeur.
+
+### Identité, sauvegarde et fusion
+
+- Les cartes normales conservent leur identifiant historique.
+- Une variante est sérialisée sous forme `baseId::mutationId`, par exemple
+  `chasseur-royer::shiny`. En mémoire, elle expose également `baseId` et `mutation`.
+- Les sauvegardes existantes restent lisibles sans migration ni tirage rétroactif.
+- Les quantités normales/Shiny sont distinctes, tout comme les annonces de marché.
+  La variante reste attachée à la carte lors des transferts.
+- Une fusion exige deux copies de la **même variante**, les consomme et crée une
+  nouvelle carte de rareté supérieure avec son propre tirage de mutation : la
+  mutation des ingrédients n'est pas transmise automatiquement.
+- La complétion du catalogue compte les cartes de base, quelle que soit la variante.
+- Le format Firestore reste une liste de chaînes : aucun nouveau champ requis.
+
+### Ajouter Gold, Shadow ou Glitch
+
+Ajouter une définition dans `CardMutations.definitions` avec un `id` stable
+(sans `::`), un `label`, une `icon`, une `cssClass`, des `rates` par rareté
+(fractions : `0.01` = 1 %) et les deux multiplicateurs. Ajouter le style associé
+dans `styles.css`. Les badges, la sauvegarde, la résolution des variantes, le
+marché et la fusion utilisent automatiquement le registre. Pour un filtre dédié,
+ajouter une entrée dans `renderFilters()`.
+
+Les mutations sont **exclusives**, non cumulables : un unique nombre aléatoire
+est comparé à des intervalles disjoints, dans l'ordre du registre. Chaque taux
+reste absolu ; la somme des taux d'une rareté doit rester inférieure ou égale à 1.
+La probabilité restante correspond à une carte normale. Ne pas supprimer ou
+renommer un identifiant déjà utilisé dans les sauvegardes.
+
+Tests : `npm test` inclut `tests/mutations.cjs` (dix taux, bornes déterministes,
+préservation du catalogue, collection, séparation des fusions, sauvegarde et
+absence de nouveau tirage à la lecture).
