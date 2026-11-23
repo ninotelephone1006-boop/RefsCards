@@ -29,14 +29,6 @@
      ci-dessus) suffit pour qu'il apparaisse dans le Shop, l'inventaire, les
      sauvegardes et les écrans d'ouverture. */
   const PACK_TYPES = ['classic', 'rare', 'legend', 'video'];
-  /* Packs annoncés mais pas encore disponibles : visibles dans le Shop, avec
-     un badge « BIENTÔT », sans achat ni ouverture possible. Passer `video` à
-     false (ou retirer la clé) publie le Pack Vidéo sans autre changement. */
-  /* Tous les packs sont publiés et achetables, y compris le Pack Vidéo. */
-  const PACK_COMING_SOON = {};
-  function packComingSoon(type) { return Boolean(PACK_COMING_SOON[type]); }
-  /* En mode démo seulement, on autorise l'ouverture pour prévisualiser. */
-  function isPackAvailable(type) { return !packComingSoon(type) || isDemoMode(); }
   function isPackType(type) { return PACK_TYPES.indexOf(type) >= 0; }
   function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
   function packLabelFr(type) {
@@ -51,9 +43,8 @@
   }
   /* Le Pack Vidéo ne tire que des cartes dotées d'une configuration `video`,
      et ces cartes restent exclusives à ce pack : elles ne sortent jamais des
-     autres boosters (classique, rare, légende), que le Pack Vidéo soit en
-     avant-première ou publié. On peut les voir verrouillées dans la collection,
-     mais on ne les obtient que par le Pack Vidéo. */
+     autres boosters (classique, rare, légende). On peut les voir verrouillées
+     dans la collection, mais on ne les obtient que par le Pack Vidéo. */
   function packPool(type) {
     if (type === 'video') {
       /* Seules les cartes configurées avec un bloc `video` sortent du Pack
@@ -434,35 +425,22 @@
     if (shopStockRare) shopStockRare.textContent = stockText(state.packStock.rare || 0);
     if (shopStockLegend) shopStockLegend.textContent = stockText(state.packStock.legend || 0);
     if (shopStockVideo) {
-      shopStockVideo.textContent = packComingSoon('video')
-        ? 'Bientôt disponible — aperçu uniquement'
-        : stockText(state.packStock.video || 0);
+      shopStockVideo.textContent = stockText(state.packStock.video || 0);
     }
 
     const updateBuy = (type, qtyEl, btn) => {
-      const soon = packComingSoon(type);
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
-      if (qtyEl) qtyEl.textContent = soon ? '—' : String(qty);
+      if (qtyEl) qtyEl.textContent = String(qty);
       if (btn) {
-        if (soon) {
-          btn.textContent = 'BIENTÔT DISPONIBLE';
-          btn.disabled = true;
-          btn.classList.add('is-coming-soon');
-        } else {
-          const total = PACK_PRICES[type] * qty;
-          btn.textContent = `ACHETER · ${fmt(total)} 🪙`;
-          btn.disabled = state.coins < total;
-          btn.classList.remove('is-coming-soon');
-        }
+        const total = PACK_PRICES[type] * qty;
+        btn.textContent = `ACHETER · ${fmt(total)} 🪙`;
+        btn.disabled = state.coins < total;
       }
       document.querySelectorAll(`.qty-chip[data-pack="${type}"], .qty-btn[data-pack="${type}"]`).forEach((control) => {
-        control.disabled = soon;
         if (control.classList.contains('qty-chip')) {
-          control.classList.toggle('is-active', !soon && Number(control.dataset.qty) === qty);
+          control.classList.toggle('is-active', Number(control.dataset.qty) === qty);
         }
       });
-      const card = document.querySelector(`.shop-card[data-pack="${type}"]`);
-      if (card) card.classList.toggle('is-coming-soon', soon);
     };
     updateBuy('classic', qtyClassic, buyClassic);
     updateBuy('rare', qtyRare, buyRare);
@@ -485,13 +463,6 @@
     ].forEach(([button, type]) => {
       if (!button) return;
       const count = state.packStock[type] || 0;
-      if (packComingSoon(type)) {
-        button.textContent = `OUVRIR ${packLabelUpper(type)} · BIENTÔT`;
-        button.disabled = true;
-        button.classList.add('is-coming-soon');
-        return;
-      }
-      button.classList.remove('is-coming-soon');
       button.textContent = `OUVRIR ${packLabelUpper(type)} · ×${count} →`;
       button.disabled = count <= 0 || (state.phase !== 'pack' && state.phase !== 'done');
     });
@@ -549,9 +520,7 @@
       },
       video: {
         title: 'Booster Vidéo',
-        desc: packComingSoon('video')
-          ? 'Bientôt disponible · 2 cartes animées (fps, son, boucle).'
-          : '2 cartes animées · fps, son et boucle réglés par carte.',
+        desc: '2 cartes animées · fps, son et boucle réglés par carte.',
         rare: false,
         video: true,
       },
@@ -565,20 +534,17 @@
       }))
       .filter((item) => item.count > 0);
     const canOpen = state.phase === 'pack' || state.phase === 'done';
-    inventoryGrid.innerHTML = items.map((item) => {
-      const soon = packComingSoon(item.type);
-      return `
-      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}${soon ? ' is-coming-soon' : ''}" data-pack-type="${item.type}">
+    inventoryGrid.innerHTML = items.map((item) => `
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}" data-pack-type="${item.type}">
         <span class="inventory-qty-badge">×${item.count}</span>
         <img class="inventory-card-img" src="${item.img}" alt="${item.title}">
         <h3 class="inventory-card-title">${item.title}</h3>
         <p class="inventory-card-desc">${item.desc}</p>
-        <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen && !soon ? '' : 'disabled'}>
-          ${soon ? 'BIENTÔT DISPONIBLE' : 'OUVRIR UN PACK →'}
+        <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen ? '' : 'disabled'}>
+          OUVRIR UN PACK →
         </button>
       </article>
-    `;
-    }).join('');
+    `).join('');
   }
 
   function selectPackType(type, { silent = false } = {}) {
@@ -622,12 +588,6 @@
 
   function buyPacks(type) {
     SFX.unlock();
-    if (packComingSoon(type)) {
-      SFX.snap();
-      setShopMsg('Le Pack Vidéo arrive bientôt : il est visible mais pas encore achetable.');
-      showToast('Pack Vidéo : bientôt disponible !', 3000);
-      return;
-    }
     const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
     const total = PACK_PRICES[type] * qty;
     if (state.coins < total) {
@@ -1095,7 +1055,6 @@
   /* Sans pack en inventaire, on ne peut pas déchirer : on renvoie au Shop. */
   function hasPackToOpen() {
     if (isDemoMode()) return true;
-    if (!isPackAvailable(state.currentPackType)) return false;
     return (state.packStock[state.currentPackType] || 0) > 0;
   }
 
@@ -3148,11 +3107,6 @@
   on(buyLegend, 'click', () => buyPacks('legend'));
   on(buyVideo, 'click', () => buyPacks('video'));
   function openFromInventory(type) {
-    if (!isPackAvailable(type)) {
-      setShopMsg('Le Pack Vidéo arrive bientôt : impossible de l’ouvrir pour le moment.');
-      showToast('Pack Vidéo : bientôt disponible !', 3000);
-      return;
-    }
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
     selectPackType(type);

@@ -112,8 +112,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
     `  window.__videoTest = {
       state, drawPack, packPool, cardFrame, buildCard, selectPackType,
       packStockFrom, packTotal, cardVideoPlaybackRate, cardVideoInfo,
-      showReveal, applySave, packComingSoon, isPackAvailable,
-      PACK_COMING_SOON, PACK_TYPES, cardsDatabase
+      showReveal, applySave, PACK_TYPES, cardsDatabase
     };
 })();
 `
@@ -133,8 +132,10 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   assert.match(html, /data-pack="video"/, 'carte Pack Vidéo dans le Shop');
   assert.match(html, /id="buy-video"/, 'bouton d’achat vidéo');
   assert.match(html, /id="open-video"/, 'bouton d’ouverture vidéo');
-  assert.match(html, /BIENTÔT/, 'le Pack Vidéo est marqué « BIENTÔT »');
-  assert.match(html, /pas encore achetable ni ouvrable/, 'message d’avant-première visible');
+  assert.doesNotMatch(html, /BIENTÔT/, 'plus de badge « BIENTÔT » dans le Shop');
+  assert.doesNotMatch(html, /pas encore achetable ni ouvrable/, 'plus de message d’avant-première');
+  assert.doesNotMatch(html, /is-coming-soon/, 'plus de classe avant-première');
+  assert.match(html, /id="buy-video"[^>]*>ACHETER/, 'bouton d’achat vidéo actif (prix affiché)');
   assert.match(html, /packetvideo\.png/, 'visuel packetvideo.png référencé');
   const rules = fs.readFileSync('firestore.rules', 'utf8');
   assert.match(rules, /packStock\.video is int/, 'les règles Firestore autorisent le stock vidéo');
@@ -289,27 +290,26 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   });
   assert.equal(test.state.packStock.video, 2, 'packStock.video chargé depuis la sauvegarde');
   assert.equal(test.state.currentPackType, 'video', 'le Pack Vidéo est sélectionné quand il est le seul en stock');
-  assert.match(doc.getElementById('open-video').textContent, /BIENTÔT/, 'bouton OUVRIR VIDÉO marqué bientôt');
-  assert.equal(doc.getElementById('open-video').disabled, true, 'ouverture vidéo bloquée');
+  assert.match(doc.getElementById('open-video').textContent, /OUVRIR VIDÉO · ×2/, 'bouton OUVRIR VIDÉO avec le stock');
+  assert.equal(doc.getElementById('open-video').disabled, false, 'ouverture vidéo possible');
   assert.ok(doc.querySelector('.inventory-card[data-pack-type="video"]'), 'carte Booster Vidéo dans l’inventaire');
-  assert.equal(doc.querySelector('.inventory-card[data-pack-type="video"] .inventory-open-btn').disabled, true,
-    'bouton d’ouverture d’inventaire bloqué');
+  assert.equal(doc.querySelector('.inventory-card[data-pack-type="video"] .inventory-open-btn').disabled, false,
+    'bouton d’ouverture d’inventaire actif');
   assert.match(doc.getElementById('inventory-summary').textContent, /2 packs prêts/, 'résumé inventaire avec les packs vidéo');
 
-  /* Achat et ouverture bloqués : visible, mais on ne peut pas le prendre. */
-  assert.equal(test.packComingSoon('video'), true, 'le Pack Vidéo est en « bientôt disponible »');
-  assert.equal(test.isPackAvailable('video'), false, 'non disponible hors démo');
-  const coinsBefore = doc.getElementById('coins').textContent;
+  /* Pack publié : achetable et ouvrable comme les autres packs. */
+  assert.equal(doc.getElementById('buy-video').disabled, false, 'bouton ACHETER actif');
+  assert.match(doc.getElementById('buy-video').textContent, /ACHETER/, 'prix affiché sur le bouton');
+  assert.match(doc.getElementById('shop-stock-video').textContent, /Tu en as 2/);
+  assert.equal(doc.querySelector('.shop-card[data-pack="video"]').classList.contains('is-coming-soon'), false,
+    'carte Shop sans état avant-première');
+  assert.equal(doc.querySelector('.qty-chip[data-pack="video"]').disabled, false, 'quantité vidéo active');
+  const coinsBefore = test.state.coins;
   doc.getElementById('buy-video').click();
   await wait(30);
-  assert.equal(doc.getElementById('coins').textContent, coinsBefore, 'aucun achat possible');
-  assert.equal(test.state.packStock.video, 2, 'aucun pack vidéo ajouté');
-  assert.equal(doc.getElementById('buy-video').disabled, true, 'bouton ACHETER désactivé');
-  assert.match(doc.getElementById('buy-video').textContent, /BIENTÔT DISPONIBLE/);
-  assert.match(doc.getElementById('shop-stock-video').textContent, /Bientôt disponible/);
-  assert.equal(doc.querySelector('.shop-card[data-pack="video"]').classList.contains('is-coming-soon'), true,
-    'carte Shop en avant-première');
-  assert.equal(doc.querySelector('.qty-chip[data-pack="video"]').disabled, true, 'quantité vidéo désactivée');
+  assert.equal(test.state.coins, coinsBefore - 1000, 'achat débite 1 000 🪙');
+  assert.equal(test.state.packStock.video, 3, 'un pack vidéo ajouté au stock');
+  assert.match(doc.getElementById('shop-stock-video').textContent, /Tu en as 3/, 'stock mis à jour après achat');
 
   test.selectPackType('video');
   assert.equal(test.state.currentPackType, 'video');
@@ -330,8 +330,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   const demo = bootApp('https://refs-cards.test/?demo=video', SAMPLE_VIDEO_CARDS);
   await wait(40);
   assert.equal(demo.w.__videoTest.state.currentPackType, 'video', '?demo=video sélectionne le pack');
-  assert.equal(demo.w.__videoTest.isPackAvailable('video'), true, 'la démo autorise la prévisualisation');
-  assert.equal(demo.doc.getElementById('buy-video').disabled, true, 'achat toujours bloqué en démo');
+  assert.equal(demo.doc.getElementById('buy-video').disabled, true, 'sans pièces, l’achat reste désactivé en démo');
   assert.match(demo.doc.getElementById('pack-img-main').getAttribute('src'), /packetvideo\.png/);
   assert.equal(demo.doc.querySelectorAll('.gap-cards i').length, 2);
   demo.w.__videoTest.showReveal();
@@ -358,6 +357,6 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   assert.equal(empty.doc.getElementById('toast').textContent, 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).');
   empty.w.close();
 
-  console.log('PASS Pack Vidéo : configurable, non achetable, démo dynamique, garde-fou vide');
+  console.log('PASS Pack Vidéo : configurable, achetable, démo dynamique, garde-fou vide');
   console.log('PASS video pack flow');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

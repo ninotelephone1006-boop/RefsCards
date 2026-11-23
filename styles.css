@@ -2625,17 +2625,6 @@ html,body{background:var(--bg)}
   border-color: #22d3ee55;
   box-shadow: 0 0 34px -12px #22d3ee66;
 }
-.shop-badge-video {
-  background: linear-gradient(100deg, #0e7490, #22d3ee);
-  color: #04121a;
-}
-.shop-video-tag {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: #67e8f9;
-  text-transform: uppercase;
-}
 .shop-card-video .shop-img { box-shadow: 0 10px 24px -8px #000, 0 0 22px -4px #22d3ee99; }
 .shop-buy-video {
   background: linear-gradient(100deg, #0e7490, #7c3aed);
@@ -2657,61 +2646,6 @@ html,body{background:var(--bg)}
   border-color: #22d3ee80;
   background: linear-gradient(135deg, #0e7490, #7c3aed);
   color: #ecfeff;
-}
-
-/* Pack annoncé : visible dans le Shop, mais ni achetable ni ouvrable. */
-.shop-card.is-coming-soon {
-  border-style: dashed;
-  border-color: #22d3ee66;
-  background: linear-gradient(155deg, #0b1a28f2, #0f0b14f5);
-}
-.shop-card.is-coming-soon .shop-img {
-  filter: saturate(0.7) brightness(0.82);
-}
-.shop-card.is-coming-soon .qty-row {
-  opacity: 0.45;
-  pointer-events: none;
-}
-.shop-card.is-coming-soon .qty-btn,
-.shop-card.is-coming-soon .qty-chip {
-  cursor: not-allowed;
-}
-.shop-soon-note {
-  margin: 2px 0 0;
-  padding: 7px 10px;
-  border: 1px dashed #22d3ee66;
-  border-radius: 9px;
-  background: #08334466;
-  color: #a5f3fc;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: center;
-}
-.shop-buy.is-coming-soon,
-.shop-buy:disabled.is-coming-soon {
-  background: linear-gradient(100deg, #0e7490, #164e63);
-  color: #ecfeff;
-  box-shadow: none;
-  cursor: not-allowed;
-  filter: none;
-  opacity: 1;
-}
-.shop-open.is-coming-soon {
-  border-color: #22d3ee66;
-  color: #a5f3fc;
-  opacity: 0.85;
-  cursor: not-allowed;
-}
-.inventory-card.is-coming-soon {
-  border-style: dashed;
-  border-color: #22d3ee66;
-}
-.inventory-card.is-coming-soon .inventory-open-btn {
-  background: #164e63;
-  color: #cffafe;
-  cursor: not-allowed;
-  opacity: 0.9;
 }
 
 /* ==========================================================================
