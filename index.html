@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.22-1">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-2">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -22,10 +22,10 @@
        dans l'ordre ci-dessous. Le paramètre ?v= évite de rejouer un ancien
        app.js resté en cache (source de « Cannot use import statement outside a
        module » et de « addEventListener of null » après une mise à jour). -->
-  <script src="firebase-config.js?v=2026.11.22-1" defer></script>
-  <script src="cards.js?v=2026.11.22-1" defer></script>
-  <script src="audio.js?v=2026.11.22-1" defer></script>
-  <script src="app.js?v=2026.11.22-1" defer></script>
+  <script src="firebase-config.js?v=2026.11.23-2" defer></script>
+  <script src="cards.js?v=2026.11.23-2" defer></script>
+  <script src="audio.js?v=2026.11.23-2" defer></script>
+  <script src="app.js?v=2026.11.23-2" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -191,6 +191,93 @@
         </div>
       </section>
 
+      <!-- ============================== COMPTE ============================== -->
+      <section class="view account-view" id="account-view" aria-label="Mon compte">
+        <div class="page-scroll">
+          <div class="profile-hero">
+            <div class="avatar-wrap">
+              <img id="profile-avatar" class="profile-avatar" alt="Ta photo de profil" hidden>
+              <span id="profile-avatar-fallback" class="profile-avatar-fallback" aria-hidden="true">✦</span>
+              <button id="avatar-upload-btn" class="avatar-edit" type="button" aria-label="Changer ma photo de profil">📷</button>
+              <input type="file" id="avatar-input" accept="image/*" hidden>
+            </div>
+            <div class="profile-id">
+              <p class="kicker"><span>✦</span> MON COMPTE <span>✦</span></p>
+              <h2 id="profile-pseudo">Joueur</h2>
+              <p class="profile-email" id="profile-email"></p>
+              <div class="friend-code-box">
+                <span class="friend-code-label">CODE AMI</span>
+                <strong id="friend-code">REFS-······</strong>
+                <button id="friend-code-copy" class="mini-btn" type="button">Copier</button>
+              </div>
+            </div>
+            <form id="pseudo-form" class="pseudo-form">
+              <label for="pseudo-input">Pseudo</label>
+              <div class="pseudo-row">
+                <input id="pseudo-input" type="text" maxlength="24" autocomplete="off" placeholder="Ton pseudo">
+                <button class="mini-btn primary" type="submit">Enregistrer</button>
+              </div>
+            </form>
+            <div class="profile-actions">
+              <button id="avatar-google-btn" class="mini-btn" type="button">Utiliser ma photo Google</button>
+            </div>
+            <p class="profile-msg" id="profile-msg" role="status"></p>
+          </div>
+
+          <div class="stats-grid" id="stats-grid" aria-label="Mes statistiques"></div>
+          <div class="rarity-breakdown" id="rarity-breakdown" aria-label="Cartes par rareté"></div>
+        </div>
+      </section>
+
+      <!-- ============================== EN LIGNE ============================== -->
+      <section class="view online-view" id="online-view" aria-label="En ligne">
+        <div class="page-scroll">
+          <div class="online-head">
+            <p class="kicker"><span>✦</span> EN LIGNE · AMIS <span>✦</span></p>
+            <h2>Échange &amp; achète<br><em>avec tes amis.</em></h2>
+            <p class="online-sub">Ajoute un ami avec son code ami, vois ses stats et ses cartes, puis propose-lui un échange ou achète-lui une carte.</p>
+          </div>
+
+          <form id="add-friend-form" class="add-friend">
+            <label for="friend-code-input">Ajouter un ami</label>
+            <div class="add-friend-row">
+              <input id="friend-code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="REFS-XXXXXX" aria-describedby="add-friend-msg">
+              <button class="mini-btn primary" type="submit">Ajouter</button>
+            </div>
+            <p class="online-msg" id="add-friend-msg" role="status"></p>
+          </form>
+
+          <section class="trades-block" aria-label="Échanges">
+            <h3>Échanges reçus</h3>
+            <div id="trades-in" class="trades-list"></div>
+            <h3>Échanges envoyés</h3>
+            <div id="trades-out" class="trades-list"></div>
+          </section>
+
+          <section class="friends-block" aria-label="Mes amis">
+            <h3>Mes amis <span class="friends-count" id="friends-count">0</span></h3>
+            <div id="friends-list" class="friends-list"></div>
+            <p class="online-empty" id="friends-empty">Aucun ami pour l'instant. Partage ton code ami (page Compte) ou saisis le code d'un ami ci-dessus.</p>
+          </section>
+
+          <section class="friend-detail" id="friend-detail" hidden aria-label="Profil d'un ami">
+            <div class="friend-detail-head">
+              <img id="friend-avatar" class="friend-avatar" alt="" hidden>
+              <span id="friend-avatar-fallback" class="friend-avatar-fallback" aria-hidden="true">✦</span>
+              <div class="friend-detail-id">
+                <h3 id="friend-pseudo">Ami</h3>
+                <p id="friend-code-label"></p>
+              </div>
+              <button id="friend-close" class="mini-btn" type="button">Fermer</button>
+            </div>
+            <div class="friend-stats" id="friend-stats"></div>
+            <h4>Ses cartes</h4>
+            <div class="friend-cards" id="friend-cards"></div>
+            <p class="online-empty" id="friend-cards-empty" hidden>Cet ami n'a pas encore de cartes.</p>
+          </section>
+        </div>
+      </section>
+
       <div class="flash" id="flash" aria-hidden="true"></div>
 
       <!-- ============================== RECAP ============================== -->
@@ -248,6 +335,32 @@
           <p class="fusion-hint" id="fusion-hint">Sans risque · une fusion consomme deux exemplaires identiques</p>
         </div>
       </div>
+
+      <!-- ========================= CHOIX DE CARTE (ÉCHANGE) ========================= -->
+      <div class="sheet" id="trade-sheet" hidden>
+        <div class="sheet-backdrop" data-close></div>
+        <div class="sheet-dialog" role="dialog" aria-modal="true" aria-labelledby="trade-sheet-title">
+          <button class="sheet-x" type="button" data-close aria-label="Fermer">✕</button>
+          <p class="kicker"><span>✦</span> ÉCHANGE <span>✦</span></p>
+          <h3 id="trade-sheet-title">Choisis une carte à donner</h3>
+          <p class="sheet-sub" id="trade-sheet-sub"></p>
+          <div class="picker-grid" id="trade-picker"></div>
+        </div>
+      </div>
+
+      <!-- ========================= CONFIRMATION ========================= -->
+      <div class="sheet" id="confirm-sheet" hidden>
+        <div class="sheet-backdrop" data-close></div>
+        <div class="sheet-dialog sheet-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+          <p class="kicker"><span>✦</span> CONFIRMER <span>✦</span></p>
+          <h3 id="confirm-title">Confirmer ?</h3>
+          <p class="sheet-sub" id="confirm-message"></p>
+          <div class="sheet-actions">
+            <button class="mini-btn" type="button" data-close>Annuler</button>
+            <button class="mini-btn primary" type="button" id="confirm-ok">Confirmer</button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- ============================ NAVIGATION ============================ -->
@@ -261,6 +374,14 @@
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="6.5" width="12" height="15" rx="2"/><path d="M8.5 3.5h9a2 2 0 0 1 2 2V16"/></svg>
         <span>Collection</span>
         <i class="tab-badge" id="tab-badge" hidden aria-label="Nouvelles cartes"></i>
+      </button>
+      <button class="tab" type="button" data-tab="online">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M16 5.4a3.2 3.2 0 0 1 0 5.9M17.8 14.8c1.7.6 2.7 1.9 3.1 4.2"/></svg>
+        <span>En ligne</span>
+      </button>
+      <button class="tab" type="button" data-tab="account">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4"/></svg>
+        <span>Compte</span>
       </button>
     </nav>
 

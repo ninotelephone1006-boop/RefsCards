@@ -8,26 +8,74 @@ Il faut un projet Firebase partagé par toutes les versions du jeu. Le plan Spar
 
 1. Crée un projet sur [Firebase Console](https://console.firebase.google.com/).
 2. Dans **Authentication → Sign-in method**, active le fournisseur **Google**. Note : `localhost` est autorisé par défaut ; pour la mise en ligne, ajoute ton domaine dans **Authentication → Settings → Authorized domains** (étape 5).
-3. Dans **Firestore Database**, crée la base (choisis la région proche de tes joueurs) et ouvre **Rules**. Publie ces règles pour que chaque personne puisse lire et modifier uniquement sa sauvegarde :
+3. Dans **Firestore Database**, crée la base (choisis la région proche de tes joueurs) et ouvre **Rules**. Publie ces règles : chaque personne ne peut modifier que sa propre sauvegarde, les profils publics sont lisibles par tout joueur connecté, et les échanges sont réservés aux deux parties concernées :
 
 ```text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs.
     match /playerSaves/{userId} {
       function ownsSave() {
         return request.auth != null && request.auth.uid == userId;
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'updatedAt'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
         && request.resource.data.firstPack is bool
         && request.resource.data.collection is list
         && request.resource.data.collection.size() <= 10000
+        && request.resource.data.friends is list
+        && request.resource.data.friends.size() <= 500
+        && request.resource.data.packsOpened is int
+        && request.resource.data.packsOpened >= 0
         && request.resource.data.updatedAt is timestamp;
+      allow delete: if false;
+    }
+
+    // Profil public (pseudo, avatar, code ami, stats, collection) : lisible par
+    // tout joueur connecté (c'est ce que voient les amis), modifiable uniquement
+    // par son propriétaire.
+    match /playerProfiles/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.pseudo is string
+        && request.resource.data.pseudo.size() <= 24
+        && request.resource.data.avatar is string
+        && request.resource.data.avatar.size() <= 300000
+        && request.resource.data.friendCode is string
+        && request.resource.data.friendCode.matches('^REFS-[A-Z0-9]{6}$');
+      allow delete: if false;
+    }
+
+    // Annuaire code ami -> uid (recherche d'amis par code).
+    match /friendCodes/{code} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Échanges / achats entre deux joueurs : seules les deux parties peuvent
+    // lire et modifier la proposition. Chaque joueur applique sa moitié dans
+    // sa propre sauvegarde (playerSaves reste « propriétaire uniquement »).
+    match /trades/{tradeId} {
+      function isParty() {
+        return request.auth != null
+          && (request.auth.uid == resource.data.fromUid
+              || request.auth.uid == resource.data.toUid);
+      }
+      allow read: if isParty();
+      allow create: if request.auth != null
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if isParty();
       allow delete: if false;
     }
   }
@@ -75,6 +123,27 @@ node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 ```
+
+## Pages Compte et En ligne (amis, échanges, achats)
+
+La barre de navigation compte quatre onglets : **Pack**, **Collection**, **En ligne** et **Compte**.
+
+### Page Compte
+
+- **Photo de profil en grand** en haut : bouton 📷 pour téléverser une image (recadrée en carré, réduite à 256 px en JPEG, stockée dans le profil public — pas besoin de Firebase Storage). Bouton « Utiliser ma photo Google » pour revenir à la photo du compte Google.
+- **Pseudo modifiable** (1 à 24 caractères), affiché en haut de la page et dans le HUD à la place de l'adresse e-mail. Cliquer sur l'avatar ou le nom dans le HUD ouvre cette page.
+- **Code ami** stable de la forme `REFS-XXXXXX`, dérivé de l'uid du compte, avec bouton « Copier ». Il est enregistré dans l'annuaire `friendCodes/{code}` pour être retrouvé par les amis.
+- **Statistiques** : pièces, cartes totales, cartes uniques (x / total), doublons, valeur de la collection (somme des récompenses), meilleure rareté, boosters ouverts, nombre d'amis, plus le détail des cartes par rareté.
+
+### Page En ligne
+
+- **Ajout d'ami par code** : saisis le code ami d'un joueur (`REFS-XXXXXX`, le préfixe et les tirets sont tolérés), l'annuaire retrouve son uid et son profil public est ajouté à ta liste d'amis (stockée dans ta sauvegarde privée, champ `friends`).
+- **Profil d'un ami** : photo, pseudo, code ami, stats (pièces, cartes, uniques, meilleure rareté) et **ses cartes** avec leurs exemplaires.
+- **Échanger** : sur une carte d'un ami, choisis une de tes cartes à lui donner ; une proposition d'échange est créée (`trades/{id}`, statut `pending`). L'ami la voit dans « Échanges reçus » et peut accepter ou refuser.
+- **Acheter** : le prix d'une carte vaut **le double de sa récompense de rareté** (Commune 40 🪙, Inhabituelle 70 🪙, Rare 110 🪙, Super Rare 160 🪙, Épique 240 🪙, Ultra épique 350 🪙, Mythique 480 🪙, Légendaire 680 🪙, Divine 1 040 🪙, Secrète 1 800 🪙). Le bouton est désactivé si ton solde est insuffisant.
+- **Acceptation** : quand un joueur accepte, il applique sa moitié dans **sa propre** sauvegarde (il donne sa carte / paie, et reçoit l'autre carte / les pièces), puis marque l'échange comme appliqué de son côté. L'autre joueur applique sa moitié à son tour — immédiatement s'il est en ligne, sinon à sa prochaine connexion (`loadTrades` rejoue les moitiés en attente). Quand les deux moitiés sont appliquées, l'échange passe à `done`. Les échanges reçus/envoyés se mettent à jour en temps réel (`onSnapshot`).
+
+Documents Firestore utilisés : `playerSaves/{uid}` (privé, + `friends` et `packsOpened`), `playerProfiles/{uid}` (public pour les joueurs connectés), `friendCodes/{code}` (annuaire), `trades/{id}` (propositions réservées aux deux parties). Les règles correspondantes sont dans `firestore.rules` — **republie-les** (`firebase deploy --only firestore:rules`) pour activer les nouvelles pages.
 
 ## Déroulé d'une ouverture
 
