@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-12">
+  <meta name="app-version" content="2026.11.24-13">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-12">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-13">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-12" defer></script>
+  <script src="app.js?v=2026.11.24-13" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -406,8 +406,8 @@
         <div class="page-scroll">
           <div class="online-head">
             <p class="kicker"><span>✦</span> EN LIGNE · MARCHÉ <span>✦</span></p>
-            <h2>Crée ton marché,<br><em>achète chez tes amis.</em></h2>
-            <p class="online-sub">Envoie une demande avec le code ami d'un joueur : il doit l'accepter pour que vous soyez amis. Ensuite, crée ton marché ici : mets en vente les cartes (et les packs) que tu veux, avec le nombre et le prix que tu choisis. Le marché d'un ami se voit sur son profil : achète-y ce qu'il propose, au nombre et au prix qu'il a fixés.</p>
+            <h2>Crée ton marché,<br><em>achète partout.</em></h2>
+            <p class="online-sub">Crée ton marché ici : mets en vente les cartes (et les packs) que tu veux, avec le nombre et le prix que tu choisis. Le <strong>marché global</strong> rassemble les annonces de tous les joueurs — même ceux qui ne sont pas tes amis — avec le nom du vendeur et un bouton pour l’ajouter. Ajoute aussi des amis avec un code ami : il devra accepter, et son marché s’affichera sur son profil.</p>
           </div>
 
           <form id="add-friend-form" class="add-friend">
@@ -471,6 +471,23 @@
             <div id="market-sent" class="trades-list"></div>
             <button id="market-refresh" class="mini-btn" type="button">Actualiser les ventes et cadeaux</button>
             <p id="market-message" class="online-msg" role="status"></p>
+          </section>
+
+          <section class="market-block global-market-block" aria-label="Marché global">
+            <h3>🌍 Marché global <span class="friends-count" id="global-market-count">0</span></h3>
+            <p class="online-empty">Toutes les annonces du jeu, même celles des joueurs qui ne sont pas tes amis. Le nom du vendeur est affiché : tu peux acheter directement, ou l’ajouter en ami s’il ne l’est pas déjà.</p>
+            <div class="global-market-tools">
+              <input id="global-market-search" type="search" autocomplete="off" placeholder="Filtrer par carte, pack ou pseudo" aria-label="Filtrer les annonces du marché global">
+              <label class="global-market-filter" for="global-market-sort">Trier</label>
+              <select id="global-market-sort" aria-label="Trier les annonces du marché global">
+                <option value="recent">Plus récentes</option>
+                <option value="cheap">Prix croissant</option>
+                <option value="expensive">Prix décroissant</option>
+              </select>
+              <button id="global-market-refresh" class="mini-btn" type="button">Actualiser</button>
+            </div>
+            <div id="global-market-list" class="trades-list"></div>
+            <p id="global-market-message" class="online-msg" role="status"></p>
           </section>
 
           <section class="friends-block" aria-label="Mes amis">

@@ -2528,6 +2528,20 @@ html,body{background:var(--bg)}
 .market-row-qty-wrap{display:inline-flex;align-items:center;gap:5px}
 .market-row-btn{width:28px;height:28px;font-size:14px}
 .market-row-qty{width:52px;padding:5px 6px;border:1px solid #725598;border-radius:8px;background:#0f0b14;color:#fff;font:inherit;font-size:13px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
+
+/* Marché global : toutes les annonces du jeu, vendeur affiché */
+.global-market-block{margin-top:20px}
+.global-market-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}
+.global-market-tools input,.global-market-tools select{flex:1 1 170px;min-width:0;padding:9px 11px;border:1px solid #725598;border-radius:9px;background:#0f0b14;color:#fff;font:inherit;font-size:13px}
+.global-market-tools select{flex:0 0 auto}
+.global-market-tools select option{background:#160f20}
+.global-market-filter{font-size:11px;color:#c4a1ff;font-weight:700}
+.global-market-tools .mini-btn{flex:0 0 auto}
+.global-seller{padding:12px;border:1px solid #a855f733;border-radius:14px;background:#0f0b14f5;display:flex;flex-direction:column;gap:8px}
+.global-seller-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid #ffffff12}
+.global-seller-head .request-id{flex:1 1 180px}
+.global-seller-tag{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#c7a9ff;background:#241c2e;border:1px solid #8b5cf644;border-radius:999px;padding:4px 9px}
+.global-seller .trade-row{background:#161020}
 .qty-btn:disabled{opacity:.38;cursor:not-allowed;transform:none}
 .market-busy{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#090510bd;color:#fff;font-weight:700}
 
