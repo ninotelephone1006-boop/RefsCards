@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.23-1">
+  <meta name="app-version" content="2026.11.23-2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-1">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-2">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -28,14 +28,14 @@
        module » et de « addEventListener of null » après une mise à jour). -->
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-4" defer></script>
-  <script src="quests.js?v=2026.11.24-2" defer></script>
+  <script src="quests.js?v=2026.11.24-3" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
   <!-- Détection de mise à jour : compare la version chargée à celle
        du index.html en ligne et propose de recharger (aucun
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-1" defer></script>
+  <script src="app.js?v=2026.11.23-2" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -623,7 +623,7 @@
                 <span class="level-xp" id="level-xp" aria-live="polite">0 / 100 XP</span>
               </div>
               <div class="level-bar" aria-hidden="true"><i id="level-fill"></i></div>
-              <p class="quests-count" id="quests-count" aria-live="polite">Quête 1 / 20</p>
+              <p class="quests-count" id="quests-count" aria-live="polite">0 / 20 terminées · 5 quêtes actives</p>
             </div>
             <div class="quests-tabs" role="tablist" aria-label="Sections des quêtes">
               <button class="chip is-active" type="button" role="tab" aria-selected="true" data-quest-tab="quests">Quêtes</button>
@@ -631,6 +631,7 @@
             </div>
           </div>
 
+          <p class="quests-help">Choisis parmi les 5 quêtes actives : chaque récompense réclamée débloque la suivante.</p>
           <div class="quest-panel" id="quest-panel" role="tabpanel" aria-label="Quêtes"></div>
           <div class="ach-panel" id="ach-panel" role="tabpanel" aria-label="Succès" hidden></div>
         </div>
