@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-1">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-2">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-1" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-1" defer></script>
+  <script src="app.js?v=2026.11.24-3" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -235,17 +235,25 @@
           <div class="online-head">
             <p class="kicker"><span>✦</span> EN LIGNE · AMIS <span>✦</span></p>
             <h2>Échange &amp; achète<br><em>avec tes amis.</em></h2>
-            <p class="online-sub">Ajoute un ami avec son code ami, vois ses stats et ses cartes, puis propose-lui un échange ou achète-lui une carte.</p>
+            <p class="online-sub">Envoie une demande avec le code ami d'un joueur : il doit l'accepter pour que vous soyez amis. Ensuite, vois ses stats et ses cartes, puis propose-lui un échange ou achète-lui une carte.</p>
           </div>
 
           <form id="add-friend-form" class="add-friend">
-            <label for="friend-code-input">Ajouter un ami</label>
+            <label for="friend-code-input">Ajouter un ami (demande à accepter)</label>
             <div class="add-friend-row">
               <input id="friend-code-input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="REFS-XXXXXX" aria-describedby="add-friend-msg">
-              <button class="mini-btn primary" type="submit">Ajouter</button>
+              <button class="mini-btn primary" type="submit">Demander</button>
             </div>
             <p class="online-msg" id="add-friend-msg" role="status"></p>
           </form>
+
+          <section class="requests-block" aria-label="Demandes d'ami">
+            <h3>Demandes reçues <span class="friends-count" id="friend-requests-count">0</span></h3>
+            <div id="friend-requests-in" class="requests-list"></div>
+            <p class="online-empty" id="friend-requests-empty">Aucune demande reçue. Quand un joueur t’ajoute avec ton code ami, sa demande apparaît ici : accepte-la pour devenir amis.</p>
+            <h3>Demandes envoyées</h3>
+            <div id="friend-requests-out" class="requests-list"></div>
+          </section>
 
           <section class="trades-block" aria-label="Échanges">
             <h3>Échanges reçus</h3>
@@ -257,7 +265,7 @@
           <section class="friends-block" aria-label="Mes amis">
             <h3>Mes amis <span class="friends-count" id="friends-count">0</span></h3>
             <div id="friends-list" class="friends-list"></div>
-            <p class="online-empty" id="friends-empty">Aucun ami pour l'instant. Partage ton code ami (page Compte) ou saisis le code d'un ami ci-dessus.</p>
+            <p class="online-empty" id="friends-empty">Aucun ami pour l'instant. Partage ton code ami (page Compte) ou envoie une demande avec le code d'un ami ci-dessus : il devra l'accepter.</p>
           </section>
 
           <section class="friend-detail" id="friend-detail" hidden aria-label="Profil d'un ami">

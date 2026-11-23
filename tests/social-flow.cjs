@@ -33,6 +33,7 @@ function makeStore() {
       }
     },
     friendCodes: { 'REFS-ABC123': { uid: 'friend1' } },
+    friendRequests: {},
     trades: {}
   };
 }
@@ -46,6 +47,9 @@ function makeFirestore(store) {
     set: async (data) => { store[coll][id] = { ...(store[coll][id] || {}), ...data }; },
     update: async (patch) => { store[coll][id] = { ...(store[coll][id] || {}), ...patch }; }
   });
+  /* Temps réel simulé : on garde les abonnés pour pouvoir pousser une mise à
+     jour (c'est ainsi que l'ami « accepte » pendant que l'onglet est ouvert). */
+  const watchers = [];
   const query = (coll, field, value) => {
     const snap = () => ({
       docs: Object.entries(store[coll])
@@ -54,14 +58,22 @@ function makeFirestore(store) {
     });
     return {
       get: async () => snap(),
-      onSnapshot: (cb) => { Promise.resolve().then(() => cb(snap())); return () => {}; }
+      onSnapshot: (cb) => {
+        watchers.push({ coll, cb: () => cb(snap()) });
+        Promise.resolve().then(() => cb(snap()));
+        return () => {};
+      }
     };
   };
   return {
     collection: (coll) => ({
       doc: (id) => docRef(coll, id),
       where: (field, op, value) => query(coll, field, value)
-    })
+    }),
+    // Pousse une mise à jour du store vers les abonnés onSnapshot.
+    refresh(coll) {
+      watchers.filter((w) => !coll || w.coll === coll).forEach((w) => w.cb());
+    }
   };
 }
 
@@ -86,7 +98,8 @@ async function boot() {
     signOut: () => Promise.resolve()
   });
   auth.GoogleAuthProvider = class { setCustomParameters() {} };
-  w.firebase = { apps: [], initializeApp() {}, auth, firestore: () => makeFirestore(store) };
+  const db = makeFirestore(store);
+  w.firebase = { apps: [], initializeApp() {}, auth, firestore: () => db };
 
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('firebase-config.js', 'utf8'), context);
@@ -96,7 +109,7 @@ async function boot() {
 
   await authState.onChange({ uid: 'me', email: 'moi@test', displayName: 'Moi', photoURL: '' });
   await wait(150); // loadProfile : profil + code ami + sauvegarde du profil
-  return { w, doc: w.document, store };
+  return { w, doc: w.document, store, db };
 }
 
 function submitForm(w, form) {
@@ -108,7 +121,7 @@ function buttonByText(root, text) {
 }
 
 (async () => {
-  const { w, doc, store } = await boot();
+  const { w, doc, store, db } = await boot();
 
   /* 1. Quatre onglets, page Compte : pseudo, code ami, stats. */
   assert.equal(doc.querySelectorAll('.tab').length, 4, 'Pack, Collection, En ligne, Compte');
@@ -131,18 +144,31 @@ function buttonByText(root, text) {
   assert.equal(doc.getElementById('account-email').textContent, 'SuperJoueur');
   console.log('PASS pseudo modifiable = profil cloud + HUD mis à jour');
 
-  /* 3. Page En ligne : ajout d'ami par code. */
+  /* 3. Page En ligne : ajout par code = DEMANDE, pas un ami direct. */
   doc.querySelector('[data-tab="online"]').click();
   await wait(30);
   assert.equal(doc.querySelectorAll('.friend-row').length, 0);
   doc.getElementById('friend-code-input').value = 'REFS-ABC123';
   submitForm(w, doc.getElementById('add-friend-form'));
   await wait(80);
-  assert.equal(doc.querySelectorAll('.friend-row').length, 1);
-  assert.match(doc.querySelector('.friend-row').textContent, /AmiJoueur/);
-  assert.match(doc.getElementById('add-friend-msg').textContent, /ajouté/);
-  console.log('PASS ajout d’ami par code ami');
+  assert.equal(doc.querySelectorAll('.friend-row').length, 0, 'pas ami avant acceptation');
+  const requestId = 'me__friend1';
+  assert.equal(store.friendRequests[requestId].status, 'pending');
+  assert.match(doc.getElementById('add-friend-msg').textContent, /doit l’accepter/);
+  console.log('PASS ajout par code = demande d’ami en attente (rien sans acceptation)');
 
+  /* 3 bis. L'AUTRE joueur accepte la demande : je deviens ami chez moi aussi
+     (temps réel : l'abonnement onSnapshot pousse la mise à jour). */
+  store.friendRequests[requestId].status = 'accepted';
+  store.friendRequests[requestId].applied = { friend1: true };
+  db.refresh('friendRequests');
+  await wait(150);
+  assert.equal(doc.querySelectorAll('.friend-row').length, 1, 'ami ajouté après acceptation');
+  assert.match(doc.querySelector('.friend-row').textContent, /AmiJoueur/);
+  assert.equal(store.friendRequests[requestId].applied.me, true, 'ma moitié est marquée appliquée');
+  await wait(400); // save() est différé de 250 ms
+  assert.ok(store.playerSaves.me.friends.includes('friend1'), 'ami enregistré dans ma sauvegarde');
+  console.log('PASS acceptation par l’autre joueur = amis des deux côtés');
   /* 4. Profil d'ami : stats + ses cartes, boutons Échanger / Acheter. */
   buttonByText(doc.querySelector('.friend-row'), 'Voir').click();
   await wait(60);
