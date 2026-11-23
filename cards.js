@@ -415,6 +415,15 @@ const cardsDatabase = [
     emoji: '👑',
     image: 'assets/Cartes/king-mathis.jpeg',
     color: '#f5d979'
+  },
+  {
+    id: 'cochon-bierry',
+    name: 'Cochon Bierry',
+    description: "c'est hallal",
+    rarity: 'mythic',
+    emoji: '🐷',
+    image: 'assets/Cartes/cochon-bierry.jpeg',
+    color: '#ffb372'
   }
 ];
 
