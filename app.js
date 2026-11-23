@@ -6,7 +6,18 @@
 (() => {
   'use strict';
 
-  const PACK_PRICE = 100;
+  /* Boutique : les packs s'achètent dans le Shop et vont dans l'inventaire
+     (onglet Pack). Les prix sont réglés AU-DESSUS de la valeur moyenne d'un
+     pack (classique ≈ 394 🪙, rare ≈ 419 🪙 pour 5 cartes) : à 100 🪙,
+     chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
+     infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
+     faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
+  const PACK_PRICES = { classic: 500, rare: 1000 };
+  const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
+  const RARE_BOOST = 1.2; // pack rare : poids des raretés Rare+ multipliés par 1,2 (+20 %)
+  const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
+  const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
+  const PACK_IMAGES = { classic: 'assets/packet.png', rare: 'assets/packetrare.png' };
   const CARD_COUNT = 5;
   const TEAR_THRESHOLD = 0.75;
 
@@ -133,6 +144,31 @@
   const accountEmail = $('account-email');
   const logoutBtn = $('logout-btn');
   const gameRegions = document.querySelectorAll('.hud, #stage, #tabbar, .toast');
+  /* Shop + inventaire (tolérants : HTML en cache obsolète sans ces blocs). */
+  const shopView = $('shop-view');
+  const packImgMain = $('pack-img-main');
+  const packImgFlap = $('pack-img-flap');
+  const packTypeClassic = $('pack-type-classic');
+  const packTypeRare = $('pack-type-rare');
+  const packCountClassic = $('pack-count-classic');
+  const packCountRare = $('pack-count-rare');
+  const packStockLabel = $('pack-stock-label');
+  const packGoShop = $('pack-go-shop');
+  const freeClaim = $('free-claim');
+  const freeLabel = $('free-label');
+  const freeDots = $('free-dots');
+  const freeMsg = $('free-msg');
+  const shopStockClassic = $('shop-stock-classic');
+  const shopStockRare = $('shop-stock-rare');
+  const qtyClassic = $('qty-classic');
+  const qtyRare = $('qty-rare');
+  const buyClassic = $('buy-classic');
+  const buyRare = $('buy-rare');
+  const shopInventoryLabel = $('shop-inventory-label');
+  const shopOpenBtn = $('shop-open-btn');
+  const shopMsg = $('shop-msg');
+  const tabBadgeShop = $('tab-badge-shop');
+  const shopQty = { classic: 1, rare: 1 };
 
   /* ----------------------------------------------------------------- state */
 
@@ -145,13 +181,25 @@
     packIndex: 0,
     fusionOpen: false,
     fusionSelection: null,
-    firstPack: true
+    firstPack: true,
+    /* Inventaire de packs (achetés dans le Shop + gratuits quotidiens).
+       Ouvrir un pack en consomme 1. `currentPackType` = pack choisi dans
+       l'onglet Pack. `freeDate`/`freeUsed` = quota quotidien (date locale
+       AAAA-MM-JJ + nombre déjà récupérés, 0..FREE_PER_DAY). */
+    packStock: { classic: 0, rare: 0 },
+    currentPackType: 'classic',
+    freeDate: '',
+    freeUsed: 0,
+    packsOpened: 0
   };
 
   /* --------------------------------------------------------------- comptes */
 
   function updateCoins(delta) {
     coinsEl.textContent = fmt(state.coins);
+    /* Les boutons d'achat du Shop dépendent du solde : on les rafraîchit
+       (fonction déclarée plus bas, hoistée — sans effet si le Shop manque). */
+    if (typeof renderShop === 'function') renderShop();
     if (delta) {
       wallet.classList.remove('bump', 'spend');
       void wallet.offsetWidth;
@@ -179,20 +227,210 @@
     toastTimer = window.setTimeout(() => toast.classList.remove('show'), duration);
   }
 
+  /* ====================================================== SHOP · INVENTAIRE
+     Les packs ne s'achètent plus en un clic depuis le récap : ils vont dans
+     l'inventaire (state.packStock) et s'ouvrent depuis l'onglet Pack.
+     - Achat : plusieurs d'un coup (quantité 1..MAX_QTY), prix PACK_PRICES.
+     - Gratuit : FREE_PER_DAY packs classiques par jour calendaire local,
+       à récupérer un par un dans le Shop (freeDate/freeUsed persistés).
+     - Ouverture : consomme 1 pack du type choisi (currentPackType). */
+
+  function todayKey() {
+    const now = new Date();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${now.getFullYear()}-${m}-${d}`;
+  }
+
+  function refreshFreeQuota() {
+    const today = todayKey();
+    if (state.freeDate !== today) {
+      state.freeDate = today;
+      state.freeUsed = 0;
+    }
+    state.freeUsed = clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY);
+  }
+
+  function freeRemaining() {
+    refreshFreeQuota();
+    return Math.max(0, FREE_PER_DAY - state.freeUsed);
+  }
+
+  function packTotal() {
+    return (state.packStock.classic || 0) + (state.packStock.rare || 0);
+  }
+
+  function isDemoMode() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('demo') === '1' || params.get('demo') === 'fusion'
+        || sessionStorage.getItem('refs-demo') === '1'
+        || sessionStorage.getItem('refs-demo') === 'fusion';
+    } catch (error) { return false; }
+  }
+
+  function setShopMsg(message) {
+    if (shopMsg) shopMsg.textContent = message || '';
+  }
+
+  function setFreeMsg(message) {
+    if (freeMsg) freeMsg.textContent = message || '';
+  }
+
+  function renderShop() {
+    refreshFreeQuota();
+    const remaining = freeRemaining();
+    if (freeClaim) {
+      freeClaim.disabled = remaining <= 0;
+      freeClaim.textContent = remaining > 0
+        ? `RÉCUPÉRER · ${remaining} RESTANT${remaining > 1 ? 'S' : ''}`
+        : 'GRATUITS ÉPUISÉS · REVIENS DEMAIN';
+    }
+    if (freeLabel) {
+      freeLabel.textContent = remaining > 0
+        ? `${state.freeUsed}/${FREE_PER_DAY} récupérés aujourd'hui · se réinitialise à minuit.`
+        : `Tu as récupéré tes ${FREE_PER_DAY} packs du jour. Se réinitialise à minuit.`;
+    }
+    if (freeDots) {
+      [...freeDots.children].forEach((dot, i) => dot.classList.toggle('is-taken', i < state.freeUsed));
+    }
+    if (tabBadgeShop) tabBadgeShop.hidden = remaining <= 0;
+
+    const stockText = (n) => `Tu en as ${n}`;
+    if (shopStockClassic) shopStockClassic.textContent = stockText(state.packStock.classic || 0);
+    if (shopStockRare) shopStockRare.textContent = stockText(state.packStock.rare || 0);
+
+    const updateBuy = (type, qtyEl, btn) => {
+      const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
+      if (qtyEl) qtyEl.textContent = String(qty);
+      if (btn) {
+        const total = PACK_PRICES[type] * qty;
+        btn.textContent = `ACHETER · ${fmt(total)} 🪙`;
+        btn.disabled = state.coins < total;
+      }
+      document.querySelectorAll(`.qty-chip[data-pack="${type}"]`).forEach((chip) => {
+        chip.classList.toggle('is-active', Number(chip.dataset.qty) === qty);
+      });
+    };
+    updateBuy('classic', qtyClassic, buyClassic);
+    updateBuy('rare', qtyRare, buyRare);
+
+    const total = packTotal();
+    if (shopInventoryLabel) {
+      shopInventoryLabel.textContent = total > 0
+        ? `Inventaire : ${state.packStock.classic || 0} classique${(state.packStock.classic || 0) > 1 ? 's' : ''} · ${state.packStock.rare || 0} rare${(state.packStock.rare || 0) > 1 ? 's' : ''}`
+        : 'Inventaire vide — achète ou récupère tes packs gratuits.';
+    }
+    if (shopOpenBtn) shopOpenBtn.disabled = total <= 0;
+  }
+
+  function renderPackInventory() {
+    const classic = state.packStock.classic || 0;
+    const rare = state.packStock.rare || 0;
+    if (packCountClassic) packCountClassic.textContent = `×${classic}`;
+    if (packCountRare) packCountRare.textContent = `×${rare}`;
+    const type = state.currentPackType === 'rare' ? 'rare' : 'classic';
+    const selected = type === 'rare' ? rare : classic;
+    const total = classic + rare;
+    if (packTypeClassic) {
+      packTypeClassic.classList.toggle('is-active', type === 'classic');
+      packTypeClassic.setAttribute('aria-pressed', String(type === 'classic'));
+    }
+    if (packTypeRare) {
+      packTypeRare.classList.toggle('is-active', type === 'rare');
+      packTypeRare.setAttribute('aria-pressed', String(type === 'rare'));
+    }
+    if (packStockLabel) {
+      packStockLabel.textContent = total > 0
+        ? `Inventaire : ${classic} classique${classic > 1 ? 's' : ''} · ${rare} rare${rare > 1 ? 's' : ''} — ${type === 'rare' ? 'pack rare sélectionné' : 'pack classique sélectionné'}`
+        : 'Inventaire vide — va au Shop pour en acheter ou récupérer les gratuits.';
+    }
+    const empty = selected <= 0 && !isDemoMode();
+    if (pack) pack.classList.toggle('is-empty', empty);
+    if (packGoShop) packGoShop.hidden = !empty;
+    if (pack) pack.setAttribute('aria-label', empty
+      ? 'Aucun pack en inventaire. Va au Shop pour en acheter.'
+      : `Booster ${type === 'rare' ? 'rare' : 'classique'}. Fais glisser vers la droite pour le déchirer.`);
+    renderOdds(type === 'rare');
+  }
+
+  function selectPackType(type) {
+    if (type !== 'classic' && type !== 'rare') return;
+    state.currentPackType = type;
+    const src = PACK_IMAGES[type];
+    if (packImgMain) packImgMain.src = src;
+    if (packImgFlap) packImgFlap.src = src;
+    SFX.tick();
+    renderPackInventory();
+  }
+
+  function claimFreePack() {
+    SFX.unlock();
+    const remaining = freeRemaining();
+    if (remaining <= 0) {
+      SFX.snap();
+      setFreeMsg('Tu as déjà récupéré tes 3 packs gratuits du jour. Reviens demain !');
+      return;
+    }
+    state.freeUsed += 1;
+    state.packStock.classic = (state.packStock.classic || 0) + 1;
+    SFX.chaChing();
+    setFreeMsg(`Pack gratuit ajouté à ton inventaire (${freeRemaining()} restant${freeRemaining() > 1 ? 's' : ''} aujourd'hui).`);
+    showToast('Pack gratuit ajouté à ton inventaire !');
+    save();
+    renderShop();
+    renderPackInventory();
+  }
+
+  function buyPacks(type) {
+    SFX.unlock();
+    const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
+    const total = PACK_PRICES[type] * qty;
+    if (state.coins < total) {
+      SFX.snap();
+      setShopMsg(`Pas assez de pièces : il te manque ${fmt(total - state.coins)} 🪙 pour ${qty} pack${qty > 1 ? 's' : ''} ${type === 'rare' ? 'rare' : 'classique'}${qty > 1 ? 's' : ''}.`);
+      return;
+    }
+    SFX.chaChing();
+    addCoins(-total);
+    state.packStock[type] = (state.packStock[type] || 0) + qty;
+    setShopMsg(`${qty} pack${qty > 1 ? 's' : ''} ${type === 'rare' ? 'rare' : 'classique'}${qty > 1 ? 's' : ''} ajouté${qty > 1 ? 's' : ''} à ton inventaire !`);
+    showToast(`${qty} pack${qty > 1 ? 's' : ''} ${type === 'rare' ? 'rare' : 'classique'}${qty > 1 ? 's' : ''} dans l'inventaire !`);
+    save();
+    renderShop();
+    renderPackInventory();
+  }
+
+  function goToShop() {
+    SFX.unlock();
+    SFX.tick();
+    setTab('shop');
+  }
+
   /* --------------------------------------------------------------- tirage */
 
-  function pickCard(forcedRarity) {
+  /* Poids effectifs d'une rareté pour un type de pack. Pack rare : les
+     raretés Rare et plus (rank >= 2) voient leur poids multiplié par
+     RARE_BOOST (1,2 = +20 % relatif), puis tout est renormalisé — les
+     Communes/Inhabituelles baissent donc légèrement en part relative. */
+  function rarityWeight(key, boosted) {
+    const info = RARITIES[key];
+    if (!info) return 0;
+    return boosted && info.rank >= RARITIES.rare.rank ? info.weight * RARE_BOOST : info.weight;
+  }
+
+  function pickCard(forcedRarity, boosted) {
     const available = Object.keys(RARITIES).filter((r) => cardsDatabase.some((c) => c.rarity === r));
     if (!available.length) return null;
     let rarity = forcedRarity;
     if (!rarity || !available.includes(rarity)) {
       // Tirage pondéré : chaque rareté garde exactement son pourcentage annoncé,
       // puis la carte est tirée au hasard à l'intérieur de la rareté.
-      const total = available.reduce((sum, r) => sum + RARITIES[r].weight, 0);
+      const total = available.reduce((sum, r) => sum + rarityWeight(r, boosted), 0);
       let roll = Math.random() * total;
       rarity = available[available.length - 1];
       for (const r of available) {
-        if ((roll -= RARITIES[r].weight) < 0) {
+        if ((roll -= rarityWeight(r, boosted)) < 0) {
           rarity = r;
           break;
         }
@@ -202,7 +440,7 @@
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
-  function drawPack() {
+  function drawPack(boosted) {
     const drawn = [];
     const params = new URLSearchParams(window.location.search);
     const demoMode = params.get('demo') || sessionStorage.getItem('refs-demo');
@@ -218,7 +456,7 @@
       });
     }
     while (drawn.length < CARD_COUNT) {
-      const card = pickCard();
+      const card = pickCard(null, boosted);
       if (!card) break;
       drawn.push(card);
     }
@@ -556,9 +794,22 @@
     }
   }
 
+  /* Sans pack en inventaire, on ne peut pas déchirer : on renvoie au Shop. */
+  function hasPackToOpen() {
+    if (isDemoMode()) return true;
+    return (state.packStock[state.currentPackType] || 0) > 0;
+  }
+
+  function denyNoPack() {
+    SFX.snap();
+    showToast('Aucun pack en inventaire — va au Shop pour en acheter ou récupérer les gratuits.', 3600);
+    if (packGoShop) packGoShop.hidden = false;
+  }
+
   function onDragStart(e) {
     if (state.phase !== 'pack' || drag) return;
     SFX.unlock();
+    if (!hasPackToOpen()) { denyNoPack(); e.preventDefault(); return; }
     if (e.button != null && e.button !== 0) return;
     const rect = pack.getBoundingClientRect();
     drag = {
@@ -650,6 +901,7 @@
 
   function autoTear() {
     if (state.phase !== 'pack') return;
+    if (!hasPackToOpen()) { denyNoPack(); return; }
     state.phase = 'tearing';
     SFX.unlock();
     SFX.tearStart();
@@ -665,6 +917,18 @@
   }
 
   function openPack() {
+    /* Consomme 1 pack de l'inventaire (sauf en démo, où l'ouverture est
+       gratuite pour les tests/apercus). Le tirage utilise ensuite le type
+       choisi (rare = chances +20 %). */
+    if (!isDemoMode()) {
+      const type = state.currentPackType === 'rare' ? 'rare' : 'classic';
+      if ((state.packStock[type] || 0) > 0) {
+        state.packStock[type] -= 1;
+        state.packsOpened = (state.packsOpened || 0) + 1;
+        save();
+        renderPackInventory();
+      }
+    }
     SFX.tearStop();
     SFX.rip();
     pack.classList.add('is-ripped');
@@ -728,6 +992,7 @@
       autoTear();
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
+      if (!hasPackToOpen()) { denyNoPack(); return; }
       SFX.unlock();
       if (!drag) {
         drag = { id: 'kbd', startX: 0, lastX: 0, lastT: 0, travel: 100, speed: 0, started: true, lastSpark: 0 };
@@ -1178,7 +1443,7 @@
       return;
     }
     nextCard.hidden = true;
-    state.deck = drawPack();
+    state.deck = drawPack(state.currentPackType === 'rare');
     packView.hidden = true;
     revealView.hidden = false;
     revealView.classList.remove('view-in');
@@ -1263,24 +1528,17 @@
 
     window.setTimeout(() => {
       SFX.coin();
+      /* Plus d'achat direct ici : le bouton renvoie au Shop (les packs
+         achetés vont dans l'inventaire, onglet Pack). */
       buyBtn.hidden = false;
       buyBtn.disabled = false;
-      buyBtn.classList.remove('is-denied');
-      if (buyLabel) buyLabel.textContent = state.firstPack ? 'PREMIER BOOSTER OFFERT' : 'OUVRIR UN BOOSTER';
-      if (state.firstPack) buyBtn.classList.add('is-free');
-      else buyBtn.classList.remove('is-free');
-      if (buyPrice) {
-        buyPrice.innerHTML = state.firstPack
-          ? '<span class="free-tag">OFFERT</span>'
-          : '<span class="coin-glyph" aria-hidden="true">🪙</span>100';
-      }
-      if (state.firstPack) buyBtn.disabled = false;
-      else if (state.coins < PACK_PRICE) {
-        buyBtn.disabled = true;
-        recapMsg.textContent = `Il te manque ${fmt(PACK_PRICE - state.coins)} 🪙 pour un nouveau booster.`;
-      } else {
-        recapMsg.textContent = '';
-      }
+      buyBtn.classList.remove('is-denied', 'is-free');
+      if (buyLabel) buyLabel.textContent = 'ALLER AU SHOP';
+      if (buyPrice) buyPrice.hidden = true;
+      const total = packTotal();
+      recapMsg.textContent = total > 0
+        ? `Tu as ${total} pack${total > 1 ? 's' : ''} en inventaire — ouvre-les dans l'onglet Pack !`
+        : 'Plus de packs ? Le Shop t\'attend (3 gratuits par jour).';
       updateFusionChip();
       if (!fusionChip.hidden) {
         fusionChip.animate?.(
@@ -1292,31 +1550,16 @@
     }, reduceMotion.matches ? 120 : 480);
   }
 
-  /* --------------------------------------------------------------- achat */
+  /* --------------------------------------------------------------- achat
+     L'ancien achat direct (100 🪙 depuis le récap) est remplacé par le Shop :
+     buyPack() ne fait plus que naviguer vers la boutique. Les achats réels
+     passent par buyPacks() (quantité, inventaire). */
 
   function buyPack() {
     SFX.unlock();
     if (state.phase !== 'done') return;
-    if (state.firstPack) {
-      SFX.chaChing();
-      state.firstPack = false;
-      save();
-      resetToPack();
-      return;
-    }
-    if (state.coins < PACK_PRICE) {
-      SFX.snap();
-      recapMsg.textContent = `Pas assez de pièces : il te manque ${fmt(PACK_PRICE - state.coins)} 🪙.`;
-      buyBtn.classList.remove('is-denied');
-      void buyBtn.offsetWidth;
-      buyBtn.classList.add('is-denied');
-      return;
-    }
-    SFX.chaChing();
-    addCoins(-PACK_PRICE);
-    state.firstPack = false;
-      save();
-    resetToPack();
+    SFX.tick();
+    setTab('shop');
   }
 
   function resetToPack() {
@@ -1359,7 +1602,10 @@
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     SFX.deal();
     scheduleSizing(10);
-    showToast('Nouveau booster ! Glisse vers la droite pour déchirer.', 2800);
+    renderPackInventory();
+    showToast(packTotal() > 0
+      ? 'Nouveau booster ! Glisse vers la droite pour déchirer.'
+      : 'Inventaire vide — va au Shop pour un nouveau pack.', 2800);
   }
 
   /* --------------------------------------------------------------- fusion */
@@ -1441,7 +1687,7 @@
       renderFusionPreview(null);
       if (state.phase === 'done') {
         fusionBuy.hidden = false;
-        fusionBuy.textContent = state.firstPack || state.coins >= PACK_PRICE ? 'OUVRIR UN BOOSTER' : `OUVRIR UN BOOSTER · 100 🪙`;
+        fusionBuy.textContent = 'ALLER AU SHOP';
       }
       return;
     }
@@ -1724,18 +1970,27 @@
     openInspect(cardById(slot.dataset.cardId));
   });
 
-  /* Probabilités : générées depuis RARITIES pour rester toujours justes. */
-  function renderOdds() {
+  /* Probabilités : générées depuis RARITIES pour rester toujours justes.
+     En pack rare, les pourcentages sont renormalisés (+20 % sur Rare+). */
+  function renderOdds(boosted) {
     if (!packOdds) return;
     packOdds.replaceChildren();
+    const total = Object.keys(RARITIES).reduce((sum, key) => sum + rarityWeight(key, boosted), 0);
     Object.entries(RARITIES).forEach(([key, r]) => {
       const row = el('span', `odds odds-${key}`);
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      row.append(dot, document.createTextNode(`${r.label} ${String(r.weight).replace('.', ',')} %`));
+      const pct = boosted ? (rarityWeight(key, true) / total) * 100 : r.weight;
+      const label = boosted
+        ? `${r.label} ${pct.toFixed(1).replace('.', ',')} %`
+        : `${r.label} ${String(r.weight).replace('.', ',')} %`;
+      row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
+    if (boosted) {
+      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : CHANCES RARE+ +20 %'));
+    }
   }
 
   /* ---------------------------------------------------------------- début */
@@ -1852,6 +2107,22 @@
       ? d.friends.filter((u) => typeof u === 'string')
       : [];
     state.packsOpened = Math.max(0, Number(d && d.packsOpened) || 0);
+    /* Inventaire : les anciennes sauvegardes n'ont pas packStock/freeDate/
+       freeUsed (défauts 0). Le premier pack offert (firstPack) devient
+       1 pack classique en inventaire, une seule fois. */
+    const stock = (d && d.packStock) || {};
+    state.packStock = {
+      classic: Math.max(0, Number(stock.classic) || 0),
+      rare: Math.max(0, Number(stock.rare) || 0)
+    };
+    if (state.firstPack) {
+      state.packStock.classic += 1;
+      state.firstPack = false;
+    }
+    state.freeDate = typeof (d && d.freeDate) === 'string' ? d.freeDate : '';
+    state.freeUsed = clamp(Number(d && d.freeUsed) || 0, 0, FREE_PER_DAY);
+    refreshFreeQuota();
+    state.currentPackType = state.packStock.rare > 0 && state.packStock.classic <= 0 ? 'rare' : 'classic';
     state.phase = 'pack';
     state.deck = [];
     state.loot = [];
@@ -1859,6 +2130,9 @@
     updateCoins();
     renderCollection();
     renderAccount();
+    renderShop();
+    renderPackInventory();
+    selectPackType(state.currentPackType);
   }
 
   async function saveNow() {
@@ -1872,6 +2146,12 @@
         collection: state.collection.map((c) => c.id),
         friends,
         packsOpened: state.packsOpened || 0,
+        packStock: {
+          classic: Math.max(0, Number(state.packStock.classic) || 0),
+          rare: Math.max(0, Number(state.packStock.rare) || 0)
+        },
+        freeDate: state.freeDate || todayKey(),
+        freeUsed: clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY),
         updatedAt: serverTimestamp()
       }, { merge: true });
       return true;
@@ -1934,6 +2214,14 @@
     trades = [];
     selectedFriendUid = null;
     rulesHelpShown = false;
+    state.packStock = { classic: 0, rare: 0 };
+    state.freeDate = '';
+    state.freeUsed = 0;
+    state.currentPackType = 'classic';
+    shopQty.classic = 1;
+    shopQty.rare = 1;
+    renderShop();
+    renderPackInventory();
     if (tradesUnsub) {
       try { tradesUnsub(); } catch (error) { /* déjà fermé */ }
       tradesUnsub = null;
@@ -2115,14 +2403,25 @@
     });
     const view = tab === 'collection'
       ? collView
-      : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
-    view.classList.remove('view-in');
-    void view.offsetWidth;
-    view.classList.add('view-in');
+      : tab === 'shop'
+        ? shopView
+        : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
+    if (view) {
+      view.classList.remove('view-in');
+      void view.offsetWidth;
+      view.classList.add('view-in');
+    }
     if (tab === 'collection') {
       renderCollection();
       fresh.clear();
       tabBadge.hidden = true;
+    } else if (tab === 'shop') {
+      renderShop();
+    } else if (tab === 'pack') {
+      renderPackInventory();
+      // Les vues Pack étaient masquées : on remesure tout.
+      if (!recap.classList.contains('is-idle')) setRecapCollapsed(recap.classList.contains('is-collapsed'));
+      scheduleSizing(8);
     } else {
       // Les vues Pack étaient masquées : on remesure tout.
       if (!recap.classList.contains('is-idle')) setRecapCollapsed(recap.classList.contains('is-collapsed'));
@@ -2195,6 +2494,34 @@
   }
 
   tabs.forEach((t) => on(t, 'click', () => setTab(t.dataset.tab)));
+
+  /* Shop : quantité, achats, gratuits, choix du pack à ouvrir. */
+  on(freeClaim, 'click', claimFreePack);
+  on(buyClassic, 'click', () => buyPacks('classic'));
+  on(buyRare, 'click', () => buyPacks('rare'));
+  on(shopOpenBtn, 'click', () => setTab('pack'));
+  on(packGoShop, 'click', goToShop);
+  on(packTypeClassic, 'click', () => selectPackType('classic'));
+  on(packTypeRare, 'click', () => selectPackType('rare'));
+  if (shopView) {
+    on(shopView, 'click', (e) => {
+      const qtyBtn = e.target.closest('.qty-btn');
+      if (qtyBtn) {
+        const type = qtyBtn.dataset.pack;
+        shopQty[type] = clamp((shopQty[type] || 1) + Number(qtyBtn.dataset.delta || 0), 1, MAX_QTY);
+        SFX.tick();
+        renderShop();
+        return;
+      }
+      const chip = e.target.closest('.qty-chip');
+      if (chip) {
+        const type = chip.dataset.pack;
+        shopQty[type] = clamp(Number(chip.dataset.qty) || 1, 1, MAX_QTY);
+        SFX.tick();
+        renderShop();
+      }
+    });
+  }
   on(collFilters, 'click', (e) => {
     const chip = e.target.closest('.chip');
     if (!chip) return;
@@ -3603,7 +3930,9 @@
     }
     updateCoins();
     renderFilters();
-    renderOdds();
+    renderOdds(false);
+    renderShop();
+    renderPackInventory();
     FX.resize();
     Dust.resize();
     Dust.start();

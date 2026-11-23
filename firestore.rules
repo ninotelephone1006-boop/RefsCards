@@ -2,14 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs.
+    // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs,
+    // inventaire de packs (Shop) et quota de packs gratuits quotidiens.
     match /playerSaves/{userId} {
       function ownsSave() {
         return request.auth != null && request.auth.uid == userId;
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'freeDate', 'freeUsed', 'updatedAt'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
@@ -20,6 +21,22 @@ service cloud.firestore {
         && request.resource.data.friends.size() <= 500
         && request.resource.data.packsOpened is int
         && request.resource.data.packsOpened >= 0
+        && (!('packStock' in request.resource.data)
+            || (request.resource.data.packStock is map
+                && request.resource.data.packStock.keys().hasOnly(['classic', 'rare'])
+                && request.resource.data.packStock.classic is int
+                && request.resource.data.packStock.classic >= 0
+                && request.resource.data.packStock.classic <= 100000
+                && request.resource.data.packStock.rare is int
+                && request.resource.data.packStock.rare >= 0
+                && request.resource.data.packStock.rare <= 100000))
+        && (!('freeDate' in request.resource.data)
+            || (request.resource.data.freeDate is string
+                && request.resource.data.freeDate.size() <= 10))
+        && (!('freeUsed' in request.resource.data)
+            || (request.resource.data.freeUsed is int
+                && request.resource.data.freeUsed >= 0
+                && request.resource.data.freeUsed <= 3))
         && request.resource.data.updatedAt is timestamp;
       allow delete: if false;
     }

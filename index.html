@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-2">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-1">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-1" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-3" defer></script>
+  <script src="app.js?v=2026.11.23-1" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -120,17 +120,32 @@
           <p class="pack-sub">Cinq cartes t'attendent sous le film. À toi de l'ouvrir.</p>
         </div>
 
+        <div class="pack-inventory" id="pack-inventory">
+          <div class="pack-type-switch" role="group" aria-label="Choisir le pack à ouvrir">
+            <button class="pack-type is-active" id="pack-type-classic" type="button" data-pack="classic" aria-pressed="true">
+              <span class="pack-type-name">Classique</span>
+              <span class="pack-type-count" id="pack-count-classic">×0</span>
+            </button>
+            <button class="pack-type pack-type-rare" id="pack-type-rare" type="button" data-pack="rare" aria-pressed="false">
+              <span class="pack-type-name">Rare <b>+20 %</b></span>
+              <span class="pack-type-count" id="pack-count-rare">×0</span>
+            </button>
+          </div>
+          <p class="pack-stock-label" id="pack-stock-label" aria-live="polite">Inventaire : 0 pack</p>
+          <button class="pack-go-shop" id="pack-go-shop" type="button" hidden>ALLER AU SHOP →</button>
+        </div>
+
         <div class="pack-area" id="pack-area">
           <div class="pack-halo" aria-hidden="true"></div>
           <div class="pack-float" id="pack-float">
             <div class="pack" id="pack" role="button" tabindex="0" aria-label="Booster mystère. Fais glisser vers la droite pour le déchirer.">
-              <img class="pack-img" src="assets/packet.png" alt="Booster Refs Cards" draggable="false">
+              <img class="pack-img" id="pack-img-main" src="assets/packet.png" alt="Booster Refs Cards" draggable="false">
               <div class="pack-gap" aria-hidden="true">
                 <span class="gap-glow"></span>
                 <span class="gap-cards"><i></i><i></i><i></i><i></i><i></i></span>
               </div>
               <div class="pack-flap" id="pack-flap" aria-hidden="true">
-                <img class="pack-img" src="assets/packet.png" alt="" draggable="false">
+                <img class="pack-img" id="pack-img-flap" src="assets/packet.png" alt="" draggable="false">
               </div>
               <div class="cut" id="cut" aria-hidden="true">
                 <span class="cut-track"></span>
@@ -175,6 +190,85 @@
         <div class="reveal-foot">
           <span class="foot-left"><i></i><span id="pile-label">CARTE 1 / 5</span></span>
           <span class="foot-right" id="foot-right">← LA PLUS RARE EST AU FOND</span>
+        </div>
+      </section>
+
+      <!-- ================================ SHOP ================================ -->
+      <section class="view shop-view" id="shop-view" aria-label="Boutique">
+        <div class="page-scroll">
+          <div class="shop-head">
+            <p class="kicker"><span>✦</span> BOUTIQUE <span>✦</span></p>
+            <h2>Achète tes packs,<br><em>ouvre-les quand tu veux.</em></h2>
+            <p class="shop-sub">Les packs achetés vont dans ton inventaire (onglet Pack). Tu peux en acheter plusieurs d'un coup — les prix sont réglés pour que l'argent reste un vrai défi.</p>
+          </div>
+
+          <div class="free-banner" id="free-banner">
+            <div class="free-info">
+              <span class="free-gift" aria-hidden="true">🎁</span>
+              <div class="free-text">
+                <strong>3 packs classiques gratuits chaque jour</strong>
+                <span id="free-label">Récupère-les ici, un par un.</span>
+                <span class="free-dots" id="free-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              </div>
+            </div>
+            <button class="free-claim" id="free-claim" type="button">RÉCUPÉRER · 3 RESTANTS</button>
+            <p class="free-msg" id="free-msg" role="status"></p>
+          </div>
+
+          <div class="shop-grid">
+            <article class="shop-card" data-pack="classic">
+              <div class="shop-img-wrap">
+                <img class="shop-img" src="assets/packet.png" alt="Pack classique Refs Cards" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Pack Classique</h3>
+                <p class="shop-desc">5 cartes · chances normales</p>
+                <p class="shop-odds">Valeur moyenne ≈ 394 🪙 par pack</p>
+                <p class="shop-stock" id="shop-stock-classic">Tu en as 0</p>
+                <div class="qty-row" role="group" aria-label="Quantité de packs classiques">
+                  <button class="qty-btn" type="button" data-pack="classic" data-delta="-1" aria-label="Moins">−</button>
+                  <span class="qty-val" id="qty-classic" aria-live="polite">1</span>
+                  <button class="qty-btn" type="button" data-pack="classic" data-delta="1" aria-label="Plus">+</button>
+                  <span class="qty-quick">
+                    <button class="qty-chip" type="button" data-pack="classic" data-qty="1">×1</button>
+                    <button class="qty-chip" type="button" data-pack="classic" data-qty="5">×5</button>
+                    <button class="qty-chip" type="button" data-pack="classic" data-qty="10">×10</button>
+                  </span>
+                </div>
+                <button class="shop-buy" id="buy-classic" type="button">ACHETER · 500 🪙</button>
+              </div>
+            </article>
+
+            <article class="shop-card shop-card-rare" data-pack="rare">
+              <span class="shop-badge" aria-hidden="true">+20 % CHANCES</span>
+              <div class="shop-img-wrap">
+                <img class="shop-img" src="assets/packetrare.png" alt="Pack rare doré Refs Cards" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Pack Rare <span class="shop-rare-tag">doré</span></h3>
+                <p class="shop-desc">5 cartes · chances Rare et plus augmentées de 20 %</p>
+                <p class="shop-odds">Valeur moyenne ≈ 419 🪙 par pack</p>
+                <p class="shop-stock" id="shop-stock-rare">Tu en as 0</p>
+                <div class="qty-row" role="group" aria-label="Quantité de packs rares">
+                  <button class="qty-btn" type="button" data-pack="rare" data-delta="-1" aria-label="Moins">−</button>
+                  <span class="qty-val" id="qty-rare" aria-live="polite">1</span>
+                  <button class="qty-btn" type="button" data-pack="rare" data-delta="1" aria-label="Plus">+</button>
+                  <span class="qty-quick">
+                    <button class="qty-chip" type="button" data-pack="rare" data-qty="1">×1</button>
+                    <button class="qty-chip" type="button" data-pack="rare" data-qty="5">×5</button>
+                    <button class="qty-chip" type="button" data-pack="rare" data-qty="10">×10</button>
+                  </span>
+                </div>
+                <button class="shop-buy shop-buy-rare" id="buy-rare" type="button">ACHETER · 1 000 🪙</button>
+              </div>
+            </article>
+          </div>
+
+          <div class="shop-inventory">
+            <p class="shop-inventory-label" id="shop-inventory-label" aria-live="polite">Inventaire : 0 pack</p>
+            <button class="shop-open" id="shop-open-btn" type="button">OUVRIR UN PACK →</button>
+            <p class="shop-msg" id="shop-msg" role="status"></p>
+          </div>
         </div>
       </section>
 
@@ -308,8 +402,8 @@
             <span class="chip-arrow" aria-hidden="true">↗</span>
           </button>
           <button class="buy-btn" id="buy-btn" type="button" hidden>
-            <span class="buy-label">OUVRIR UN BOOSTER</span>
-            <span class="buy-price"><span class="coin-glyph" aria-hidden="true">🪙</span>100</span>
+            <span class="buy-label">ALLER AU SHOP</span>
+            <span class="buy-price" hidden></span>
           </button>
           <p class="recap-msg" id="recap-msg" role="status"></p>
         </div>
@@ -338,7 +432,7 @@
           <div class="fusion-actions">
             <button class="ghost-btn" id="fusion-later" type="button">Plus tard</button>
             <button class="ghost-btn primary" id="fusion-go" type="button" hidden>FUSIONNER</button>
-            <button class="ghost-btn primary" id="fusion-buy" type="button" hidden>OUVRIR UN BOOSTER</button>
+            <button class="ghost-btn primary" id="fusion-buy" type="button" hidden>ALLER AU SHOP</button>
           </div>
           <p class="fusion-hint" id="fusion-hint">Sans risque · une fusion consomme deux exemplaires identiques</p>
         </div>
@@ -377,6 +471,11 @@
       <button class="tab is-active" type="button" data-tab="pack" aria-current="page">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M7 3.5h10l1.2 3.5H5.8z"/><path d="M6 7v12.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7"/><path d="m12 10.6 1 2.2 2.3.3-1.7 1.6.5 2.3-2.1-1.2-2.1 1.2.5-2.3-1.7-1.6 2.3-.3z"/></svg>
         <span>Pack</span>
+      </button>
+      <button class="tab" type="button" data-tab="shop">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h7.9a1.5 1.5 0 0 0 1.5-1.2L20.5 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/></svg>
+        <span>Shop</span>
+        <i class="tab-badge" id="tab-badge-shop" hidden aria-label="Packs gratuits disponibles"></i>
       </button>
       <button class="tab" type="button" data-tab="collection">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="6.5" width="12" height="15" rx="2"/><path d="M8.5 3.5h9a2 2 0 0 1 2 2V16"/></svg>
