@@ -2867,3 +2867,57 @@ body:has(.inspect.is-open) .update-banner{display:none}
 @media (prefers-reduced-motion:reduce){
   .coll-tile,.coll-shiny-dot,.coll-pill,.cf.mutation-shiny,.insp-count,.ic-shiny,.fusion-dialog.is-fusing,.fusion-dialog.is-fusing .fs-card.result,.fs-arrow,.fs-card.result,.fusion-row.is-selected{animation:none!important}
 }
+
+
+/* ==========================================================================
+   SUSPENSE DE RÉVÉLATION (4 paliers selon la rareté)
+   Les animations utilisent translate / scale / rotate (propriétés
+   individuelles) pour ne pas écraser le transform de la pile de cartes.
+   ========================================================================== */
+.suspense-layer{position:absolute;inset:0;z-index:21;pointer-events:none;animation:sus-in .25s ease-out both}
+.suspense-layer.is-out{animation:sus-out .4s ease-in forwards}
+.suspense-dim{position:absolute;inset:0;opacity:0;animation:sus-dim var(--dur) ease-in forwards;
+  background:radial-gradient(circle at var(--x) var(--y),transparent 0,transparent 130px,#000000d9 460px)}
+.suspense-layer[data-tier='1'] .suspense-dim{--max:.45}
+.suspense-layer[data-tier='2'] .suspense-dim{--max:.7}
+.suspense-layer[data-tier='3'] .suspense-dim{--max:.88}
+.suspense-layer[data-tier='4'] .suspense-dim{--max:1;background:radial-gradient(circle at var(--x) var(--y),transparent 0,transparent 110px,#000 400px)}
+.charge-ring{position:absolute;left:var(--x);top:var(--y);width:260px;height:260px;margin:-130px 0 0 -130px;border-radius:50%;
+  border:2px solid var(--c);box-shadow:0 0 22px var(--c),inset 0 0 22px var(--c);opacity:0;
+  animation:ring-converge .8s ease-in infinite}
+.suspense-layer[data-tier='3'] .charge-ring,.suspense-layer[data-tier='4'] .charge-ring{border-width:3px;animation-duration:.6s}
+.suspense-layer[data-tier='4'] .charge-ring{animation-duration:.45s;border-color:#fff}
+
+.card.is-charging{z-index:60;cursor:progress;
+  animation:charge-shake .09s linear infinite,charge-grow var(--dur) cubic-bezier(.5,0,.9,.4) forwards}
+.card.is-charging[data-tier='1']{--amp:1.5px;--gs:1.05}
+.card.is-charging[data-tier='2']{--amp:3px;--gs:1.1}
+.card.is-charging[data-tier='3']{--amp:5px;--gs:1.16}
+.card.is-charging[data-tier='4']{--amp:7px;--gs:1.24}
+.card.is-charging[data-tier='2'],.card.is-charging[data-tier='3'],.card.is-charging[data-tier='4']{
+  animation:charge-shake .08s linear infinite,charge-grow var(--dur) cubic-bezier(.5,0,.9,.4) forwards,charge-float var(--dur) ease-in forwards}
+.card.is-charging[data-tier='4'] .card-back{animation:charge-hue .7s linear infinite}
+
+@keyframes sus-in{from{opacity:0}to{opacity:1}}
+@keyframes sus-out{to{opacity:0}}
+@keyframes sus-dim{to{opacity:var(--max,.5)}}
+@keyframes ring-converge{0%{transform:scale(3.4);opacity:0}25%{opacity:.85}100%{transform:scale(.35);opacity:0}}
+@keyframes charge-shake{
+  0%{translate:0 0}20%{translate:calc(var(--amp,2px) * -1) calc(var(--amp,2px) * .5)}
+  40%{translate:var(--amp,2px) calc(var(--amp,2px) * -.6)}60%{translate:calc(var(--amp,2px) * -.7) calc(var(--amp,2px) * -.5)}
+  80%{translate:calc(var(--amp,2px) * .8) var(--amp,2px)}100%{translate:0 0}}
+@keyframes charge-grow{
+  0%{scale:1;filter:drop-shadow(0 0 0 var(--cc,#fff)) brightness(1)}
+  70%{filter:drop-shadow(0 0 22px var(--cc,#fff)) brightness(1.2)}
+  100%{scale:var(--gs,1.05);filter:drop-shadow(0 0 46px var(--cc,#fff)) brightness(1.55)}}
+@keyframes charge-float{0%{rotate:0deg}100%{rotate:0deg}}
+@keyframes charge-hue{to{filter:hue-rotate(360deg) brightness(1.3)}}
+@media (prefers-reduced-motion:reduce){
+  .suspense-layer,.card.is-charging,.card.is-charging .card-back,.charge-ring{animation:none!important}
+}
+
+.ic-cell{font:inherit;cursor:pointer;transition:transform .2s cubic-bezier(.2,1.5,.4,1),opacity .2s}
+.ic-cell:disabled{opacity:.4;cursor:default}
+.ic-cell:not(:disabled):hover{transform:translateY(-3px) scale(1.05)}
+.ic-cell.is-on{outline:2px solid #fff;outline-offset:2px}
+.coll-shiny-dot{top:5px;right:5px;font-size:15px}
