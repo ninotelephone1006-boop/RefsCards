@@ -84,7 +84,7 @@ function makeStore() {
   await wait(200); // loadProfile / loadTrades refusés, mais le jeu démarre
 
   const doc = w.document;
-  assert.equal(doc.querySelectorAll('.tab').length, 5, 'le jeu démarre malgré les règles');
+  assert.equal(doc.querySelectorAll('.tab').length, 6, 'le jeu démarre malgré les règles');
   assert.ok(doc.querySelector('.app').classList.contains('is-authenticated'), 'partie affichée (playerSaves lisible)');
 
   /* Le compte reste utilisable : les stats sont calculées localement. */

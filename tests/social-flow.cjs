@@ -123,8 +123,8 @@ function buttonByText(root, text) {
 (async () => {
   const { w, doc, store, db } = await boot();
 
-  /* 1. Cinq onglets, page Compte : pseudo, code ami, stats. */
-  assert.equal(doc.querySelectorAll('.tab').length, 5, 'Pack, Shop, Collection, En ligne, Compte');
+  /* 1. Six onglets, page Compte : pseudo, code ami, stats. */
+  assert.equal(doc.querySelectorAll('.tab').length, 6, 'Pack, Shop, Inventaire, Collection, En ligne, Compte');
   doc.querySelector('[data-tab="account"]').click();
   await wait(30);
   assert.equal(doc.getElementById('profile-pseudo').textContent, 'Moi');

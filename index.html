@@ -264,6 +264,23 @@
         </div>
       </section>
 
+      <!-- ============================ INVENTAIRE ============================ -->
+      <section class="view inventory-view" id="inventory-view" aria-label="Inventaire">
+        <div class="inventory-head">
+          <p class="kicker"><span>✦</span> TON STOCK DE BOOSTERS <span>✦</span></p>
+          <h2>Inventaire</h2>
+          <p class="inventory-summary" id="inventory-summary" aria-live="polite">Aucun pack en inventaire.</p>
+        </div>
+
+        <div class="inventory-grid" id="inventory-grid"></div>
+
+        <div class="inventory-empty" id="inventory-empty" hidden>
+          <p class="inventory-empty-title">Ton inventaire est vide</p>
+          <p class="inventory-empty-sub">Achète des boosters ou récupère tes packs gratuits quotidiens dans le Shop.</p>
+          <button class="inventory-go-shop" id="inventory-go-shop" type="button">Aller au Shop →</button>
+        </div>
+      </section>
+
       <!-- ============================ COLLECTION ============================ -->
       <section class="view collection-view" id="collection-view" aria-label="Collection">
         <div class="coll-head">
@@ -472,6 +489,11 @@
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5h2.2l2.1 10.2a1.5 1.5 0 0 0 1.5 1.2h7.9a1.5 1.5 0 0 0 1.5-1.2L20.5 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/></svg>
         <span>Shop</span>
         <i class="tab-badge" id="tab-badge-shop" hidden aria-label="Packs gratuits disponibles"></i>
+      </button>
+      <button class="tab" type="button" data-tab="inventory">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M4.5 8.5 12 4l7.5 4.5v7L12 20l-7.5-4.5z"/><path d="M4.5 8.5 12 13l7.5-4.5"/><path d="M12 13v7"/></svg>
+        <span>Inventaire</span>
+        <i class="tab-badge" id="tab-badge-inventory" hidden aria-label="Packs disponibles"></i>
       </button>
       <button class="tab" type="button" data-tab="collection">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="6.5" width="12" height="15" rx="2"/><path d="M8.5 3.5h9a2 2 0 0 1 2 2V16"/></svg>
