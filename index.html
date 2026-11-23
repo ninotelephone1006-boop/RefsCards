@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-4">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-6">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -364,9 +364,9 @@
       <section class="view online-view" id="online-view" aria-label="En ligne">
         <div class="page-scroll">
           <div class="online-head">
-            <p class="kicker"><span>✦</span> EN LIGNE · AMIS <span>✦</span></p>
-            <h2>Échange &amp; achète<br><em>avec tes amis.</em></h2>
-            <p class="online-sub">Envoie une demande avec le code ami d'un joueur : il doit l'accepter pour que vous soyez amis. Ensuite, vois ses stats et ses cartes, puis offre-lui des pièces ou achète les cartes qu’il met en vente.</p>
+            <p class="kicker"><span>✦</span> EN LIGNE · MARCHÉ <span>✦</span></p>
+            <h2>Crée ton marché,<br><em>achète chez tes amis.</em></h2>
+            <p class="online-sub">Envoie une demande avec le code ami d'un joueur : il doit l'accepter pour que vous soyez amis. Ensuite, crée ton marché ici : mets en vente les cartes (et les packs) que tu veux, avec le nombre et le prix que tu choisis. Le marché d'un ami se voit sur son profil : achète-y ce qu'il propose, au nombre et au prix qu'il a fixés.</p>
           </div>
 
           <form id="add-friend-form" class="add-friend">
@@ -387,28 +387,40 @@
             <div id="friend-requests-out" class="requests-list"></div>
           </section>
 
-          <section class="trades-block" aria-label="Échanges">
-            <h3>Échanges reçus</h3>
-            <div id="trades-in" class="trades-list"></div>
-            <h3>Échanges envoyés</h3>
-            <div id="trades-out" class="trades-list"></div>
-          </section>
-
-          <section class="market-block" aria-label="Mes ventes et cadeaux">
-            <h3>Mes cartes à vendre</h3>
-            <p class="online-empty">Choisis une carte, combien d’exemplaires tu veux vendre et le prix par carte. Seule la quantité choisie est réservée jusqu’à la vente ou l’annulation.</p>
+          <section class="market-block" aria-label="Mon marché">
+            <h3>🏪 Mon marché — créer une annonce</h3>
+            <p class="online-empty">Mets en vente les cartes que tu veux : choisis la carte, le nombre d'exemplaires à vendre et le prix par carte, comme tu veux. Seule la quantité choisie est réservée jusqu’à la vente ou l’annulation. Tes amis verront ton marché sur ton profil.</p>
             <form id="market-list-form" class="market-form">
-              <label for="market-card">Carte</label><select id="market-card" required></select>
-              <label for="market-qty">Combien en vendre</label>
+              <label for="market-card">Carte à vendre</label><select id="market-card" required></select>
+              <label for="market-qty">Nombre à vendre (exemplaires)</label>
               <div class="market-qty-wrap">
                 <button class="qty-btn" id="market-qty-minus" type="button" aria-label="Vendre une carte de moins">−</button>
                 <input id="market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
                 <button class="qty-btn" id="market-qty-plus" type="button" aria-label="Vendre une carte de plus">+</button>
                 <span class="market-qty-hint" id="market-qty-hint" aria-live="polite"></span>
               </div>
-              <label for="market-price">Prix par carte (en pièces)</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+              <label for="market-price">Prix par carte (en pièces, libre)</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
               <button class="mini-btn primary" id="market-submit" type="submit">Mettre en vente</button>
             </form>
+            <h4 class="market-sub">📦 Vendre des packs (boosters)</h4>
+            <p class="online-empty">Tu peux aussi vendre des packs de ton inventaire : choisis le type de pack, le nombre de packs et le prix par pack, comme tu veux.</p>
+            <form id="pack-market-form" class="market-form">
+              <label for="pack-market-type">Pack à vendre</label>
+              <select id="pack-market-type" required>
+                <option value="classic">Pack Classique</option>
+                <option value="rare">Pack Rare doré</option>
+              </select>
+              <label for="pack-market-qty">Nombre de packs à vendre</label>
+              <div class="market-qty-wrap">
+                <button class="qty-btn" id="pack-market-qty-minus" type="button" aria-label="Vendre un pack de moins">−</button>
+                <input id="pack-market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
+                <button class="qty-btn" id="pack-market-qty-plus" type="button" aria-label="Vendre un pack de plus">+</button>
+                <span class="market-qty-hint" id="pack-market-qty-hint" aria-live="polite"></span>
+              </div>
+              <label for="pack-market-price">Prix par pack (en pièces, libre)</label><input id="pack-market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+              <button class="mini-btn primary" id="pack-market-submit" type="submit">Mettre les packs en vente</button>
+            </form>
+            <h4 class="market-sub">Mes annonces en cours</h4>
             <div id="my-listings" class="trades-list"></div>
             <h3>Pièces à récupérer <span class="friends-count" id="market-inbox-count">0</span></h3>
             <p class="online-empty">Les ventes et cadeaux reçus restent ici, même si tu étais hors ligne. Ils arrivent aussi tout seuls : la page se met à jour dès qu’un ami t’envoie des pièces.</p>
@@ -442,9 +454,10 @@
               <input id="gift-amount" type="number" min="1" max="1000000000" step="1" required placeholder="Montant">
               <button class="mini-btn primary" type="submit">Donner</button>
             </form>
-            <h4>Ses cartes à vendre</h4>
+            <h4>🏪 Son marché</h4>
+            <p class="online-empty">Les cartes et packs que cet ami met en vente, avec le nombre disponible et son prix. Choisis combien en acheter, puis confirme.</p>
             <div id="friend-listings" class="trades-list"></div>
-            <h4>Sa collection · proposer un échange</h4>
+            <h4>Sa collection</h4>
             <div class="friend-cards" id="friend-cards"></div>
             <p class="online-empty" id="friend-cards-empty" hidden>Cet ami n'a pas encore de cartes.</p>
           </section>
@@ -506,18 +519,6 @@
             <button class="ghost-btn primary" id="fusion-buy" type="button" hidden>ALLER AU SHOP</button>
           </div>
           <p class="fusion-hint" id="fusion-hint">Sans risque · une fusion consomme deux exemplaires identiques</p>
-        </div>
-      </div>
-
-      <!-- ========================= CHOIX DE CARTE (ÉCHANGE) ========================= -->
-      <div class="sheet" id="trade-sheet" hidden>
-        <div class="sheet-backdrop" data-close></div>
-        <div class="sheet-dialog" role="dialog" aria-modal="true" aria-labelledby="trade-sheet-title">
-          <button class="sheet-x" type="button" data-close aria-label="Fermer">✕</button>
-          <p class="kicker"><span>✦</span> ÉCHANGE <span>✦</span></p>
-          <h3 id="trade-sheet-title">Choisis une carte à donner</h3>
-          <p class="sheet-sub" id="trade-sheet-sub"></p>
-          <div class="picker-grid" id="trade-picker"></div>
         </div>
       </div>
 

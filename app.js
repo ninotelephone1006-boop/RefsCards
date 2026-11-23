@@ -1954,10 +1954,6 @@
       closeFusion();
       return;
     }
-    if (e.key === 'Escape' && tradeSheet && !tradeSheet.hidden) {
-      closeSheet(tradeSheet);
-      return;
-    }
     if (e.key === 'Escape' && confirmSheet && !confirmSheet.hidden) {
       confirmAction = null;
       closeSheet(confirmSheet);
@@ -2298,8 +2294,8 @@
     await loadProfile();
     loadFriendRequests();
     subscribeFriendRequests();
-    loadTrades();
-    subscribeTrades();
+    /* Échanges désactivés : seul le marché existe (cartes + packs en vente).
+       Les anciennes propositions trades/ ne sont plus chargées ni proposées. */
     loadMarket();
     subscribeMarket();
     if (authScreen) authScreen.hidden = true;
@@ -2331,7 +2327,6 @@
     removedFriendsThisSession.clear();
     knownRequestIds.clear();
     hadRequests = false;
-    trades = [];
     marketListings = [];
     marketGifts = [];
     sentGifts = [];
@@ -2349,10 +2344,6 @@
     shopQty.legend = 1;
     renderShop();
     renderPackInventory();
-    if (tradesUnsub) {
-      try { tradesUnsub(); } catch (error) { /* déjà fermé */ }
-      tradesUnsub = null;
-    }
     if (friendRequestsUnsub) {
       try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
       friendRequestsUnsub = null;
@@ -2712,8 +2703,6 @@
   const friendRequestsOut = $('friend-requests-out');
   const friendRequestsEmpty = $('friend-requests-empty');
   const friendRequestsCount = $('friend-requests-count');
-  const tradesIn = $('trades-in');
-  const tradesOut = $('trades-out');
   const friendsList = $('friends-list');
   const friendsEmpty = $('friends-empty');
   const friendsCount = $('friends-count');
@@ -2726,9 +2715,6 @@
   const friendCards = $('friend-cards');
   const friendCardsEmpty = $('friend-cards-empty');
   const friendClose = $('friend-close');
-  const tradeSheet = $('trade-sheet');
-  const tradeSheetSub = $('trade-sheet-sub');
-  const tradePicker = $('trade-picker');
   const confirmSheet = $('confirm-sheet');
   const confirmTitle = $('confirm-title');
   const confirmMessage = $('confirm-message');
@@ -2742,17 +2728,22 @@
   const friendProfiles = new Map();  // uid -> profil public d'un ami
   let friendRequests = [];           // demandes d'ami où je suis destinataire
   let friendRequestsUnsub = null;
-  let trades = [];                   // échanges où je suis partie
-  let tradesUnsub = null;
   let sentRequests = [];             // demandes d'ami que j'ai envoyées (requêtes)
   const sentRequestsByUid = new Map(); // uid -> id du document friendRequests
   const pendingFriendUids = new Set(); // uids demandés mais pas encore acceptés
   let selectedFriendUid = null;
-  let tradeTarget = null;            // {uid, cardId} : carte visée par l'échange en cours
   let confirmAction = null;
   let profileTimer = 0;
   let pseudoTimer = 0;              // auto-sauvegarde du pseudo pendant la frappe
   let rulesHelpShown = false;       // un seul toast « règles » par session
+
+  function snapshotDocs(snap) {
+    if (!snap) return [];
+    if (Array.isArray(snap.docs)) return snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+    const out = [];
+    if (typeof snap.forEach === 'function') snap.forEach((d) => out.push({ id: d.id, data: d.data() }));
+    return out;
+  }
 
   function serverTimestamp() {
     try {
@@ -3607,7 +3598,6 @@
       friendsList.replaceChildren(frag);
     }
     renderFriendRequests();
-    renderTrades();
     if (selectedFriendUid) renderFriendDetail(selectedFriendUid);
   }
 
@@ -3780,12 +3770,9 @@
         const n = owned.get(card.id) || 0;
         if (n > 1) frame.append(el('span', 'coll-pill', `x${n}`));
         tile.append(frame);
-        const actions = el('div', 'friend-card-actions');
-        const swap = el('button', 'mini-btn', 'Échanger');
-        swap.type = 'button';
-        on(swap, 'click', () => openTradePicker(uid, card.id));
-        actions.append(swap);
-        tile.append(actions);
+        /* Pas de bouton « Échanger » : on ne peut plus demander une carte
+           à un ami. Pour obtenir une de ses cartes, il faut l'acheter dans
+           son marché (voir « Son marché » ci-dessus). */
         return tile;
       }));
       if (friendCardsEmpty) friendCardsEmpty.hidden = ownedCards.length > 0;
@@ -3794,7 +3781,7 @@
 
   on(friendClose, 'click', closeFriendDetail);
 
-  /* ------------------------------------------------- fenêtres d'échange/achat */
+  /* --------------------------------------------- fenêtres d'achat / confirmation */
 
   function openSheet(sheet) {
     if (!sheet) return;
@@ -3824,46 +3811,14 @@
     if (action) action();
   });
 
-  [tradeSheet, confirmSheet].forEach((sheet) => {
+  [confirmSheet].forEach((sheet) => {
     if (!sheet) return;
     sheet.querySelectorAll('[data-close]').forEach((b) => on(b, 'click', () => closeSheet(sheet)));
   });
 
-  function openTradePicker(uid, cardId) {
-    const data = friendProfiles.get(uid);
-    const wanted = cardsDatabase.find((c) => c.id === cardId);
-    if (!wanted) return;
-    tradeTarget = { uid, cardId };
-    const who = data ? data.pseudo : 'Ton ami';
-    if (tradeSheetSub) {
-      tradeSheetSub.textContent = `${who} te donne « ${wanted.name} ». Choisis une de tes cartes à lui donner en échange :`;
-    }
-    const owned = countMap();
-    const mine = cardsDatabase.filter((c) => owned.has(c.id));
-    if (tradePicker) {
-      tradePicker.replaceChildren(...mine.map((card) => {
-        const info = RARITIES[card.rarity] || RARITIES.common;
-        const n = owned.get(card.id) || 0;
-        const b = el('button', 'picker-tile');
-        b.type = 'button';
-        b.style.setProperty('--r-color', info.color);
-        b.style.setProperty('--r-glow', info.glow);
-        b.append(cardFrame(card, { mini: true, alt: card.name }));
-        if (n > 1) b.append(el('span', 'coll-pill', `x${n}`));
-        on(b, 'click', () => {
-          closeSheet(tradeSheet);
-          askConfirm({
-            title: 'Proposer l’échange ?',
-            message: `Tu donnes « ${card.name} » et tu reçois « ${wanted.name} » de ${who}. ${who} pourra accepter ou refuser.`,
-            confirmLabel: 'Proposer',
-            onConfirm: () => createTrade({ toUid: uid, giveId: card.id, receiveId: wanted.id, price: 0 })
-          });
-        });
-        return b;
-      }));
-    }
-    openSheet(tradeSheet);
-  }
+  /* Demandes d'échange désactivées : les joueurs ne peuvent plus demander
+     une carte précise à un ami. Le seul moyen d'obtenir une carte d'un ami
+     est d'acheter une annonce de son marché (cartes ou packs en vente). */
 
   /* Marché : la carte / les pièces sont mises en réserve avant d'être reçues.
      Chaque opération modifie seulement la sauvegarde de son propriétaire et
@@ -3885,6 +3840,15 @@
   const marketQtyHint = $('market-qty-hint');
   const marketSubmit = $('market-submit');
   const marketPrice = $('market-price');
+  /* Marché des packs (boosters) : même principe que les cartes, mais on
+     vend des packs de l'inventaire (packStock) au lieu de cartes. */
+  const packMarketType = $('pack-market-type');
+  const packMarketQty = $('pack-market-qty');
+  const packMarketQtyMinus = $('pack-market-qty-minus');
+  const packMarketQtyPlus = $('pack-market-qty-plus');
+  const packMarketQtyHint = $('pack-market-qty-hint');
+  const packMarketSubmit = $('pack-market-submit');
+  const packMarketPrice = $('pack-market-price');
   const myListings = $('my-listings');
   const marketInbox = $('market-inbox');
   const marketInboxCount = $('market-inbox-count');
@@ -3918,6 +3882,42 @@
     return n;
   }
 
+  function marketPackQuantity(input, ownedCount) {
+    const value = input && input.value.trim();
+    const n = Number(value);
+    if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < 1) {
+      throw new Error('Choisis un nombre entier de packs supérieur ou égal à 1.');
+    }
+    if (n > ownedCount) {
+      throw new Error(`Tu ne possèdes que ${ownedCount} pack${ownedCount > 1 ? 's' : ''} de ce type.`);
+    }
+    if (n > MAX_MARKET_QTY) {
+      throw new Error(`Tu peux mettre au maximum ${MAX_MARKET_QTY} packs en vente à la fois.`);
+    }
+    return n;
+  }
+
+  /* Une annonce peut être une carte (cardId) ou un pack (packType
+     'classic' | 'rare'). Les anciennes annonces n'ont pas de packType :
+     ce sont des cartes. */
+  function cardName(id) {
+    const card = cardsDatabase.find((c) => c.id === id);
+    return card ? card.name : 'une carte';
+  }
+
+  function isPackListing(listing) {
+    return Boolean(listing && (listing.packType === 'classic' || listing.packType === 'rare'));
+  }
+
+  function packName(packType) {
+    return packType === 'rare' ? 'Pack Rare doré' : 'Pack Classique';
+  }
+
+  function listingName(listing) {
+    if (isPackListing(listing)) return packName(listing.packType);
+    return cardName(listing && listing.cardId);
+  }
+
   function marketInfo(message) {
     if (marketMessage) marketMessage.textContent = message;
     showToast(message);
@@ -3927,10 +3927,13 @@
     const groups = [];
     const byKey = new Map();
     for (const listing of list) {
-      const key = `${listing.cardId}\u0000${listing.price}`;
+      const isPack = isPackListing(listing);
+      const key = isPack
+        ? `pack:${listing.packType}\u0000${listing.price}`
+        : `card:${listing.cardId}\u0000${listing.price}`;
       let group = byKey.get(key);
       if (!group) {
-        group = { cardId: listing.cardId, price: listing.price, ids: [] };
+        group = { cardId: listing.cardId || '', packType: isPack ? listing.packType : '', price: listing.price, ids: [] };
         byKey.set(key, group);
         groups.push(group);
       }
@@ -3989,8 +3992,58 @@
     }
   }
 
+  function syncPackMarketQty({ reset = false, clampValue = true } = {}) {
+    if (!packMarketType || !packMarketQty) return;
+    const type = packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
+    const maxSell = Math.min(ownedCount, MAX_MARKET_QTY);
+    if (ownedCount < 1) {
+      packMarketQty.value = '1';
+      packMarketQty.min = '1';
+      packMarketQty.max = '1';
+      packMarketQty.disabled = true;
+      if (packMarketQtyMinus) packMarketQtyMinus.disabled = true;
+      if (packMarketQtyPlus) packMarketQtyPlus.disabled = true;
+      if (packMarketQtyHint) packMarketQtyHint.textContent = `Aucun ${packName(type)} à vendre`;
+      if (packMarketSubmit) {
+        packMarketSubmit.disabled = true;
+        packMarketSubmit.textContent = 'Mettre les packs en vente';
+      }
+      return;
+    }
+    packMarketQty.disabled = false;
+    packMarketQty.min = '1';
+    packMarketQty.max = String(maxSell);
+    if (packMarketSubmit) packMarketSubmit.disabled = false;
+    const raw = packMarketQty.value.trim();
+    const parsed = /^\d+$/.test(raw) ? Number(raw) : NaN;
+    let currentQty = parsed;
+    if (reset) {
+      currentQty = 1;
+      packMarketQty.value = '1';
+    } else if (clampValue) {
+      currentQty = Number.isSafeInteger(parsed) ? clamp(parsed, 1, maxSell) : 1;
+      packMarketQty.value = String(currentQty);
+    }
+    const valid = Number.isSafeInteger(currentQty) && currentQty >= 1 && currentQty <= maxSell;
+    if (packMarketQtyMinus) packMarketQtyMinus.disabled = !valid || currentQty <= 1;
+    if (packMarketQtyPlus) packMarketQtyPlus.disabled = !valid || currentQty >= maxSell;
+    if (packMarketQtyHint) {
+      if (!valid) {
+        packMarketQtyHint.textContent = `Choisis un nombre entre 1 et ${maxSell}`;
+      } else {
+        const remaining = ownedCount - currentQty;
+        packMarketQtyHint.textContent = `${currentQty} sur ${ownedCount} (il t’en restera ${remaining})`;
+      }
+    }
+    if (packMarketSubmit) {
+      packMarketSubmit.textContent = valid && currentQty > 1 ? `Mettre les packs en vente (×${currentQty})` : 'Mettre les packs en vente';
+    }
+  }
+
   function renderMarket() {
     if (!currentUser) return;
+    syncPackMarketQty({ clampValue: true });
     if (marketCard) {
       const old = marketCard.value;
       const owned = countMap();
@@ -4014,9 +4067,12 @@
       myListings.replaceChildren(...(groups.length ? groups.map((group) => {
         const row = el('div', 'trade-row');
         const count = group.ids.length;
+        const isPack = Boolean(group.packType);
+        const name = isPack ? packName(group.packType) : cardName(group.cardId);
+        const unit = isPack ? 'pack' : 'carte';
         const label = count > 1
-          ? `${cardName(group.cardId)} (×${count}) · ${fmt(group.price)} 🪙 / carte`
-          : `${cardName(group.cardId)} · ${fmt(group.price)} 🪙`;
+          ? `${name} (×${count}) · ${fmt(group.price)} 🪙 / ${unit}`
+          : `${name} · ${fmt(group.price)} 🪙`;
         row.append(el('span', 'trade-text', label));
         if (count > 1) {
           const cancelOne = el('button', 'mini-btn', 'Retirer 1');
@@ -4033,7 +4089,7 @@
           row.append(cancel);
         }
         return row;
-      }) : [el('p', 'online-empty', 'Aucune carte en vente.') ]));
+      }) : [el('p', 'online-empty', 'Aucune annonce en cours. Crée ton marché ci-dessus : cartes ou packs, nombre et prix comme tu veux.') ]));
     }
     if (marketInbox) {
       const income = [
@@ -4043,7 +4099,7 @@
       if (marketInboxCount) marketInboxCount.textContent = String(income.length);
       marketInbox.replaceChildren(...(income.length ? income.map((item) => {
         const row = el('div', 'trade-row');
-        const text = item.kind === 'sale' ? `Vente de « ${cardName(item.cardId)} » : ${fmt(item.price)} 🪙` : `Cadeau de pièces : ${fmt(item.amount)} 🪙`;
+        const text = item.kind === 'sale' ? `Vente de « ${listingName(item)} » : ${fmt(item.price)} 🪙` : `Cadeau de pièces : ${fmt(item.amount)} 🪙`;
         row.append(el('span', 'trade-text', text));
         const claim = el('button', 'mini-btn primary', 'Récupérer');
         claim.type = 'button';
@@ -4166,16 +4222,19 @@
       friendListings.replaceChildren(...(groups.length ? groups.map((group) => {
         const row = el('div', 'trade-row');
         const count = group.ids.length;
+        const isPack = Boolean(group.packType);
+        const name = isPack ? packName(group.packType) : cardName(group.cardId);
+        const unit = isPack ? 'pack' : 'carte';
         const label = count > 1
-          ? `${cardName(group.cardId)} (×${count} dispo) · ${fmt(group.price)} 🪙 / carte`
-          : `${cardName(group.cardId)} · ${fmt(group.price)} 🪙`;
+          ? `${name} (×${count} dispo) · ${fmt(group.price)} 🪙 / ${unit}`
+          : `${name} · ${fmt(group.price)} 🪙`;
         row.append(el('span', 'trade-text', label));
         let qtyInput = null;
         if (count > 1) {
           const qtyWrap = el('div', 'market-row-qty-wrap');
           const minus = el('button', 'qty-btn market-row-btn', '−');
           minus.type = 'button';
-          minus.setAttribute('aria-label', 'Acheter une carte de moins');
+          minus.setAttribute('aria-label', `Acheter ${unit === 'pack' ? 'un pack' : 'une carte'} de moins`);
           qtyInput = el('input', 'market-row-qty');
           qtyInput.type = 'number';
           qtyInput.min = '1';
@@ -4183,10 +4242,10 @@
           qtyInput.step = '1';
           qtyInput.value = '1';
           qtyInput.inputMode = 'numeric';
-          qtyInput.setAttribute('aria-label', `Quantité de ${cardName(group.cardId)} à acheter`);
+          qtyInput.setAttribute('aria-label', `Quantité de ${name} à acheter`);
           const plus = el('button', 'qty-btn market-row-btn', '+');
           plus.type = 'button';
-          plus.setAttribute('aria-label', 'Acheter une carte de plus');
+          plus.setAttribute('aria-label', `Acheter ${unit === 'pack' ? 'un pack' : 'une carte'} de plus`);
           const syncRowQty = () => {
             const raw = qtyInput.value.trim();
             const val = /^\d+$/.test(raw) ? Number(raw) : NaN;
@@ -4214,14 +4273,16 @@
         buy.type = 'button';
         on(buy, 'click', () => {
           try {
-            const quantity = qtyInput ? marketQuantity(qtyInput, count) : 1;
+            const quantity = qtyInput ? (isPack ? marketPackQuantity(qtyInput, count) : marketQuantity(qtyInput, count)) : 1;
             const total = group.price * quantity;
             if (!Number.isSafeInteger(total)) throw new Error('Montant total trop élevé.');
+            const noun = isPack ? 'pack' : 'carte';
+            const nounPlural = isPack ? 'packs' : 'cartes';
             const msg = quantity === 1
-              ? `Acheter « ${cardName(group.cardId)} » pour ${fmt(group.price)} 🪙 ?`
-              : `Acheter ${quantity} exemplaires de « ${cardName(group.cardId)} » pour ${fmt(total)} 🪙 (${fmt(group.price)} 🪙 pièce) ?`;
+              ? `Acheter « ${name} » pour ${fmt(group.price)} 🪙 ?`
+              : `Acheter ${quantity} ${isPack ? 'packs' : 'exemplaires'} de « ${name} » pour ${fmt(total)} 🪙 (${fmt(group.price)} 🪙 / ${noun}) ?`;
             askConfirm({
-              title: quantity === 1 ? 'Acheter cette carte ?' : 'Acheter ces cartes ?',
+              title: quantity === 1 ? `Acheter ce ${noun} ?` : `Acheter ces ${nounPlural} ?`,
               message: msg,
               confirmLabel: 'Acheter',
               onConfirm: () => (quantity === 1
@@ -4232,7 +4293,7 @@
         });
         row.append(buy);
         return row;
-      }) : [el('p', 'online-empty', 'Aucune carte en vente pour le moment.') ]));
+      }) : [el('p', 'online-empty', 'Aucune annonce en cours pour le moment.') ]));
     } catch (error) {
       if (selectedFriendUid === uid) friendListings.replaceChildren(el('p', 'online-empty', 'Impossible de charger les ventes. Réessaie.'));
       noteCloudError('Ventes de l’ami illisibles', error);
@@ -4265,13 +4326,24 @@
         const saveData = saveSnap.data();
         const coins = Number(saveData.coins) || 0;
         const cards = Array.isArray(saveData.collection) ? [...saveData.collection] : [];
+        const savedStock = (saveData && saveData.packStock) || {};
+        const packStock = {
+          classic: Math.max(0, Number(savedStock.classic) || 0),
+          rare: Math.max(0, Number(savedStock.rare) || 0)
+        };
         /* On utilise la liste d'amis ENREGISTRÉE (celle que vérifient les
            règles Firestore), pas l'état mémoire qui peut être en avance. */
         const savedFriends = Array.isArray(saveData.friends) ? saveData.friends : [];
         const item = itemSnap && itemSnap.exists ? itemSnap.data() : null;
+        const isPackItem = Boolean(item && (item.packType === 'classic' || item.packType === 'rare'));
         let nextCoins = coins;
         let patch;
-        if (singleAction === 'list') {
+        if (singleAction === 'list' && singleValue && singleValue.packType) {
+          const type = singleValue.packType === 'rare' ? 'rare' : 'classic';
+          if (packStock[type] < 1) throw new Error('Tu ne possèdes plus ce pack.');
+          packStock[type] -= 1;
+          tx.set(ref, { sellerUid: uid, packType: type, price: singleValue.price, status: 'open', buyerUid: '', createdAt: serverTimestamp() });
+        } else if (singleAction === 'list') {
           const index = cards.indexOf(singleValue.cardId);
           if (index < 0) throw new Error('Tu ne possèdes plus cette carte.');
           cards.splice(index, 1);
@@ -4283,14 +4355,26 @@
           tx.set(ref, { fromUid: uid, toUid: singleValue.toUid, amount: singleValue.amount, status: 'pending', createdAt: serverTimestamp() });
         } else if (singleAction === 'cancel') {
           if (!item || item.sellerUid !== uid || item.status !== 'open') throw new Error('Cette annonce n’est plus disponible.');
-          if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
-          cards.push(item.cardId); patch = { status: 'cancelled' };
+          if (isPackItem) {
+            packStock[item.packType] = Math.min(100000, packStock[item.packType] + 1);
+          } else {
+            if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
+            cards.push(item.cardId);
+          }
+          patch = { status: 'cancelled' };
         } else if (singleAction === 'buy') {
-          if (!item || item.status !== 'open' || item.sellerUid === uid) throw new Error('Cette carte n’est plus en vente.');
+          if (!item || item.status !== 'open' || item.sellerUid === uid) {
+            throw new Error(isPackItem ? 'Ce pack n’est plus en vente.' : 'Cette carte n’est plus en vente.');
+          }
           if (!savedFriends.includes(item.sellerUid)) throw new Error('Cette vente est réservée à tes amis.');
           if (coins < item.price) throw new Error('Tu n’as pas assez de pièces.');
-          if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
-          nextCoins -= item.price; cards.push(item.cardId); patch = { status: 'sold', buyerUid: uid };
+          if (isPackItem) {
+            packStock[item.packType] = Math.min(100000, packStock[item.packType] + 1);
+          } else {
+            if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
+            cards.push(item.cardId);
+          }
+          nextCoins -= item.price; patch = { status: 'sold', buyerUid: uid };
         } else if (singleAction === 'claimSale') {
           if (!item || item.sellerUid !== uid || item.status !== 'sold') throw new Error('Cette vente a déjà été récupérée.');
           nextCoins += item.price; patch = { status: 'completed' };
@@ -4304,8 +4388,8 @@
         } else throw new Error('Action inconnue.');
         if (nextCoins > MAX_COINS) throw new Error('Ton solde dépasserait la limite de pièces. Dépense-en avant de récupérer ce montant.');
         if (patch) tx.update(ref, patch);
-        tx.update(saveRef, { coins: nextCoins, collection: cards, updatedAt: serverTimestamp() });
-        return { coins: nextCoins, cards };
+        tx.update(saveRef, { coins: nextCoins, collection: cards, packStock, updatedAt: serverTimestamp() });
+        return { coins: nextCoins, cards, packStock };
       });
     };
 
@@ -4313,7 +4397,13 @@
       if (!result || !currentUser || currentUser.uid !== uid) return;
       state.coins = result.coins;
       state.collection = result.cards.map((cardId) => cardsDatabase.find((c) => c.id === cardId)).filter(Boolean);
-      updateCoins(); renderCollection(); renderShop(); renderAccount(); saveProfileSoon();
+      if (result.packStock) {
+        state.packStock = {
+          classic: Math.max(0, Number(result.packStock.classic) || 0),
+          rare: Math.max(0, Number(result.packStock.rare) || 0)
+        };
+      }
+      updateCoins(); renderCollection(); renderShop(); renderAccount(); renderPackInventory(); saveProfileSoon();
     };
 
     let lastResult = null;
@@ -4322,6 +4412,7 @@
     try {
       if (!await saveNow(true)) throw new Error('Sauvegarde impossible : transaction annulée.');
       if (action === 'list') {
+        const isPackList = Boolean(value && value.packType);
         targetCount = Math.max(1, Number(value && value.quantity) || 1);
         for (let step = 0; step < targetCount; step++) {
           if (!currentUser || currentUser.uid !== uid) return;
@@ -4330,8 +4421,13 @@
           doneCount++;
         }
         applyResult(lastResult);
-        if (marketQty) marketQty.value = '1';
-        marketInfo(doneCount === 1 ? 'Carte mise en vente !' : `${doneCount} cartes mises en vente !`);
+        if (isPackList) {
+          if (packMarketQty) packMarketQty.value = '1';
+          marketInfo(doneCount === 1 ? 'Pack mis en vente !' : `${doneCount} packs mis en vente !`);
+        } else {
+          if (marketQty) marketQty.value = '1';
+          marketInfo(doneCount === 1 ? 'Carte mise en vente !' : `${doneCount} cartes mises en vente !`);
+        }
       } else if (action === 'cancel' && value && Array.isArray(value.ids)) {
         targetCount = value.ids.length;
         let lastError = null;
@@ -4349,8 +4445,8 @@
         if (doneCount === 0) throw (lastError || new Error('Cette annonce n’est plus disponible.'));
         applyResult(lastResult);
         marketInfo(doneCount === targetCount
-          ? (doneCount === 1 ? 'Carte rendue à ta collection.' : `${doneCount} cartes rendues à ta collection.`)
-          : `${doneCount} carte${doneCount > 1 ? 's' : ''} rendue${doneCount > 1 ? 's' : ''} (le reste avait déjà été vendu).`);
+          ? (doneCount === 1 ? 'Annonce retirée : rendu à ton inventaire.' : `${doneCount} annonces retirées : rendus à ton inventaire.`)
+          : `${doneCount} annonce${doneCount > 1 ? 's' : ''} retirée${doneCount > 1 ? 's' : ''} (le reste avait déjà été vendu).`);
       } else if (action === 'buy' && value && Array.isArray(value.ids)) {
         targetCount = Math.max(1, Number(value.quantity) || value.ids.length);
         if (typeof value.unitPrice === 'number' && state.coins < value.unitPrice * targetCount) {
@@ -4369,11 +4465,11 @@
             throw err;
           }
         }
-        if (doneCount === 0) throw (lastError || new Error('Cette carte n’est plus en vente.'));
+        if (doneCount === 0) throw (lastError || new Error('Cette annonce n’est plus en vente.'));
         applyResult(lastResult);
         marketInfo(doneCount === targetCount
-          ? (doneCount === 1 ? 'Carte achetée !' : `${doneCount} cartes achetées !`)
-          : `${doneCount} carte${doneCount > 1 ? 's' : ''} achetée${doneCount > 1 ? 's' : ''} sur ${targetCount} (le reste n’était plus disponible).`);
+          ? (doneCount === 1 ? 'Achat réussi !' : `${doneCount} achats réussis !`)
+          : `${doneCount} achat${doneCount > 1 ? 's' : ''} sur ${targetCount} (le reste n’était plus disponible).`);
       } else {
         lastResult = await runSingle(action, id, value);
         doneCount = 1;
@@ -4381,8 +4477,8 @@
         marketInfo({
           gift: 'Cadeau envoyé ! Ton ami peut le récupérer dans « Pièces à récupérer » (annulable tant qu’il ne l’a pas fait).',
           cancelGift: 'Cadeau annulé : tes pièces sont rendues.',
-          cancel: 'Carte rendue à ta collection.',
-          buy: 'Carte achetée !',
+          cancel: 'Annonce retirée : rendu à ton inventaire.',
+          buy: 'Achat réussi !',
           claimSale: 'Pièces de la vente récupérées !',
           claimGift: 'Cadeau récupéré !'
         }[action]);
@@ -4459,245 +4555,56 @@
   });
   on($('market-refresh'), 'click', () => { loadMarket(); if (selectedFriendUid) loadFriendListings(selectedFriendUid); });
 
+  on(packMarketType, 'change', () => syncPackMarketQty({ reset: true }));
+  on(packMarketQtyMinus, 'click', () => {
+    if (!packMarketQty || !packMarketType) return;
+    const type = packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
+    const maxSell = Math.min(ownedCount, MAX_MARKET_QTY);
+    if (maxSell < 1) return;
+    const cur = /^\d+$/.test(packMarketQty.value.trim()) ? Number(packMarketQty.value.trim()) : 1;
+    packMarketQty.value = String(clamp(cur - 1, 1, maxSell));
+    syncPackMarketQty({ clampValue: true });
+    SFX.tick();
+  });
+  on(packMarketQtyPlus, 'click', () => {
+    if (!packMarketQty || !packMarketType) return;
+    const type = packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
+    const maxSell = Math.min(ownedCount, MAX_MARKET_QTY);
+    if (maxSell < 1) return;
+    const cur = /^\d+$/.test(packMarketQty.value.trim()) ? Number(packMarketQty.value.trim()) : 1;
+    packMarketQty.value = String(clamp(cur + 1, 1, maxSell));
+    syncPackMarketQty({ clampValue: true });
+    SFX.tick();
+  });
+  on(packMarketQty, 'input', () => syncPackMarketQty({ clampValue: false }));
 
-  /* ---------------------------------------------------------------- échanges
-     Un échange est un document trades/{id} partagé par les deux joueurs.
-     Chacun applique sa propre moitié dans SA sauvegarde (les règles
-     Firestore restent « propriétaire uniquement ») : quand les deux
-     moitiés sont appliquées, l'échange passe à « done ». Si l'autre joueur
-     est hors ligne, sa moitié s'applique à sa prochaine connexion. */
-
-  async function createTrade({ toUid, giveId, receiveId, price }) {
-    if (!cloudReady()) {
-      showToast('Connexion requise pour échanger.');
-      return;
-    }
-    const id = `${currentUser.uid}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  on($('pack-market-form'), 'submit', (e) => {
+    e.preventDefault();
     try {
-      await cloudDb.collection('trades').doc(id).set({
-        fromUid: currentUser.uid,
-        toUid,
-        giveId: giveId || null,
-        receiveId: receiveId || null,
-        price: Number(price) || 0,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        applied: {}
+      const type = packMarketType && packMarketType.value === 'rare' ? 'rare' : 'classic';
+      const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
+      if (ownedCount < 1) throw new Error(`Tu ne possèdes aucun ${packName(type)}.`);
+      const quantity = packMarketQty ? marketPackQuantity(packMarketQty, ownedCount) : 1;
+      const price = marketNumber(packMarketPrice, 0);
+      const remaining = ownedCount - quantity;
+      const msg = quantity === 1
+        ? `Réserver 1 « ${packName(type)} » pour ${fmt(price)} 🪙 ? (Il t’en restera ${remaining}.)`
+        : `Réserver ${quantity} « ${packName(type)} » à ${fmt(price)} 🪙 pièce ? (Il t’en restera ${remaining}.)`;
+      askConfirm({
+        title: 'Mettre des packs en vente ?',
+        message: msg,
+        confirmLabel: 'Mettre en vente',
+        onConfirm: () => marketTransaction('list', null, { packType: type, price, quantity })
       });
-      showToast('Échange proposé ! Ton ami le verra dans « En ligne ».');
-      await loadTrades();
-      renderOnline();
-    } catch (error) {
-      if (isPermissionDenied(error)) showToast(RULES_HELP);
-      else showToast('Impossible d’envoyer la proposition. Réessaie.');
-    }
-  }
+    } catch (error) { marketInfo(error.message); }
+  });
 
-  async function updateTrade(id, patch) {
-    if (!cloudReady()) return;
-    try {
-      await cloudDb.collection('trades').doc(id).update(patch);
-    } catch (error) {
-      noteCloudError('Échange non mis à jour', error);
-    }
-  }
 
-  function snapshotDocs(snap) {
-    if (!snap) return [];
-    if (Array.isArray(snap.docs)) return snap.docs.map((d) => ({ id: d.id, data: d.data() }));
-    const out = [];
-    if (typeof snap.forEach === 'function') snap.forEach((d) => out.push({ id: d.id, data: d.data() }));
-    return out;
-  }
-
-  async function loadTrades() {
-    if (!cloudReady()) return;
-    const tradesColl = cloudDb.collection('trades');
-    if (!tradesColl || typeof tradesColl.where !== 'function') return;
-    const uid = currentUser.uid;
-    const found = new Map();
-    try {
-      const q1 = tradesColl.where('fromUid', '==', uid);
-      const q2 = tradesColl.where('toUid', '==', uid);
-      const [s1, s2] = await Promise.all([q1.get(), q2.get()]);
-      for (const t of [...snapshotDocs(s1), ...snapshotDocs(s2)]) {
-        found.set(t.id, { id: t.id, ...t.data });
-      }
-    } catch (error) {
-      noteCloudError('Échanges illisibles', error);
-      return;
-    }
-    trades = [...found.values()];
-    for (const trade of trades) {
-      if (trade.status === 'accepted' && !(trade.applied && trade.applied[uid])) {
-        await applyMyHalf(trade);
-      }
-    }
-    if (app.dataset.tab === 'online') renderOnline();
-  }
-
-  function subscribeTrades() {
-    if (!cloudReady() || tradesUnsub) return;
-    const uid = currentUser.uid;
-    try {
-      const onSnap = (snap) => {
-        const found = new Map(trades.map((t) => [t.id, t]));
-        for (const t of snapshotDocs(snap)) found.set(t.id, { id: t.id, ...t.data });
-        trades = [...found.values()];
-        if (app.dataset.tab === 'online') renderOnline();
-      };
-      const q1 = cloudDb.collection('trades').where('fromUid', '==', uid);
-      const q2 = cloudDb.collection('trades').where('toUid', '==', uid);
-      if (typeof q1.onSnapshot === 'function') {
-        const onSnapError = (error) => noteCloudError('Échanges illisibles (temps réel)', error);
-        const un1 = q1.onSnapshot(onSnap, onSnapError);
-        const un2 = typeof q2.onSnapshot === 'function' ? q2.onSnapshot(onSnap, onSnapError) : null;
-        tradesUnsub = () => {
-          try { if (un1) un1(); } catch (error) { /* déjà fermé */ }
-          try { if (un2) un2(); } catch (error) { /* déjà fermé */ }
-        };
-      }
-    } catch (error) { /* temps réel indisponible : loadTrades suffit */ }
-  }
-
-  async function applyMyHalf(trade) {
-    const uid = currentUser.uid;
-    const applied = { ...(trade.applied || {}), [uid]: true };
-    const ids = collectionIds();
-    const removeOne = (id) => {
-      const i = ids.indexOf(id);
-      if (i >= 0) ids.splice(i, 1);
-    };
-    const addOne = (id) => {
-      if (cardsDatabase.some((c) => c.id === id)) ids.push(id);
-    };
-
-    if (trade.price > 0) {
-      if (trade.fromUid === uid) {
-        // Je suis l'acheteur : je paie et je reçois la carte.
-        if (state.coins < trade.price) {
-          await updateTrade(trade.id, { status: 'declined', applied });
-          showToast('Échange refusé : pièces insuffisantes.');
-          return;
-        }
-        addOne(trade.receiveId);
-        state.collection = ids.map((id) => cardsDatabase.find((c) => c.id === id)).filter(Boolean);
-        addCoins(-trade.price);
-      } else {
-        // Je suis le vendeur : je donne la carte et je reçois les pièces.
-        if (!ids.includes(trade.receiveId)) {
-          await updateTrade(trade.id, { status: 'declined', applied });
-          showToast('Échange refusé : tu n’as plus cette carte.');
-          return;
-        }
-        removeOne(trade.receiveId);
-        state.collection = ids.map((id) => cardsDatabase.find((c) => c.id === id)).filter(Boolean);
-        addCoins(trade.price);
-      }
-    } else {
-      // Échange : je donne giveId, je reçois receiveId.
-      if (!ids.includes(trade.giveId)) {
-        await updateTrade(trade.id, { status: 'declined', applied });
-        showToast('Échange refusé : tu n’as plus cette carte.');
-        return;
-      }
-      removeOne(trade.giveId);
-      addOne(trade.receiveId);
-      state.collection = ids.map((id) => cardsDatabase.find((c) => c.id === id)).filter(Boolean);
-      save();
-    }
-    saveProfileSoon();
-    renderCollection();
-    const done = Object.keys(applied).length >= 2;
-    await updateTrade(trade.id, { applied, status: done ? 'done' : 'accepted' });
-    trade.applied = applied;
-    trade.status = done ? 'done' : 'accepted';
-    showToast('Échange terminé !');
-  }
-
-  async function acceptTrade(trade) {
-    await updateTrade(trade.id, { status: 'accepted' });
-    trade.status = 'accepted';
-    await applyMyHalf(trade);
-    renderOnline();
-  }
-
-  async function declineTrade(trade) {
-    await updateTrade(trade.id, { status: 'declined' });
-    trade.status = 'declined';
-    renderOnline();
-  }
-
-  async function cancelTrade(trade) {
-    await updateTrade(trade.id, { status: 'cancelled' });
-    trade.status = 'cancelled';
-    renderOnline();
-  }
-
-  function cardName(id) {
-    const card = cardsDatabase.find((c) => c.id === id);
-    return card ? card.name : 'une carte';
-  }
-
-  function tradeText(trade, incoming) {
-    const otherUid = incoming ? trade.fromUid : trade.toUid;
-    const other = friendProfiles.get(otherUid);
-    const who = other ? other.pseudo : 'Ton ami';
-    if (trade.price > 0) {
-      return incoming
-        ? `${who} te vend « ${cardName(trade.receiveId)} » pour ${fmt(trade.price)} 🪙`
-        : `Tu achètes « ${cardName(trade.receiveId)} » à ${who} pour ${fmt(trade.price)} 🪙`;
-    }
-    return incoming
-      ? `${who} t’offre « ${cardName(trade.receiveId)} » contre ton « ${cardName(trade.giveId)} »`
-      : `Tu proposes ton « ${cardName(trade.giveId)} » contre « ${cardName(trade.receiveId)} » à ${who}`;
-  }
-
-  function renderTrades() {
-    if (!tradesIn || !tradesOut) return;
-    const uid = currentUser && currentUser.uid;
-    // Profils des autres joueurs inconnus : on les charge puis on rafraîchit.
-    trades.forEach((t) => {
-      const other = t.toUid === uid ? t.fromUid : t.toUid;
-      if (other && !friendProfiles.has(other)) {
-        fetchFriendProfile(other).then(() => {
-          if (app.dataset.tab === 'online') renderOnline();
-        });
-      }
-    });
-    const incoming = trades.filter((t) => t.toUid === uid && (t.status === 'pending' || t.status === 'accepted'));
-    const outgoing = trades.filter((t) => t.fromUid === uid && (t.status === 'pending' || t.status === 'accepted'));
-    const build = (list, isIncoming) => {
-      if (!list.length) {
-        return [el('p', 'online-empty', isIncoming ? 'Aucune proposition reçue.' : 'Aucune proposition envoyée.')];
-      }
-      return list.map((trade) => {
-        const row = el('div', 'trade-row');
-        row.append(el('span', 'trade-text', tradeText(trade, isIncoming)));
-        if (trade.status === 'pending') {
-          if (isIncoming) {
-            const ok = el('button', 'mini-btn primary', 'Accepter');
-            ok.type = 'button';
-            on(ok, 'click', () => acceptTrade(trade));
-            const no = el('button', 'mini-btn danger', 'Refuser');
-            no.type = 'button';
-            on(no, 'click', () => declineTrade(trade));
-            row.append(ok, no);
-          } else {
-            const cancel = el('button', 'mini-btn', 'Annuler');
-            cancel.type = 'button';
-            on(cancel, 'click', () => cancelTrade(trade));
-            row.append(cancel);
-          }
-        } else {
-          row.append(el('span', 'trade-status', 'En attente de l’autre joueur…'));
-        }
-        return row;
-      });
-    };
-    tradesIn.replaceChildren(...build(incoming, true));
-    tradesOut.replaceChildren(...build(outgoing, false));
-  }
+  /* Échanges à la demande désactivés : 
+     le marché (cartes et packs en vente) est le seul moyen
+     d'obtenir les cartes d'un ami. Voir « Mon marché ». */
 
   /* Inspection : la carte suit le doigt / la souris (tilt + reflet holographique). */
   let inspRaf = 0;
