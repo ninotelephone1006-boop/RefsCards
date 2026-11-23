@@ -165,7 +165,7 @@ const cardsDatabase = [
     description: 'un gay refouler',
     rarity: 'uncommon',
     emoji: '💘',
-    image: 'assets/Cartes/mathis-date.jpg',
+    image: 'assets/Cartes/mathis date.jpg',
     color: '#9dbfc4'
   },
   {
