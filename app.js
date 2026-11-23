@@ -1584,6 +1584,10 @@
     // 1er clic : retourne. 2e clic (après 650 ms, pour éviter le double-clic) : carte suivante.
     on(btn, 'click', () => {
       if (!btn.classList.contains('is-top') || btn.classList.contains('is-flying')) return;
+      if (btn.classList.contains('is-charging')) {
+        if (performance.now() - Number(btn.dataset.chargeAt || 0) > 600 && btn._skipCharge) btn._skipCharge();
+        return;
+      }
       if (!btn.classList.contains('is-revealed')) revealCard(btn, card);
       else if (btn.classList.contains('is-flipped') && performance.now() - Number(btn.dataset.flipAt || 0) > 650) {
         sendToRecap(btn, card);
@@ -1641,6 +1645,7 @@
   /* ---------------------------------------------------------- mise en scène */
 
   function clearEffects() {
+    stage.querySelectorAll('.suspense-layer').forEach((n) => n.remove());
     rays.classList.remove('on');
     tableGlow.removeAttribute('data-rarity');
     app.classList.remove('slow-mo');
@@ -1665,6 +1670,70 @@
     return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height / 2, r, s };
   }
 
+  /* ------------------------------------------------------------ suspense
+     Plus la rareté est haute, plus la carte « se charge » longtemps avant
+     de se retourner : tremblement, anneaux qui convergent, ombre autour de
+     la carte, battements de cœur de plus en plus rapides, flash final.
+     Un clic après ~0,6 s permet de passer la mise en scène. */
+  const SUSPENSE = {
+    rare:      { ms: 450,  tier: 1 },
+    superrare: { ms: 650,  tier: 1 },
+    epic:      { ms: 1000, tier: 2 },
+    ultraepic: { ms: 1300, tier: 2 },
+    mythic:    { ms: 1700, tier: 3 },
+    legendary: { ms: 2100, tier: 3 },
+    divine:    { ms: 2600, tier: 4 },
+    secret:    { ms: 3200, tier: 4 }
+  };
+
+  function startCharge(btn, info, cx, cy, sus, done) {
+    const layer = el('div', 'suspense-layer');
+    layer.dataset.tier = String(sus.tier);
+    layer.style.setProperty('--x', `${cx.toFixed(0)}px`);
+    layer.style.setProperty('--y', `${cy.toFixed(0)}px`);
+    layer.style.setProperty('--dur', `${sus.ms}ms`);
+    layer.style.setProperty('--c', info.glow);
+    layer.append(el('div', 'suspense-dim'));
+    for (let i = 0; i < sus.tier + 1; i++) {
+      const ring = el('i', 'charge-ring');
+      ring.style.animationDelay = `${(i * 0.7 / (sus.tier + 1)).toFixed(2)}s`;
+      layer.append(ring);
+    }
+    stage.append(layer);
+
+    btn.classList.add('is-charging');
+    btn.dataset.tier = String(sus.tier);
+    btn.dataset.chargeAt = String(performance.now());
+    btn.style.setProperty('--cc', info.glow);
+    btn.style.setProperty('--dur', `${sus.ms}ms`);
+    tableGlow.setAttribute('data-rarity', info.rank >= RARITIES.legendary.rank ? 'legendary' : info.rank >= RARITIES.epic.rank ? 'epic' : 'rare');
+    revealKicker.textContent = '✦ ? ✦';
+    revealSub.textContent = 'Quelque chose se prépare…';
+
+    const timers = [];
+    let gap = 440;
+    const beat = () => {
+      SFX.tick();
+      gap = Math.max(85, gap * 0.8);
+      timers.push(window.setTimeout(beat, gap));
+    };
+    beat();
+
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      timers.forEach((t) => window.clearTimeout(t));
+      layer.classList.add('is-out');
+      window.setTimeout(() => layer.remove(), 420);
+      if (sus.tier >= 3) { flashScreen(); SFX.whoosh(); }
+      if (sus.tier >= 4) window.setTimeout(flashScreen, 140);
+      done();
+    };
+    timers.push(window.setTimeout(finish, sus.ms));
+    btn._skipCharge = finish;
+  }
+
   function revealCard(btn, card) {
     if (btn.classList.contains('is-revealed')) return;
     SFX.unlock();
@@ -1673,16 +1742,6 @@
     if (cardVideoInfo(card)) activateCardAudio(btn);
     btn.dataset.flipAt = String(performance.now());
     btn.classList.add('is-revealed');
-    if (card.rarity === 'epic') {
-      // Petit suspense : la carte marque un temps d'arrêt avant de se retourner.
-      btn.classList.add('is-hesitating');
-      window.setTimeout(() => {
-        btn.classList.remove('is-hesitating');
-        btn.classList.add('is-flipped');
-      }, reduceMotion.matches ? 0 : 340);
-    } else {
-      btn.classList.add('is-flipped');
-    }
     const info = RARITIES[card.rarity];
     const c = cardCenter(btn);
     const cx = c.x;
@@ -1690,52 +1749,64 @@
     const quiet = reduceMotion.matches;
 
     btn.setAttribute('aria-label', `Carte ${state.deck.indexOf(card) + 1}. ${card.name}, ${info.label}. ${card.description}. Activez le bouton Carte suivante pour continuer.`);
-    revealKicker.innerHTML = `<span>✦</span> ${info.label.toUpperCase()} <span>✦</span>`;
     footRight.textContent = 'CARTE SUIVANTE POUR CONTINUER →';
     nextCard.hidden = false;
     nextCard.textContent = remaining.length === 1 ? 'TERMINER LE BOOSTER →' : 'CARTE SUIVANTE →';
 
-    clearEffects();
-
     const fx = info.fx || 'calm';
-    tableGlow.setAttribute('data-rarity', card.rarity);
-    app.dataset.rarity = card.rarity;
+    const burst = () => {
+      revealKicker.innerHTML = `<span>✦</span> ${info.label.toUpperCase()} <span>✦</span>`;
+    clearEffects();
+        tableGlow.setAttribute('data-rarity', card.rarity);
+      app.dataset.rarity = card.rarity;
 
-    if (fx === 'calm') {
-      if (!quiet) {
-        const n = card.rarity === 'common' ? 10 : 18;
-        for (let i = 0; i < n; i++) FX.dot(cx, cy, info.glow, { speedMax: 170, g: -20, size: 3, life: 0.8 });
-      }
-    } else if (fx === 'rare') {
-      if (!quiet) {
-        FX.ring(cx, cy, info.glow, 190);
-        for (let i = 0; i < 26; i++) FX.spark(cx, cy, i % 2 ? '#ffffff' : info.glow, { speedMax: 380, g: 180, size: 2.4 });
-        for (let i = 0; i < 12; i++) FX.dot(cx, cy, info.glow, { speedMax: 220, g: -40, size: 4, life: 1 });
-      }
-    } else if (fx === 'epic') {
-      app.classList.add('slow-mo');
-      window.setTimeout(() => app.classList.remove('slow-mo'), 1600);
-      window.setTimeout(() => {
-        shakeStage();
-        flashScreen();
+      if (fx === 'calm') {
         if (!quiet) {
-          FX.ring(cx, cy, info.glow, 260);
-          for (let i = 0; i < 46; i++) FX.spark(cx, cy, i % 3 ? info.glow : '#ffffff', { speedMax: 560, g: 320, size: 2.8, life: 0.9 });
-          for (let i = 0; i < 18; i++) FX.dot(cx, cy, info.glow, { speedMax: 300, g: -60, size: 5, life: 1.4 });
+          const n = card.rarity === 'common' ? 10 : 18;
+          for (let i = 0; i < n; i++) FX.dot(cx, cy, info.glow, { speedMax: 170, g: -20, size: 3, life: 0.8 });
         }
-      }, quiet ? 0 : 420);
-    } else {
-      rays.classList.add('on');
-      if (!quiet) {
-        FX.ring(cx, cy, '#ffffff', 300);
-        FX.rain([info.color, info.glow, '#ffffff', '#ffe9a3'], 90);
-        for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? info.glow : '#ffffff', { speedMax: 620, g: 260, size: 3, life: 1.1 });
-        FX.confetti(cx, cy, [info.color, info.glow, '#ffffff', '#ffe9a3'], 40);
+      } else if (fx === 'rare') {
+        if (!quiet) {
+          FX.ring(cx, cy, info.glow, 190);
+          for (let i = 0; i < 26; i++) FX.spark(cx, cy, i % 2 ? '#ffffff' : info.glow, { speedMax: 380, g: 180, size: 2.4 });
+          for (let i = 0; i < 12; i++) FX.dot(cx, cy, info.glow, { speedMax: 220, g: -40, size: 4, life: 1 });
+        }
+      } else if (fx === 'epic') {
+        app.classList.add('slow-mo');
+        window.setTimeout(() => app.classList.remove('slow-mo'), 1600);
+        window.setTimeout(() => {
+          shakeStage();
+          flashScreen();
+          if (!quiet) {
+            FX.ring(cx, cy, info.glow, 260);
+            for (let i = 0; i < 46; i++) FX.spark(cx, cy, i % 3 ? info.glow : '#ffffff', { speedMax: 560, g: 320, size: 2.8, life: 0.9 });
+            for (let i = 0; i < 18; i++) FX.dot(cx, cy, info.glow, { speedMax: 300, g: -60, size: 5, life: 1.4 });
+          }
+        }, quiet ? 0 : 420);
+      } else {
+        rays.classList.add('on');
+        if (!quiet) {
+          FX.ring(cx, cy, '#ffffff', 300);
+          FX.rain([info.color, info.glow, '#ffffff', '#ffe9a3'], 90);
+          for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? info.glow : '#ffffff', { speedMax: 620, g: 260, size: 3, life: 1.1 });
+          FX.confetti(cx, cy, [info.color, info.glow, '#ffffff', '#ffe9a3'], 40);
+        }
+        window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
       }
-      window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
-    }
 
-    window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
+      window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
+
+    };
+    const doFlip = () => {
+      btn.classList.remove('is-charging');
+      delete btn._skipCharge;
+      btn.dataset.flipAt = String(performance.now());
+      btn.classList.add('is-flipped');
+      burst();
+    };
+    const sus = quiet ? null : SUSPENSE[card.rarity];
+    if (sus) startCharge(btn, info, cx, cy, sus, doFlip);
+    else doFlip();
 
     const isNew = !state.collection.some((c) => c.id === card.id);
     state.collection.push(card);
@@ -1779,11 +1850,23 @@
     SFX.tick();
     if (stat) {
       const box = el('div', 'insp-count');
-      const a = el('span', 'ic-cell');
-      a.append(el('b', null, String(stat.normal)), el('small', null, 'Normale' + (stat.normal > 1 ? 's' : '')));
-      const b = el('span', 'ic-cell ic-shiny');
-      b.append(el('b', null, String(stat.shiny)), el('small', null, '✦ Shiny'));
-      box.append(a, b);
+      const mk = (cls, n, label, variant) => {
+        const cell = el('button', `ic-cell ${cls}`);
+        cell.type = 'button';
+        cell.append(el('b', null, String(n)), el('small', null, label));
+        cell.disabled = !n || !variant;
+        if (variant === card) cell.classList.add('is-on');
+        on(cell, 'click', () => {
+          inspectCard.replaceChildren(cardFrame(variant, { eager: true, alt: `${variant.name} — ${info.label}` }));
+          box.querySelectorAll('.ic-cell').forEach((c) => c.classList.toggle('is-on', c === cell));
+          SFX.tick();
+        });
+        return cell;
+      };
+      box.append(
+        mk('', stat.normal, 'Normale' + (stat.normal > 1 ? 's' : ''), stat.card),
+        mk('ic-shiny', stat.shiny, '✦ Shiny', stat.shinyCard)
+      );
       inspectCard.parentElement.append(box);
     }
     inspectX.focus({ preventScroll: true });
@@ -3108,20 +3191,12 @@
       t.style.setProperty('--i', i);
       t.style.setProperty('--r-color', info.color);
       t.style.setProperty('--r-glow', info.glow);
-      t.setAttribute('aria-label', `${card.name}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}${st.shiny ? `, dont ${st.shiny} shiny` : ''}. Clic : voir en grand. Double-clic : détail normal / shiny.`);
+      t.setAttribute('aria-label', `${card.name}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}${st.shiny ? `, dont ${st.shiny} shiny` : ''}. Clic : voir en grand avec le détail normal / shiny.`);
       t.append(cardFrame(shown_card, { mini: true, alt: `${card.name} — ${info.label}` }));
       if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
       if (st.shiny) t.append(el('span', 'coll-shiny-dot', '✦'));
       if (fresh.has(card.id) || (st.shinyCard && fresh.has(st.shinyCard.id))) t.classList.add('is-fresh');
-      let clickTimer = 0;
-      on(t, 'click', () => {
-        window.clearTimeout(clickTimer);
-        clickTimer = window.setTimeout(() => openInspect(shown_card), 230);
-      });
-      on(t, 'dblclick', () => {
-        window.clearTimeout(clickTimer);
-        openInspect(shown_card, st);
-      });
+      on(t, 'click', () => openInspect(shown_card, st));
       frag.append(t);
     });
     collGrid.replaceChildren(frag);
