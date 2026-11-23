@@ -24,7 +24,7 @@
     video: 'assets/packetvideo.png'
   };
   const CARD_COUNT = 5;
-  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10, video: 3 };
+  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10, video: 2 };
   /* Ordre d'affichage + validation. Ajouter un type ici (et dans les objets
      ci-dessus) suffit pour qu'il apparaisse dans le Shop, l'inventaire, les
      sauvegardes et les écrans d'ouverture. */
@@ -48,11 +48,11 @@
   function cardVideoInfo(card) {
     return typeof cardVideoConfig === 'function' ? cardVideoConfig(card) : null;
   }
-  /* Le Pack Vidéo ne tire que des cartes dotées d'une configuration `video`.
-     Tant qu'il est « bientôt disponible », ses cartes ne sortent pas non plus
-     des autres boosters : on peut les voir verrouillées dans la collection,
-     mais pas les obtenir. Dès la publication, tout le catalogue redevient
-     tirable normalement. */
+  /* Le Pack Vidéo ne tire que des cartes dotées d'une configuration `video`,
+     et ces cartes restent exclusives à ce pack : elles ne sortent jamais des
+     autres boosters (classique, rare, légende), que le Pack Vidéo soit en
+     avant-première ou publié. On peut les voir verrouillées dans la collection,
+     mais on ne les obtient que par le Pack Vidéo. */
   function packPool(type) {
     if (type === 'video') {
       /* Seules les cartes configurées avec un bloc `video` sortent du Pack
@@ -60,10 +60,7 @@
          garde-fou dans showReveal). */
       return cardsDatabase.filter((card) => Boolean(cardVideoInfo(card)));
     }
-    if (packComingSoon('video') && !isDemoMode()) {
-      return cardsDatabase.filter((card) => !cardVideoInfo(card));
-    }
-    return cardsDatabase;
+    return cardsDatabase.filter((card) => !cardVideoInfo(card));
   }
   function emptyPackStock() { return { classic: 0, rare: 0, legend: 0, video: 0 }; }
   function packStockFrom(raw) {
@@ -552,8 +549,8 @@
       video: {
         title: 'Booster Vidéo',
         desc: packComingSoon('video')
-          ? 'Bientôt disponible · 3 cartes animées (fps, son, boucle).'
-          : '3 cartes animées · fps, son et boucle réglés par carte.',
+          ? 'Bientôt disponible · 2 cartes animées (fps, son, boucle).'
+          : '2 cartes animées · fps, son et boucle réglés par carte.',
         rare: false,
         video: true,
       },
@@ -693,7 +690,7 @@
     return cards.reduce((sum, c) => sum + cardBaseWeight(c, boosted, list), 0);
   }
 
-  function pickCard(forcedRarity, boosted, packCounts, pool) {
+  function pickCard(forcedRarity, boosted, packCounts, pool, maxSame = MAX_SAME_CARD_PER_PACK) {
     /* Un pool explicitement fourni est respecté même s'il est vide : le Pack
        Vidéo ne doit jamais puiser dans les cartes image par accident. */
     const source = pool || cardsDatabase;
@@ -704,7 +701,7 @@
       : validCards;
     if (!candidates.length) candidates = validCards;
     if (packCounts) {
-      const underCap = candidates.filter((c) => (packCounts.get(c.id) || 0) < MAX_SAME_CARD_PER_PACK);
+      const underCap = candidates.filter((c) => (packCounts.get(c.id) || 0) < maxSame);
       if (underCap.length) candidates = underCap;
     }
     const weights = candidates.map((c) => {
@@ -753,7 +750,10 @@
       });
     }
     while (drawn.length < cardCountFor(packType)) {
-      const card = pickCard(null, boosted, packCounts, cardPool);
+      /* Le Pack Vidéo ne tire que 2 cartes : on évite les doublons dès qu'il
+         existe assez de cartes vidéo différentes (sinon le pool est rempli). */
+      const maxSame = packType === 'video' ? 1 : MAX_SAME_CARD_PER_PACK;
+      const card = pickCard(null, boosted, packCounts, cardPool, maxSame);
       if (!card) break;
       record(card);
     }
@@ -2527,7 +2527,7 @@
       packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : +20 % DE CHANCES SUR RARE+'));
     }
     if (packType === 'video') {
-      packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 3 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
+      packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 2 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
     }
   }
 

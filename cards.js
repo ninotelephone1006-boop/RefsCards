@@ -357,7 +357,8 @@ const cardsDatabase = [
 /* Aucune carte vidéo n'est livrée par défaut : on ajoute les siennes dans
    cardsDatabase (bloc `video`, voir l'en-tête de ce fichier) et on dépose
    les fichiers dans assets/Cartes/videos/. Le Pack Vidéo tire alors
-   automatiquement toutes les cartes ainsi configurées. */
+   automatiquement toutes les cartes ainsi configurées — et uniquement elles :
+   ces cartes ne sortent pas des autres boosters. */
 
 /* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */
@@ -370,12 +371,12 @@ const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-f
 const fusionDemoDraw = ['chasseur-royer', 'chasseur-royer', 'toilet-call', 'toilet-call', 'gros-plan-royer'];
 
 /* Tirage de démonstration du Pack Vidéo : ?demo=video (ou le bouton Démo)
-   ouvre jusqu'à trois cartes vidéo configurées dans cardsDatabase, quelles
+   ouvre jusqu'à deux cartes vidéo configurées dans cardsDatabase, quelles
    qu'elles soient — aucune liste d'identifiants n'est codée en dur. */
 function videoDemoIds() {
   return cardsDatabase
     .filter((card) => cardVideoConfig(card))
-    .slice(0, 3)
+    .slice(0, 2)
     .map((card) => card.id);
 }
 
