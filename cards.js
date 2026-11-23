@@ -356,7 +356,7 @@ const cardsDatabase = [
     id: 'sapin-george',
     name: 'Le Sapin George',
     description: 'skibidi sapin',
-    rarity: 'rare',
+    rarity: 'epic',
     emoji: '🎄',
     color: '#8fc8ef',
     video: {
