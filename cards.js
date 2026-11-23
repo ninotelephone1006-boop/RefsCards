@@ -149,16 +149,21 @@ const cardsDatabase = [
     emoji: '👗',
     image: 'assets/Cartes/Bierry Feministe.jpg',
     color: '#c6a0eb'
+  },
+  {
+    id: 'piter-selfie',
+    name: 'Piter Selfie',
+    description: "Bro m'a volé mon tel",
+    rarity: 'rare',
+    emoji: '🤳',
+    image: 'assets/Cartes/Piter selfie.jpg',
+    color: '#8fc8ef'
   }
 ];
 
 /* Tirages de démonstration : utilisés par le bouton « Démo » (ou ?
    demo=1 dans l'URL) pour montrer plusieurs raretés d'un seul booster. */
 const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-fagar', 'babault-musique'];
-
-/* Tirage de démonstration de la fusion (?demo=fusion dans l'URL) : un doublon
-   (chasseur-royer x2) pour voir la demande de fusion à la fin du booster. */
-const fusionDemoDraw = ['chasseur-royer', 'chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-fagar'];
 
 /* Résout les chemins d'image possibles pour une carte : chemin explicite,
    ou nom de fichier sans extension décliné sur les extensions courantes.
