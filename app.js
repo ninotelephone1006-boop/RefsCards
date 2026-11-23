@@ -2625,10 +2625,16 @@
   const collCount = $('coll-count');
   const collFill = $('coll-fill');
   const collFilters = $('coll-filters');
+  const collSort = $('coll-sort');
+  const collSortDir = $('coll-sort-dir');
   const collEmpty = $('coll-empty');
   const tabBadge = $('tab-badge');
   const fresh = new Set(); // cartes obtenues depuis la dernière visite de la collection
   let collFilter = 'all';
+  /* Tri courant : critère (`collSortKey`, clé de COLL_SORTS) + sens inversé
+     ou non (`collSortDirFlip`, piloté par le bouton ⇅). */
+  let collSortKey = 'num';
+  let collSortDirFlip = false;
 
   let firebaseAuth = null;
   let cloudDb = null;
@@ -3214,6 +3220,111 @@
     }));
   }
 
+  /* Critères de tri de la collection. `dir` est résolu pour chaque critère :
+     un « sens naturel » (numéro croissant, rareté de la plus rare à la plus
+     commune, etc.) que le bouton ⇅ inverse. `valueOf` renvoie donc toujours
+     une grandeur positive, et le sens est appliqué après le calcul. */
+  const COLL_SORT_KEY = 'refs-cards:collection-sort';
+  const COLL_SORTS = {
+    num: { label: 'Numéro', dir: 1 },
+    rarity: { label: 'Rareté', dir: -1 },
+    count: { label: 'Exemplaires', dir: -1 },
+    value: { label: 'Valeur', dir: -1 },
+    name: { label: 'Nom', dir: 1 },
+    shiny: { label: 'Shiny', dir: -1 },
+    recent: { label: 'Ajout récente', dir: -1 }
+  };
+  const COLL_SORT_DEFAULT = { key: 'num', dir: 1 };
+
+  function collSortRank(st) {
+    const info = RARITIES[st.card.rarity] || RARITIES.common;
+    return info.rank * 1000 + (st.shiny > 0 ? 1 : 0);
+  }
+
+  function collSortValue(st, key) {
+    switch (key) {
+      case 'rarity': return collSortRank(st);
+      case 'count': return st.normal + st.shiny;
+      case 'value': return (CardMutations.multiply(st.card, (RARITIES[st.card.rarity] || RARITIES.common).reward) || 0) * (st.normal + st.shiny);
+      case 'name': return String(st.card.name || '').toLocaleLowerCase('fr');
+      case 'shiny': return st.shiny;
+      case 'recent': return st.lastIndex;
+      case 'num':
+      default: return st.num;
+    }
+  }
+
+  function compareColl(a, b) {
+    const key = COLL_SORTS[collSortKey] ? collSortKey : COLL_SORT_DEFAULT.key;
+    const dir = COLL_SORTS[collSortKey] ? COLL_SORTS[collSortKey].dir : COLL_SORT_DEFAULT.dir;
+    const factor = collSortDirFlip ? -dir : dir;
+    const va = collSortValue(a, key);
+    const vb = collSortValue(b, key);
+    let diff = 0;
+    if (typeof va === 'string' || typeof vb === 'string') {
+      diff = String(va).localeCompare(String(vb), 'fr', { numeric: true, sensitivity: 'base' });
+    } else {
+      diff = Math.sign(va - vb);
+    }
+    /* Égalité : le numéro de carte garde un ordre stable et lisible. */
+    return diff !== 0 ? diff * factor : (a.num - b.num);
+  }
+
+  function updateCollSortDirButton() {
+    if (!collSortDir) return;
+    const key = COLL_SORTS[collSortKey] ? collSortKey : COLL_SORT_DEFAULT.key;
+    const dir = COLL_SORTS[collSortKey] ? COLL_SORTS[collSortKey].dir : COLL_SORT_DEFAULT.dir;
+    const ascending = (collSortDirFlip ? -dir : dir) > 0;
+    collSortDir.classList.toggle('is-flipped', collSortDirFlip);
+    collSortDir.setAttribute('aria-pressed', String(collSortDirFlip));
+    collSortDir.setAttribute('aria-label', ascending
+      ? 'Tri croissant : cliquer pour inverser l’ordre'
+      : 'Tri décroissant : cliquer pour inverser l’ordre');
+    collSortDir.title = ascending ? 'Ordre croissant' : 'Ordre décroissant';
+  }
+
+  function renderSortControls() {
+    if (collSort) {
+      const entries = Object.keys(COLL_SORTS);
+      const active = COLL_SORTS[collSortKey] ? collSortKey : COLL_SORT_DEFAULT.key;
+      if (collSort.options.length !== entries.length) {
+        collSort.replaceChildren(...entries.map((key) => {
+          const option = el('option', '', COLL_SORTS[key].label);
+          option.value = key;
+          return option;
+        }));
+      }
+      collSort.value = active;
+    }
+    updateCollSortDirButton();
+  }
+
+  function saveCollSort() {
+    try {
+      window.localStorage.setItem(COLL_SORT_KEY, JSON.stringify({
+        key: collSortKey, flipped: collSortDirFlip
+      }));
+    } catch (error) { /* stockage bloqué : le tri reste valable pour la session */ }
+  }
+
+  function loadCollSort() {
+    try {
+      const raw = window.localStorage.getItem(COLL_SORT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved && COLL_SORTS[saved.key]) collSortKey = saved.key;
+      collSortDirFlip = Boolean(saved && saved.flipped);
+    } catch (error) { /* valeur illisible : on garde le tri par défaut */ }
+  }
+
+  function setCollSort(key, flip) {
+    collSortKey = COLL_SORTS[key] ? key : COLL_SORT_DEFAULT.key;
+    collSortDirFlip = Boolean(flip);
+    renderSortControls();
+    saveCollSort();
+    renderCollection();
+  }
+
   function renderCollection() {
     const owned = countMap();
     const total = cardsDatabase.length;
@@ -3224,24 +3335,39 @@
 
     const frag = document.createDocumentFragment();
     let shown = 0;
-    /* Une seule case par carte de base : normales + shiny comptent ensemble. */
-    const stats = new Map(cardsDatabase.map((c) => [c.id, { card: c, normal: owned.get(c.id) || 0, shiny: 0, shinyCard: null }]));
+    /* Une seule case par carte de base : normales + shiny comptent ensemble.
+       `num` est le numéro de la carte dans la base (ordre d'affichage
+       historique) : il sert au tri et au libellé des cartes verrouillées. */
+    const lastSeen = new Map();
+    state.collection.forEach((c, index) => lastSeen.set(c.baseId || c.id, index));
+    const stats = new Map(cardsDatabase.map((c, index) => [c.id, {
+      card: c, num: index + 1, lastIndex: lastSeen.has(c.id) ? lastSeen.get(c.id) : -1,
+      normal: owned.get(c.id) || 0, shiny: 0, shinyCard: null
+    }]));
     for (const v of CardMutations.owned(collectionIds())) {
       if (!v.mutation) continue;
       const st = stats.get(v.baseId || v.id);
       const n = owned.get(v.id) || 0;
       if (st && n) { st.shiny += n; st.shinyCard = v; }
     }
-    [...stats.values()].forEach((st, i) => {
+    const visible = [...stats.values()]
+      .filter((st) => {
+        const n = st.normal + st.shiny;
+        if (collFilter === 'all') return true;
+        if (!n) return false;
+        return collFilter === 'shiny' ? st.shiny > 0 : collFilter === 'owned' ? true : st.card.rarity === collFilter;
+      })
+      .sort(compareColl);
+    visible.forEach((st, i) => {
       const card = st.card;
       const n = st.normal + st.shiny;
-      if (collFilter !== 'all' && (!n || (collFilter === 'shiny' ? !st.shiny : collFilter !== 'owned' && card.rarity !== collFilter))) return;
       shown++;
+      const num = st.num;
       if (!n) {
         const t = el('div', 'coll-tile is-locked');
         t.style.setProperty('--i', i);
-        t.setAttribute('aria-label', `Carte verrouillée, numéro ${i + 1}`);
-        t.append(el('span', 'lock-q', '???'), el('span', 'lock-n', `N° ${String(i + 1).padStart(3, '0')}`));
+        t.setAttribute('aria-label', `Carte verrouillée, numéro ${num}`);
+        t.append(el('span', 'lock-q', '???'), el('span', 'lock-n', `N° ${String(num).padStart(3, '0')}`));
         frag.append(t);
         return;
       }
@@ -3325,6 +3451,18 @@
     });
     collGrid.parentElement.scrollTop = 0;
     renderCollection();
+    SFX.tick();
+  });
+  if (collSort) {
+    on(collSort, 'change', () => {
+      collGrid.parentElement.scrollTop = 0;
+      setCollSort(collSort.value, collSortDirFlip);
+      SFX.tick();
+    });
+  }
+  on(collSortDir, 'click', () => {
+    collGrid.parentElement.scrollTop = 0;
+    setCollSort(collSortKey, !collSortDirFlip);
     SFX.tick();
   });
 
@@ -6110,7 +6248,9 @@
       return;
     }
     updateCoins();
+    loadCollSort();
     renderFilters();
+    renderSortControls();
     renderOdds(false);
     renderShop();
     renderPackInventory();

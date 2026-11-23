@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.23-5">
+  <meta name="app-version" content="2026.11.23-6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-4">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-5">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-4" defer></script>
+  <script src="app.js?v=2026.11.23-5" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -368,6 +368,24 @@
           <div class="coll-title"><h2>Collection</h2><span class="coll-count" id="coll-count" aria-live="polite">0 / 0</span></div>
           <div class="coll-bar" aria-hidden="true"><i id="coll-fill"></i></div>
           <div class="coll-filters" id="coll-filters" aria-label="Filtres"></div>
+          <div class="coll-sort">
+            <label class="coll-sort-field" for="coll-sort">
+              <span aria-hidden="true">⇅</span>
+              <span>Trier</span>
+              <select id="coll-sort" aria-label="Trier les cartes de la collection">
+                <option value="num">Numéro de carte</option>
+                <option value="rarity">Rareté</option>
+                <option value="count">Exemplaires possédés</option>
+                <option value="value">Valeur des exemplaires</option>
+                <option value="name">Nom de la carte</option>
+                <option value="shiny">Shiny</option>
+                <option value="recent">Ajout récente</option>
+              </select>
+            </label>
+            <button class="coll-sort-dir" id="coll-sort-dir" type="button" aria-label="Inverser l'ordre du tri">
+              <span aria-hidden="true">↓</span>
+            </button>
+          </div>
           <button class="coll-fusion" id="coll-fusion" type="button" hidden>
             <span aria-hidden="true">⚗</span>
             <span id="coll-fusion-label">DEMANDE DE FUSION</span>
