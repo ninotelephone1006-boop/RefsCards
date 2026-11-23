@@ -234,3 +234,58 @@ function cardImageSources(card) {
   const base = CARTE_DIR + card.image;
   return CARTE_EXTENSIONS.map((ext) => `${base}.${ext}`);
 }
+
+/* Mutations : couche indépendante du catalogue et du tirage de rareté.
+   Les identifiants persistés restent des chaînes : baseId::mutationId.
+   Une seule mutation par obtention ; intervalles disjoints, taux absolus.
+   Aucun tirage à la lecture d'une sauvegarde ou lors d'un achat. */
+const CardMutations = (() => {
+  const definitions = Object.freeze([
+    Object.freeze({
+      id: 'shiny', label: 'Shiny', icon: '✦', cssClass: 'mutation-shiny',
+      // Pas de bonus économique implicite : changer explicitement ces facteurs.
+      valueMultiplier: 1, rewardMultiplier: 1,
+      rates: Object.freeze({
+        common: 0.01, uncommon: 0.008, rare: 0.006, superrare: 0.0045,
+        epic: 0.003, ultraepic: 0.002, mythic: 0.0012,
+        legendary: 0.0008, divine: 0.0005, secret: 0.0002
+      })
+    })
+  ]);
+  function definition(card) {
+    return definitions.find((m) => m.id === card?.mutation) || null;
+  }
+  function apply(base, mutation) {
+    return { ...base, baseId: base.id, id: `${base.id}::${mutation.id}`, mutation: mutation.id };
+  }
+  function roll(card, random = Math.random) {
+    if (!card || card.mutation) return card;
+    const roll = random();
+    let threshold = 0;
+    for (const mutation of definitions) {
+      threshold += mutation.rates[card.rarity] || 0;
+      if (roll < threshold) return apply(card, mutation);
+    }
+    return { ...card };
+  }
+  function resolve(id) {
+    if (typeof id !== 'string') return null;
+    const [baseId, mutationId, extra] = id.split('::');
+    const base = cardsDatabase.find((c) => c.id === baseId);
+    if (!base || extra !== undefined) return null;
+    if (mutationId === undefined) return base;
+    const mutation = definitions.find((m) => m.id === mutationId);
+    return mutation ? apply(base, mutation) : null;
+  }
+  function label(card) {
+    const mutation = definition(card);
+    return mutation ? `${card.name} · ${mutation.label}` : card.name;
+  }
+  function multiply(card, value, effect = 'value') {
+    return value * (definition(card)?.[`${effect}Multiplier`] ?? 1);
+  }
+  function owned(ids) {
+    return [...new Set(ids)].map(resolve).filter(Boolean);
+  }
+  return Object.freeze({ definitions, definition, roll, resolve, label, multiply, owned });
+})();
