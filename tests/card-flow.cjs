@@ -18,13 +18,22 @@ const assert = require('node:assert/strict');
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
     vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
-    const sources = vm.runInContext('cardsDatabase.flatMap(cardImageSources)', context);
-    const cardCount = vm.runInContext('cardsDatabase.length', context);
-    assert.ok(sources.length >= cardCount, 'au moins une source candidate par carte');
+    // Les cartes vidéo peuvent se passer d'`image` : leur couverture est la
+    // vidéo elle-même. On ne contrôle donc les sources d'image que pour les
+    // cartes sans bloc `video`.
+    const imageCards = vm.runInContext(
+      'cardsDatabase.filter((card) => !cardVideoConfig(card))',
+      context
+    );
+    const sources = vm.runInContext(
+      'cardsDatabase.filter((card) => !cardVideoConfig(card)).flatMap(cardImageSources)',
+      context
+    );
+    assert.ok(sources.length >= imageCards.length, 'au moins une source candidate par carte image');
     // Les visuels manquants sont prévus (repli emoji/couleur) : on vérifie
     // que les fichiers présents sont bien trouvés, sans exiger les absents.
     const present = sources.filter((src) => fs.existsSync(src));
-    assert.ok(present.length >= cardCount - 1, 'presque toutes les images doivent exister');
+    assert.ok(present.length >= imageCards.length - 1, 'presque toutes les images doivent exister');
     // Start the reveal directly; the pack tear is unrelated to this regression.
     /* `boot();` est appelé dans start() (garde-fou DOMContentLoaded) : on
        choisit l'indentation réelle pour lancer aussi la révélation. */

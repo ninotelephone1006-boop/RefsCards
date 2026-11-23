@@ -169,7 +169,7 @@ Chaque carte possède un identifiant, un nom, une description, une rareté, un e
 
 ### Cartes vidéo (Pack Vidéo)
 
-Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle conserve donc sa rareté, sa récompense, ses effets, la fusion, la collection et le marché. Le projet livre une carte vidéo : **Le Sapin George** (`sapin-george`), rare, « skibidi sapin », 30 i/s avec son et en boucle (`assets/Cartes/videos/GeorgeSapin.mp4`, affiche `assets/Cartes/sapin-george.jpg`). Pour en ajouter d'autres, dépose tes fichiers `.mp4` (ou `.webm`) dans `assets/Cartes/videos/` et configure les cartes. Le Pack Vidéo ne tire que les cartes qui possèdent un bloc `video` valide. Ces cartes ne sortent jamais des autres boosters : elles restent exclusives au Pack Vidéo (visibles, verrouillées, dans la collection), que le pack soit en avant-première ou publié. Une carte vidéo peut aussi être **Shiny** : la mutation conserve le lecteur et les réglages `fps` / `sound` / `loop`.
+Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle conserve donc sa rareté, sa récompense, ses effets, la fusion, la collection et le marché. Le projet livre une carte vidéo : **Le Sapin George** (`sapin-george`), rare, « skibidi sapin », 30 i/s avec son et en boucle (`assets/Cartes/videos/GeorgeSapin.mp4`) — sans image de secours, la vidéo est elle-même la couverture de la carte. Pour en ajouter d'autres, dépose tes fichiers `.mp4` (ou `.webm`) dans `assets/Cartes/videos/` et configure les cartes. Le Pack Vidéo ne tire que les cartes qui possèdent un bloc `video` valide. Ces cartes ne sortent jamais des autres boosters : elles restent exclusives au Pack Vidéo (visibles, verrouillées, dans la collection), que le pack soit en avant-première ou publié. Une carte vidéo peut aussi être **Shiny** : la mutation conserve le lecteur et les réglages `fps` / `sound` / `loop`.
 
 ```js
 {
@@ -178,7 +178,7 @@ Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle c
   description: 'Une carte qui bouge.',
   rarity: 'epic',
   emoji: '🎬',
-  image: 'assets/Cartes/mon-affiche.jpg', // affiche fixe + secours
+  image: 'assets/Cartes/mon-affiche.jpg', // affiche fixe + secours (optionnel)
   color: '#b47bff',
   video: {
     src: 'mon-clip',                  // → assets/Cartes/videos/mon-clip.mp4
