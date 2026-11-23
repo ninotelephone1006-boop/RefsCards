@@ -3,14 +3,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Sauvegarde privée du joueur : pièces, collection, liste d'amis, compteurs,
-    // inventaire de packs (Shop) et quota de packs gratuits quotidiens.
+    // inventaire de packs (Shop) et calendrier de connexion (récompenses
+    // quotidiennes de mieux en mieux).
     match /playerSaves/{userId} {
       function ownsSave() {
         return request.auth != null && request.auth.uid == userId;
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'freeDate', 'freeUsed', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'streakDate', 'streak', 'claimedDays', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'updatedAt'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
@@ -52,13 +53,18 @@ service cloud.firestore {
                 && request.resource.data.packStock.video is int
                 && request.resource.data.packStock.video >= 0
                 && request.resource.data.packStock.video <= 100000))
-        && (!('freeDate' in request.resource.data)
-            || (request.resource.data.freeDate is string
-                && request.resource.data.freeDate.size() <= 10))
-        && (!('freeUsed' in request.resource.data)
-            || (request.resource.data.freeUsed is int
-                && request.resource.data.freeUsed >= 0
-                && request.resource.data.freeUsed <= 3))
+        /* Calendrier de connexion : date du dernier cadeau récupéré
+           (AAAA-MM-JJ), série de jours d'affilée, dates cochées ce mois-ci. */
+        && (!('streakDate' in request.resource.data)
+            || (request.resource.data.streakDate is string
+                && request.resource.data.streakDate.size() <= 10))
+        && (!('streak' in request.resource.data)
+            || (request.resource.data.streak is int
+                && request.resource.data.streak >= 0
+                && request.resource.data.streak <= 10000))
+        && (!('claimedDays' in request.resource.data)
+            || (request.resource.data.claimedDays is list
+                && request.resource.data.claimedDays.size() <= 31))
         && request.resource.data.updatedAt is timestamp;
       allow delete: if false;
     }

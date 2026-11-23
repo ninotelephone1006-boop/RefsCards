@@ -1,6 +1,7 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/shop-flow.cjs
 // Vérifie la boutique : prix équilibrés (500 / 1 000), achats multiples dans
-// l'inventaire, 3 packs gratuits par jour, pack rare (raretés élevées boostées) et navigation
+// l'inventaire, le calendrier de connexion (cadeaux quotidiens de mieux en
+// mieux), pack rare (raretés élevées boostées) et navigation
 // « Aller au Shop » depuis le récap (plus d'achat direct à 100 🪙).
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
@@ -86,6 +87,11 @@ function todayKey() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
+function yesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 (async () => {
   /* 0. Fichiers de packs présents + prix dans le HTML. */
@@ -103,17 +109,17 @@ function todayKey() {
   assert.match(appSrc, /classic:\s*500/, 'pack classique à 500');
   assert.match(appSrc, /rare:\s*1000/, 'pack rare à 1000');
   assert.match(appSrc, /legend:\s*800/, 'pack légende à 800');
-  assert.match(appSrc, /FREE_PER_DAY\s*=\s*3/, '3 gratuits par jour');
+  assert.match(appSrc, /DAILY_REWARD_CYCLE/, 'calendrier de connexion (cycle de récompenses)');
   assert.match(appSrc, /RARE_RANK_FACTOR_BASE/, 'pack rare : boost par rang (base)');
   assert.match(appSrc, /RARE_RANK_FACTOR_STEP/, 'pack rare : boost par rang (step)');
   assert.doesNotMatch(appSrc, /RARE_BOOST\s*=\s*1\.2/, 'ancien boost plat +20 % supprimé');
-  console.log('PASS prix boutique (500 / 1 000), 3 gratuits, rare boost par rang');
+  console.log('PASS prix boutique (500 / 1 000), calendrier de connexion, rare boost par rang');
 
   /* 1. Achat multiple : quantité 5 classique = 2 500 🪙, inventaire +5. */
   {
     const { w, doc, store } = await boot({
       coins: 3000, firstPack: false, collection: [], friends: [], packsOpened: 0,
-      packStock: { classic: 0, rare: 0 }, freeDate: todayKey(), freeUsed: 0
+      packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '3 000');
     // Quantité ×5 via le raccourci.
@@ -136,43 +142,97 @@ function todayKey() {
     console.log('PASS achat multiple (×5 classique) + inventaire persisté');
   }
 
-  /* 2. Gratuits quotidiens : 3 récupérables, le 4e bloqué. */
+  /* 2. Calendrier de connexion : cadeau du jour récupérable une fois, puis
+        bloqué jusqu'à demain. */
   {
     const { w, doc, store } = await boot({
       coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
-      packStock: { classic: 0, rare: 0 }, freeDate: todayKey(), freeUsed: 0
+      packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     const claim = doc.getElementById('free-claim');
-    assert.match(claim.textContent, /3 RESTANT/);
+    assert.match(claim.textContent, /CADEAU DU JOUR 1/);
+    assert.ok(doc.querySelectorAll('#daily-calendar .daily-cal-cell.is-today').length >= 1,
+      'calendrier du mois affiché avec la date du jour');
     claim.click(); await wait(30);
-    claim.click(); await wait(30);
-    claim.click(); await wait(30);
-    assert.equal(claim.disabled, true, '4e gratuit bloqué le même jour');
-    assert.match(claim.textContent, /ÉPUISÉS/);
-    assert.match(doc.getElementById('open-classic').textContent, /×3/);
+    assert.equal(claim.disabled, true, '2e cadeau bloqué le même jour');
+    assert.match(claim.textContent, /RÉCUPÉRÉ/);
+    assert.match(doc.getElementById('open-classic').textContent, /×1/);
+    assert.ok(doc.querySelectorAll('#daily-calendar .daily-cal-cell.is-claimed').length >= 1,
+      'jour coché dans le calendrier après récupération');
     await wait(400);
-    assert.equal(store.playerSaves.me.packStock.classic, 3);
-    assert.equal(store.playerSaves.me.freeUsed, 3);
+    assert.equal(store.playerSaves.me.packStock.classic, 1, 'jour 1 = 1 pack classique');
+    assert.equal(store.playerSaves.me.coins, 150, 'jour 1 = 150 pièces');
+    assert.equal(store.playerSaves.me.streakDate, todayKey(), 'date du cadeau persistée');
+    assert.equal(store.playerSaves.me.streak, 1, 'série à 1');
+    assert.ok(store.playerSaves.me.claimedDays.includes(todayKey()), 'jour mémorisé dans claimedDays');
     w.close();
-    console.log('PASS 3 packs gratuits par jour, 4e bloqué');
+    console.log('PASS calendrier de connexion : jour 1 récupéré, 2e bloqué');
   }
 
-  /* 3. Quota d'hier réinitialisé aujourd'hui. */
+  /* 3. Jour suivant d'affilée : on passe au cran 2, plus avantageux. */
+  {
+    const { w, doc, store } = await boot({
+      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      packStock: { classic: 0, rare: 0 }, streakDate: yesterdayKey(), streak: 1, claimedDays: [yesterdayKey()]
+    });
+    const claim = doc.getElementById('free-claim');
+    assert.match(claim.textContent, /CADEAU DU JOUR 2/, 'cadeau du jour 2 après un jour 1 la veille');
+    claim.click(); await wait(30);
+    assert.equal(doc.getElementById('open-classic').textContent.match(/×(\d+)/)[1], '2', 'jour 2 = 2 packs classiques');
+    assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '200', 'jour 2 = 200 pièces');
+    await wait(400); // save différée (250 ms)
+    assert.equal(store.playerSaves.me.streak, 2, 'série à 2');
+    assert.equal(store.playerSaves.me.packStock.classic, 2, 'jour 2 = 2 packs classiques persistés');
+    assert.equal(store.playerSaves.me.coins, 200, 'jour 2 = 200 pièces persistées');
+    w.close();
+    console.log('PASS jour 2 de suite : récompense améliorée');
+  }
+
+  /* 3bis. Série interrompue : le cadeau repart au jour 1. */
   {
     const { w, doc } = await boot({
       coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
-      packStock: { classic: 0, rare: 0 }, freeDate: '2000-01-01', freeUsed: 3
+      packStock: { classic: 0, rare: 0 }, streakDate: '2000-01-01', streak: 5, claimedDays: []
     });
-    assert.equal(doc.getElementById('free-claim').disabled, false, 'nouveau jour = gratuits à nouveau');
+    const claim = doc.getElementById('free-claim');
+    assert.equal(claim.disabled, false, 'cadeau disponible après une série interrompue');
+    assert.match(claim.textContent, /CADEAU DU JOUR 1/, 'série interrompue = retour au jour 1');
+    claim.click(); await wait(30);
+    assert.match(doc.getElementById('free-label').textContent, /jour 1/i);
     w.close();
-    console.log('PASS quota gratuit réinitialisé le lendemain');
+    console.log('PASS série interrompue : retour au jour 1');
+  }
+
+  /* 3ter. Migration ancienne sauvegarde « 3 gratuits/jour » : quota entamé
+        aujourd'hui = cadeau déjà pris ; sinon la série repart de zéro. */
+  {
+    const { w, doc } = await boot({
+      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      packStock: { classic: 0, rare: 0 }, freeDate: todayKey(), freeUsed: 2
+    });
+    const claim = doc.getElementById('free-claim');
+    assert.equal(claim.disabled, true, 'quota gratuit déjà entamé aujourd\'hui = cadeau pris');
+    assert.equal(doc.getElementById('tab-badge-shop').hidden, true, 'pas de pastille si cadeau déjà pris');
+    w.close();
+    console.log('PASS migration gratuits → calendrier (quota entamé)');
+  }
+  {
+    const { w, doc } = await boot({
+      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      packStock: { classic: 0, rare: 0 }, freeDate: '2000-01-01', freeUsed: 0
+    });
+    const claim = doc.getElementById('free-claim');
+    assert.equal(claim.disabled, false, 'ancien quota non entamé = cadeau disponible');
+    assert.match(claim.textContent, /CADEAU DU JOUR 1/);
+    w.close();
+    console.log('PASS migration gratuits → calendrier (quota vierge)');
   }
 
   /* 4. Pack rare : sélection change l'image et les chances affichées. */
   {
     const { w, doc } = await boot({
       coins: 5000, firstPack: false, collection: [], friends: [], packsOpened: 0,
-      packStock: { classic: 1, rare: 1 }, freeDate: todayKey(), freeUsed: 0
+      packStock: { classic: 1, rare: 1 }, streakDate: '', streak: 0, claimedDays: []
     });
     doc.getElementById('open-rare').click();
     assert.equal(doc.getElementById('app').dataset.tab, 'pack');
@@ -204,7 +264,7 @@ function todayKey() {
   {
     const { w, doc, store } = await boot({
       coins: 1600, firstPack: false, collection: [], friends: [], packsOpened: 0,
-      packStock: { classic: 0, rare: 0, legend: 0 }, freeDate: todayKey(), freeUsed: 0
+      packStock: { classic: 0, rare: 0, legend: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     // Avant achat : inventaire vide et badge caché.
     assert.equal(doc.getElementById('tab-badge-inventory').hidden, true);
@@ -253,7 +313,7 @@ function todayKey() {
   {
     const { w, doc } = await boot({
       coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
-      packStock: { classic: 0, rare: 0 }, freeDate: todayKey(), freeUsed: 3
+      packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     assert.equal(doc.getElementById('pack-stock-label').textContent, 'Aucun booster');
     assert.equal(doc.getElementById('pack-area').hidden, true);
@@ -264,5 +324,5 @@ function todayKey() {
     console.log('PASS inventaire vide → bouton Aller au Shop');
   }
 
-  console.log('PASS shop flow (boutique, inventaire, gratuits, rare)');
+  console.log('PASS shop flow (boutique, inventaire, calendrier de connexion, rare)');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
