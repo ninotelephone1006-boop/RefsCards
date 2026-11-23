@@ -12,16 +12,66 @@
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
-  const PACK_PRICES = { classic: 500, rare: 1000, legend: 800 };
+  const PACK_PRICES = { classic: 500, rare: 1000, legend: 800, video: 1000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
   const RARE_BOOST = 1.2; // pack rare : chances d'obtenir une rareté Rare+ multipliées par 1,2 (+20 % réels)
   const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
-  const PACK_IMAGES = { classic: 'assets/packet.png', rare: 'assets/packetrare.png', legend: 'assets/packetlegende.png' };
+  const PACK_IMAGES = {
+    classic: 'assets/packet.png',
+    rare: 'assets/packetrare.png',
+    legend: 'assets/packetlegende.png',
+    video: 'assets/packetvideo.png'
+  };
   const CARD_COUNT = 5;
-  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10 };
+  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10, video: 3 };
+  /* Ordre d'affichage + validation. Ajouter un type ici (et dans les objets
+     ci-dessus) suffit pour qu'il apparaisse dans le Shop, l'inventaire, les
+     sauvegardes et les écrans d'ouverture. */
+  const PACK_TYPES = ['classic', 'rare', 'legend', 'video'];
+  /* Packs annoncés mais pas encore disponibles : visibles dans le Shop, avec
+     un badge « BIENTÔT », sans achat ni ouverture possible. Passer `video` à
+     false (ou retirer la clé) publie le Pack Vidéo sans autre changement. */
+  const PACK_COMING_SOON = { video: true };
+  function packComingSoon(type) { return Boolean(PACK_COMING_SOON[type]); }
+  /* En mode démo seulement, on autorise l'ouverture pour prévisualiser. */
+  function isPackAvailable(type) { return !packComingSoon(type) || isDemoMode(); }
+  function isPackType(type) { return PACK_TYPES.indexOf(type) >= 0; }
   function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
-  function packLabelFr(type) { return type === 'rare' ? 'rare' : type === 'legend' ? 'légende' : 'classique'; }
+  function packLabelFr(type) {
+    return type === 'rare' ? 'rare' : type === 'legend' ? 'légende' : type === 'video' ? 'vidéo' : 'classique';
+  }
+  function packLabelUpper(type) {
+    return type === 'rare' ? 'RARE' : type === 'legend' ? 'LÉGENDE' : type === 'video' ? 'VIDÉO' : 'CLASSIQUE';
+  }
+  /* Accès tolérant à la configuration vidéo (cards.js en cache ancien). */
+  function cardVideoInfo(card) {
+    return typeof cardVideoConfig === 'function' ? cardVideoConfig(card) : null;
+  }
+  /* Le Pack Vidéo ne tire que des cartes dotées d'une configuration `video`.
+     Tant qu'il est « bientôt disponible », ses cartes ne sortent pas non plus
+     des autres boosters : on peut les voir verrouillées dans la collection,
+     mais pas les obtenir. Dès la publication, tout le catalogue redevient
+     tirable normalement. */
+  function packPool(type) {
+    if (type === 'video') {
+      const videoCards = cardsDatabase.filter((card) => Boolean(cardVideoInfo(card)));
+      return videoCards.length ? videoCards : cardsDatabase;
+    }
+    if (packComingSoon('video') && !isDemoMode()) {
+      return cardsDatabase.filter((card) => !cardVideoInfo(card));
+    }
+    return cardsDatabase;
+  }
+  function emptyPackStock() { return { classic: 0, rare: 0, legend: 0, video: 0 }; }
+  function packStockFrom(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const stock = emptyPackStock();
+    PACK_TYPES.forEach((type) => {
+      stock[type] = Math.max(0, Number(source[type]) || 0);
+    });
+    return stock;
+  }
   const TEAR_THRESHOLD = 0.75;
 
   /* Dix raretés, du plus courant au plus rare. `weight` est la probabilité de
@@ -171,6 +221,10 @@
   const qtyLegend = $('qty-legend');
   const buyLegend = $('buy-legend');
   const openLegend = $('open-legend');
+  const shopStockVideo = $('shop-stock-video');
+  const qtyVideo = $('qty-video');
+  const buyVideo = $('buy-video');
+  const openVideo = $('open-video');
   const shopMsg = $('shop-msg');
   const tabBadgeShop = $('tab-badge-shop');
   const inventoryView = $('inventory-view');
@@ -179,7 +233,7 @@
   const inventoryEmpty = $('inventory-empty');
   const inventoryGoShop = $('inventory-go-shop');
   const tabBadgeInventory = $('tab-badge-inventory');
-  const shopQty = { classic: 1, rare: 1, legend: 1 };
+  const shopQty = { classic: 1, rare: 1, legend: 1, video: 1 };
 
   /* ----------------------------------------------------------------- state */
 
@@ -197,7 +251,7 @@
        Ouvrir un pack en consomme 1. `currentPackType` = pack choisi dans
        l'onglet Pack. `freeDate`/`freeUsed` = quota quotidien (date locale
        AAAA-MM-JJ + nombre déjà récupérés, 0..FREE_PER_DAY). */
-    packStock: { classic: 0, rare: 0, legend: 0 },
+    packStock: emptyPackStock(),
     currentPackType: 'classic',
     freeDate: '',
     freeUsed: 0,
@@ -268,15 +322,19 @@
   }
 
   function packTotal() {
-    return (state.packStock.classic || 0) + (state.packStock.rare || 0) + (state.packStock.legend || 0);
+    return PACK_TYPES.reduce((sum, type) => sum + (Number(state.packStock[type]) || 0), 0);
+  }
+
+  /* Premier type disponible (sert de repli quand le pack affiché est épuisé). */
+  function firstAvailablePackType() {
+    return PACK_TYPES.find((type) => (Number(state.packStock[type]) || 0) > 0) || 'classic';
   }
 
   function isDemoMode() {
     try {
       const params = new URLSearchParams(window.location.search);
-      return params.get('demo') === '1' || params.get('demo') === 'fusion'
-        || sessionStorage.getItem('refs-demo') === '1'
-        || sessionStorage.getItem('refs-demo') === 'fusion';
+      return ['1', 'fusion', 'video'].includes(params.get('demo'))
+        || ['1', 'fusion', 'video'].includes(sessionStorage.getItem('refs-demo'));
     } catch (error) { return false; }
   }
 
@@ -311,62 +369,91 @@
     if (shopStockClassic) shopStockClassic.textContent = stockText(state.packStock.classic || 0);
     if (shopStockRare) shopStockRare.textContent = stockText(state.packStock.rare || 0);
     if (shopStockLegend) shopStockLegend.textContent = stockText(state.packStock.legend || 0);
+    if (shopStockVideo) {
+      shopStockVideo.textContent = packComingSoon('video')
+        ? 'Bientôt disponible — aperçu uniquement'
+        : stockText(state.packStock.video || 0);
+    }
 
     const updateBuy = (type, qtyEl, btn) => {
+      const soon = packComingSoon(type);
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
-      if (qtyEl) qtyEl.textContent = String(qty);
+      if (qtyEl) qtyEl.textContent = soon ? '—' : String(qty);
       if (btn) {
-        const total = PACK_PRICES[type] * qty;
-        btn.textContent = `ACHETER · ${fmt(total)} 🪙`;
-        btn.disabled = state.coins < total;
+        if (soon) {
+          btn.textContent = 'BIENTÔT DISPONIBLE';
+          btn.disabled = true;
+          btn.classList.add('is-coming-soon');
+        } else {
+          const total = PACK_PRICES[type] * qty;
+          btn.textContent = `ACHETER · ${fmt(total)} 🪙`;
+          btn.disabled = state.coins < total;
+          btn.classList.remove('is-coming-soon');
+        }
       }
-      document.querySelectorAll(`.qty-chip[data-pack="${type}"]`).forEach((chip) => {
-        chip.classList.toggle('is-active', Number(chip.dataset.qty) === qty);
+      document.querySelectorAll(`.qty-chip[data-pack="${type}"], .qty-btn[data-pack="${type}"]`).forEach((control) => {
+        control.disabled = soon;
+        if (control.classList.contains('qty-chip')) {
+          control.classList.toggle('is-active', !soon && Number(control.dataset.qty) === qty);
+        }
       });
+      const card = document.querySelector(`.shop-card[data-pack="${type}"]`);
+      if (card) card.classList.toggle('is-coming-soon', soon);
     };
     updateBuy('classic', qtyClassic, buyClassic);
     updateBuy('rare', qtyRare, buyRare);
     updateBuy('legend', qtyLegend, buyLegend);
+    updateBuy('video', qtyVideo, buyVideo);
 
     const total = packTotal();
     if (shopInventoryLabel) {
       shopInventoryLabel.textContent = total > 0
-        ? `Inventaire : ${state.packStock.classic || 0} classique${(state.packStock.classic || 0) > 1 ? 's' : ''} · ${state.packStock.rare || 0} rare${(state.packStock.rare || 0) > 1 ? 's' : ''} · ${state.packStock.legend || 0} légende${(state.packStock.legend || 0) > 1 ? 's' : ''}`
+        ? `Inventaire : ${PACK_TYPES
+          .map((type) => ({ type, count: Number(state.packStock[type]) || 0 }))
+          .filter((entry) => entry.count > 0)
+          .map((entry) => `${entry.count} ${packLabelFr(entry.type)}${entry.count > 1 ? 's' : ''}`)
+          .join(' · ')}`
         : 'Inventaire vide — achète ou récupère tes packs gratuits.';
     }
-    [[openClassic, 'classic', 'CLASSIQUE'], [openRare, 'rare', 'RARE'], [openLegend, 'legend', 'LÉGENDE']].forEach(([button, type, label]) => {
+    [
+      [openClassic, 'classic'], [openRare, 'rare'],
+      [openLegend, 'legend'], [openVideo, 'video']
+    ].forEach(([button, type]) => {
       if (!button) return;
       const count = state.packStock[type] || 0;
-      button.textContent = `OUVRIR ${label} · ×${count} →`;
+      if (packComingSoon(type)) {
+        button.textContent = `OUVRIR ${packLabelUpper(type)} · BIENTÔT`;
+        button.disabled = true;
+        button.classList.add('is-coming-soon');
+        return;
+      }
+      button.classList.remove('is-coming-soon');
+      button.textContent = `OUVRIR ${packLabelUpper(type)} · ×${count} →`;
       button.disabled = count <= 0 || (state.phase !== 'pack' && state.phase !== 'done');
     });
   }
 
   function renderPackInventory() {
-    const classic = state.packStock.classic || 0;
-    const rare = state.packStock.rare || 0;
-    const legend = state.packStock.legend || 0;
-    const type = state.currentPackType === 'legend' ? 'legend' : state.currentPackType === 'rare' ? 'rare' : 'classic';
+    const total = packTotal();
+    const type = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
     const selected = state.packStock[type] || 0;
-    const empty = selected <= 0 && !isDemoMode() && state.phase === 'pack';
+    const demo = isDemoMode();
+    const empty = selected <= 0 && !demo && state.phase === 'pack';
     const head = document.querySelector('.pack-head');
-    if (head) head.hidden = classic + rare + legend === 0 && !isDemoMode() && state.phase === 'pack';
-    if (packStockLabel) packStockLabel.textContent = classic + rare + legend === 0 && !isDemoMode() ? 'Aucun booster' : '';
+    if (head) head.hidden = total === 0 && !demo && state.phase === 'pack';
+    if (packStockLabel) packStockLabel.textContent = total === 0 && !demo ? 'Aucun booster' : '';
     if (packArea) packArea.hidden = empty;
     if (packOdds) packOdds.hidden = empty;
     if (pack) {
       pack.classList.toggle('is-empty', empty);
       pack.setAttribute('aria-label', `Booster ${packLabelFr(type)}. Fais glisser vers la droite pour le déchirer.`);
     }
-    renderOdds(type === 'rare');
+    renderOdds(type === 'rare', packPool(type), type);
     renderInventory();
   }
 
   function renderInventory() {
-    const classic = state.packStock.classic || 0;
-    const rare = state.packStock.rare || 0;
-    const legend = state.packStock.legend || 0;
-    const total = classic + rare + legend;
+    const total = packTotal();
     if (tabBadgeInventory) tabBadgeInventory.hidden = total <= 0;
     if (inventorySummary) {
       inventorySummary.textContent = total > 0
@@ -380,48 +467,58 @@
       inventoryGrid.innerHTML = '';
       return;
     }
-    const items = [
-      {
-        type: 'classic',
-        count: classic,
+    const definitions = {
+      classic: {
         title: 'Booster Classique',
         desc: '5 cartes aléatoires · Chances standard de rareté.',
-        img: PACK_IMAGES.classic,
         rare: false,
       },
-      {
-        type: 'rare',
-        count: rare,
+      rare: {
         title: 'Booster Rare',
         desc: '5 cartes aléatoires · +20 % de chances sur les raretés.',
-        img: PACK_IMAGES.rare,
         rare: true,
       },
-      {
-        type: 'legend',
-        count: legend,
+      legend: {
         title: 'Booster Légende',
         desc: '10 cartes aléatoires · Chances standard de rareté.',
-        img: PACK_IMAGES.legend,
         rare: false,
       },
-    ].filter((item) => item.count > 0);
+      video: {
+        title: 'Booster Vidéo',
+        desc: packComingSoon('video')
+          ? 'Bientôt disponible · 3 cartes animées (fps, son, boucle).'
+          : '3 cartes animées · fps, son et boucle réglés par carte.',
+        rare: false,
+        video: true,
+      },
+    };
+    const items = PACK_TYPES
+      .map((type) => ({
+        type,
+        count: Number(state.packStock[type]) || 0,
+        img: PACK_IMAGES[type],
+        ...definitions[type]
+      }))
+      .filter((item) => item.count > 0);
     const canOpen = state.phase === 'pack' || state.phase === 'done';
-    inventoryGrid.innerHTML = items.map((item) => `
-      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}" data-pack-type="${item.type}">
+    inventoryGrid.innerHTML = items.map((item) => {
+      const soon = packComingSoon(item.type);
+      return `
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}${soon ? ' is-coming-soon' : ''}" data-pack-type="${item.type}">
         <span class="inventory-qty-badge">×${item.count}</span>
         <img class="inventory-card-img" src="${item.img}" alt="${item.title}">
         <h3 class="inventory-card-title">${item.title}</h3>
         <p class="inventory-card-desc">${item.desc}</p>
-        <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen ? '' : 'disabled'}>
-          OUVRIR UN PACK →
+        <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen && !soon ? '' : 'disabled'}>
+          ${soon ? 'BIENTÔT DISPONIBLE' : 'OUVRIR UN PACK →'}
         </button>
       </article>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function selectPackType(type, { silent = false } = {}) {
-    if (type !== 'classic' && type !== 'rare' && type !== 'legend') return;
+    if (!isPackType(type)) return;
     state.currentPackType = type;
     const src = PACK_IMAGES[type];
     if (packImgMain) packImgMain.src = src;
@@ -458,6 +555,12 @@
 
   function buyPacks(type) {
     SFX.unlock();
+    if (packComingSoon(type)) {
+      SFX.snap();
+      setShopMsg('Le Pack Vidéo arrive bientôt : il est visible mais pas encore achetable.');
+      showToast('Pack Vidéo : bientôt disponible !', 3000);
+      return;
+    }
     const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
     const total = PACK_PRICES[type] * qty;
     if (state.coins < total) {
@@ -491,13 +594,13 @@
   const MAX_SAME_CARD_PER_PACK = 2;
   const SECOND_COPY_WEIGHT_FACTOR = 0.5;
 
-  function cardBaseWeight(card, boosted) {
+  function cardBaseWeight(card, boosted, pool) {
     const info = card && RARITIES[card.rarity];
     if (!info) return 0;
     if (!boosted) return info.weight;
     let lowBase = 0;
     let highBase = 0;
-    for (const c of cardsDatabase) {
+    for (const c of (pool && pool.length ? pool : cardsDatabase)) {
       const r = RARITIES[c.rarity];
       if (!r) continue;
       if (r.rank < HIGH_RANK) lowBase += r.weight;
@@ -511,14 +614,16 @@
     return info.weight * (info.rank >= HIGH_RANK ? highFactor : lowFactor);
   }
 
-  function rarityWeight(key, boosted) {
-    const cards = cardsDatabase.filter((c) => c.rarity === key);
+  function rarityWeight(key, boosted, pool) {
+    const list = pool && pool.length ? pool : cardsDatabase;
+    const cards = list.filter((c) => c.rarity === key);
     if (!cards.length) return 0;
-    return cards.reduce((sum, c) => sum + cardBaseWeight(c, boosted), 0);
+    return cards.reduce((sum, c) => sum + cardBaseWeight(c, boosted, list), 0);
   }
 
-  function pickCard(forcedRarity, boosted, packCounts) {
-    const validCards = cardsDatabase.filter((c) => RARITIES[c.rarity]);
+  function pickCard(forcedRarity, boosted, packCounts, pool) {
+    const source = pool && pool.length ? pool : cardsDatabase;
+    const validCards = source.filter((c) => RARITIES[c.rarity]);
     if (!validCards.length) return null;
     let candidates = forcedRarity
       ? validCards.filter((c) => c.rarity === forcedRarity)
@@ -531,7 +636,7 @@
     const weights = candidates.map((c) => {
       const copies = packCounts ? (packCounts.get(c.id) || 0) : 0;
       const dupFactor = copies >= 1 ? SECOND_COPY_WEIGHT_FACTOR : 1;
-      return cardBaseWeight(c, boosted) * dupFactor;
+      return cardBaseWeight(c, boosted, validCards) * dupFactor;
     });
     const total = weights.reduce((sum, w) => sum + w, 0);
     if (total <= 0) return candidates[Math.floor(Math.random() * candidates.length)];
@@ -542,28 +647,32 @@
     return candidates[candidates.length - 1];
   }
 
-  function drawPack(boosted) {
+  function drawPack(boosted, pool, type) {
     const drawn = [];
     const packCounts = new Map();
     const record = (card) => {
       drawn.push(CardMutations.roll(card));
       packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
     };
+    const packType = isPackType(type) ? type : isPackType(state.currentPackType) ? state.currentPackType : 'classic';
+    const cardPool = pool && pool.length ? pool : packPool(packType);
     const params = new URLSearchParams(window.location.search);
     const demoMode = params.get('demo') || sessionStorage.getItem('refs-demo');
-    const wantsDemo = demoMode === '1' || demoMode === 'fusion';
+    const wantsDemo = demoMode === '1' || demoMode === 'fusion' || demoMode === 'video';
     if (wantsDemo) {
-      sessionStorage.setItem('refs-demo', demoMode === 'fusion' ? 'fusion' : '1');
-      const demoList = demoMode === 'fusion' && typeof fusionDemoDraw !== 'undefined'
-        ? fusionDemoDraw
-        : (typeof demoDraw !== 'undefined' ? demoDraw : []);
-      demoList.slice(0, cardCountFor(state.currentPackType)).forEach((id) => {
+      sessionStorage.setItem('refs-demo', demoMode === 'fusion' ? 'fusion' : demoMode === 'video' ? 'video' : '1');
+      const demoList = packType === 'video' && typeof videoDemoDraw !== 'undefined'
+        ? videoDemoDraw
+        : demoMode === 'fusion' && typeof fusionDemoDraw !== 'undefined'
+          ? fusionDemoDraw
+          : (typeof demoDraw !== 'undefined' ? demoDraw : []);
+      demoList.slice(0, cardCountFor(packType)).forEach((id) => {
         const found = CardMutations.resolve(id);
         if (found) record(found);
       });
     }
-    while (drawn.length < cardCountFor(state.currentPackType)) {
-      const card = pickCard(null, boosted, packCounts);
+    while (drawn.length < cardCountFor(packType)) {
+      const card = pickCard(null, boosted, packCounts, cardPool);
       if (!card) break;
       record(card);
     }
@@ -904,6 +1013,7 @@
   /* Sans pack en inventaire, on ne peut pas déchirer : on renvoie au Shop. */
   function hasPackToOpen() {
     if (isDemoMode()) return true;
+    if (!isPackAvailable(state.currentPackType)) return false;
     return (state.packStock[state.currentPackType] || 0) > 0;
   }
 
@@ -1027,7 +1137,7 @@
        gratuite pour les tests/apercus). Le tirage utilise ensuite le type
        choisi (rare = chances +20 %). */
     if (!isDemoMode()) {
-      const type = state.currentPackType === 'legend' ? 'legend' : state.currentPackType === 'rare' ? 'rare' : 'classic';
+      const type = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
       if ((state.packStock[type] || 0) > 0) {
         state.packStock[type] -= 1;
         state.packsOpened = (state.packsOpened || 0) + 1;
@@ -1149,11 +1259,179 @@
     return promise;
   }
 
+  /* ------------------------------------------------------- lecteurs vidéo
+     Une carte vidéo garde exactement le même cadre que les autres : l'image
+     sert d'affiche, le <video> se superpose, et les surcouches de rareté
+     (titre, description, holo, effets) restent au-dessus. */
+
+  /* Taux de lecture à appliquer pour atteindre le fps demandé quand le fichier
+     source a une autre fréquence (ex. 24 i/s demandées sur un fichier 60 i/s
+     → ×0,4, un vrai ralenti). Sans `sourceFps`, on ne devine pas : le fps sert
+     de métadonnée et de critère de choix dans `srcByFps`. */
+  function cardVideoPlaybackRate(config) {
+    if (!config || !config.fps || !config.sourceFps) return 1;
+    return clamp(config.fps / config.sourceFps, 0.25, 4);
+  }
+
+  /* jsdom et les navigateurs sans décodage vidéo renvoient '' : on évite alors
+     d'appeler play() inutilement (et les avertissements de test). */
+  function canPlayCardVideo(videoEl) {
+    try {
+      if (!videoEl || typeof videoEl.canPlayType !== 'function') return false;
+      return Boolean(
+        videoEl.canPlayType('video/mp4; codecs="avc1.42E01E"')
+        || videoEl.canPlayType('video/webm; codecs="vp8, vorbis"')
+      );
+    } catch (error) { return false; }
+  }
+
+  function startCardVideo(videoEl) {
+    if (!videoEl || videoEl.dataset.autoplay !== '1') return;
+    if (!canPlayCardVideo(videoEl)) return;
+    try {
+      const played = videoEl.play();
+      if (played && typeof played.catch === 'function') played.catch(() => {});
+    } catch (error) { /* lecture bloquée : l'affiche reste visible */ }
+  }
+
+  /* Les miniatures (collection, récap) ne tournent que si elles sont visibles :
+     on évite de décoder vingt vidéos hors écran. */
+  let cardVideoObserver = null;
+  function observeCardVideo(videoEl) {
+    if (!videoEl) return;
+    if (typeof IntersectionObserver !== 'function') {
+      startCardVideo(videoEl);
+      return;
+    }
+    if (!cardVideoObserver) {
+      cardVideoObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          if (entry.isIntersecting) startCardVideo(video);
+          else if (typeof video.pause === 'function') video.pause();
+        });
+      }, { rootMargin: '80px' });
+    }
+    cardVideoObserver.observe(videoEl);
+  }
+
+  /* Active le son des cartes vidéo d'un élément (appelé depuis un clic, seul
+     moment où les navigateurs autorisent l'audio). */
+  function activateCardAudio(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    root.querySelectorAll('video.cf-video[data-sound="on"]').forEach((video) => {
+      try {
+        video.muted = false;
+        video.dataset.audioActive = 'on';
+        const played = video.play();
+        if (played && typeof played.catch === 'function') played.catch(() => {});
+        const button = video.parentElement && video.parentElement.querySelector('.cf-audio');
+        if (button) {
+          button.textContent = '🔊';
+          button.setAttribute('aria-pressed', 'true');
+          button.setAttribute('aria-label', 'Couper le son de la carte');
+        }
+      } catch (error) { /* son indisponible */ }
+    });
+  }
+
+  /* Construit le lecteur d'une carte vidéo et le branche sur sa config. */
+  function buildCardVideo(card, config, opts) {
+    const video = document.createElement('video');
+    video.className = 'cf-video';
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    video.preload = config.preload || 'metadata';
+    video.loop = Boolean(config.loop);
+    /* Toujours démarrer en muet : c'est la seule façon d'obtenir l'autoplay
+       sur tous les navigateurs. Le son s'active au clic (carte ou bouton 🔊). */
+    video.muted = true;
+    video.defaultMuted = true;
+    video.dataset.fps = config.fps == null ? 'auto' : String(config.fps);
+    video.dataset.sourceFps = config.sourceFps == null ? '' : String(config.sourceFps);
+    video.dataset.sound = config.sound ? 'on' : 'off';
+    video.dataset.loop = config.loop ? 'on' : 'off';
+    video.dataset.audioActive = 'off';
+    video.dataset.autoplay = config.autoplay ? '1' : '0';
+    video.setAttribute('aria-label', `Vidéo de la carte ${card.name}${config.sound ? ', avec son' : ', sans son'}${config.loop ? ', en boucle' : ''}`);
+    if (config.fps) video.style.setProperty('--video-fps', String(config.fps));
+
+    const rate = cardVideoPlaybackRate(config);
+    if (rate !== 1) {
+      try { video.playbackRate = rate; } catch (error) { /* ignore */ }
+      video.dataset.playbackRate = String(rate);
+    }
+    on(video, 'loadedmetadata', () => {
+      if (rate !== 1) {
+        try { video.playbackRate = rate; } catch (error) { /* ignore */ }
+      }
+    });
+    on(video, 'loadeddata', () => {
+      const frame = video.closest('.cf');
+      if (frame) frame.classList.add('has-video');
+    });
+    on(video, 'ended', () => {
+      const frame = video.closest('.cf');
+      if (frame) frame.classList.add('is-video-ended');
+    });
+
+    const sources = typeof cardVideoSources === 'function' ? cardVideoSources(card) : [];
+    sources.forEach((src) => {
+      const source = document.createElement('source');
+      source.src = src;
+      source.type = /\.webm$/i.test(src) ? 'video/webm' : 'video/mp4';
+      video.append(source);
+    });
+    if (!sources.length && config.src) video.src = config.src;
+
+    if (config.autoplay) observeCardVideo(video);
+    return video;
+  }
+
+  /* Bouton son (uniquement si la carte a du son et hors miniature). */
+  function buildCardAudioButton(config) {
+    if (!config.sound) return null;
+    const button = el('button', 'cf-audio', '🔇');
+    button.type = 'button';
+    button.setAttribute('aria-pressed', 'false');
+    button.setAttribute('aria-label', 'Activer le son de la carte');
+    on(button, 'pointerdown', (event) => event.stopPropagation());
+    on(button, 'click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const frame = button.closest('.cf');
+      const video = frame && frame.querySelector('video.cf-video');
+      if (!video) return;
+      const nextMuted = !video.muted;
+      video.muted = nextMuted;
+      video.dataset.audioActive = nextMuted ? 'off' : 'on';
+      button.textContent = nextMuted ? '🔇' : '🔊';
+      button.setAttribute('aria-pressed', String(!nextMuted));
+      button.setAttribute('aria-label', nextMuted ? 'Activer le son de la carte' : 'Couper le son de la carte');
+      if (!nextMuted) {
+        try {
+          const played = video.play();
+          if (played && typeof played.catch === 'function') played.catch(() => {});
+        } catch (error) { /* ignore */ }
+      }
+    });
+    return button;
+  }
+
+  function videoTagLabel(config) {
+    const parts = [config.fps ? `${config.fps} i/s` : 'vidéo'];
+    if (config.sound) parts.push('son');
+    if (config.loop) parts.push('boucle');
+    return `▶ ${parts.join(' · ')}`;
+  }
+
   /* Cadre d'une carte : image plein cadre (5:7), titre en haut sur dégradé,
      description en bas sur dégradé, ID discret. Le tout réutilisable dans la
      révélation, le récap miniature et l'inspection en grand. */
   function cardFrame(card, opts = {}) {
     const info = RARITIES[card.rarity] || RARITIES.common;
+    const videoConfig = cardVideoInfo(card);
     const frame = el('span', 'cf');
     const mutation = CardMutations.definition(card);
     if (mutation) {
@@ -1164,6 +1442,7 @@
     frame.style.setProperty('--r-ink', info.ink);
     frame.style.setProperty('--r-glow', info.glow);
     frame.dataset.rarity = card.rarity;
+    if (videoConfig) frame.dataset.video = '1';
     if (opts.mini) frame.classList.add('cf-mini');
 
     const img = el('img', 'cf-img');
@@ -1185,19 +1464,30 @@
 
     const bottom = el('span', 'cf-bottom');
     bottom.append(el('span', 'cf-desc', card.description || ''));
+    if (videoConfig) {
+      bottom.append(el('span', 'cf-video-tags', videoTagLabel(videoConfig)));
+    }
     const meta = el('span', 'cf-meta');
     meta.append(el('span', 'cf-id', `#${card.id}`));
     if (opts.index != null) meta.append(el('span', 'cf-num', `S01·${String(opts.index + 1).padStart(2, '0')}`));
     bottom.append(meta);
 
-    frame.append(fallback, img, top, bottom);
+    const video = videoConfig ? buildCardVideo(card, videoConfig, opts) : null;
+    frame.append(fallback, img);
+    if (video) frame.append(video);
+    frame.append(top, bottom);
     if (!opts.mini) {
       frame.append(el('span', 'cf-holo'), el('span', 'cf-shine'));
     }
+    const audioButton = videoConfig && !opts.mini ? buildCardAudioButton(videoConfig) : null;
+    if (audioButton) frame.append(audioButton);
 
     resolveCardImage(card).then((src) => {
       if (!src) return;
       img.src = src;
+      if (video) {
+        try { video.poster = src; } catch (error) { /* ignore */ }
+      }
       on(img, 'load', () => frame.classList.add('has-img'), { once: true });
       frame.classList.add('has-src');
     });
@@ -1328,6 +1618,9 @@
   function revealCard(btn, card) {
     if (btn.classList.contains('is-revealed')) return;
     SFX.unlock();
+    /* Clic utilisateur : c'est le bon moment pour activer le son des cartes
+       vidéo qui le demandent (les navigateurs bloquent l'audio automatique). */
+    if (cardVideoInfo(card)) activateCardAudio(btn);
     btn.dataset.flipAt = String(performance.now());
     btn.classList.add('is-revealed');
     if (card.rarity === 'epic') {
@@ -1425,6 +1718,7 @@
     inspectCard.style.setProperty('--r-glow', info.glow);
     inspectCard.dataset.rarity = card.rarity;
     inspectCard.dataset.fx = info.fx || 'calm';
+    if (cardVideoInfo(card)) activateCardAudio(inspectCard);
     resetInspTilt();
     inspectReturnFocus = document.activeElement;
     inspect.hidden = false;
@@ -1557,7 +1851,11 @@
       return;
     }
     nextCard.hidden = true;
-    state.deck = drawPack(state.currentPackType === 'rare');
+    state.deck = drawPack(
+      state.currentPackType === 'rare',
+      packPool(state.currentPackType),
+      state.currentPackType
+    );
     packView.hidden = true;
     revealView.hidden = false;
     revealView.classList.remove('view-in');
@@ -1726,7 +2024,7 @@
     SFX.deal();
     scheduleSizing(10);
     if (!state.packStock[state.currentPackType] && packTotal() > 0) {
-      selectPackType(state.packStock.classic > 0 ? 'classic' : state.packStock.rare > 0 ? 'rare' : 'legend');
+      selectPackType(firstAvailablePackType());
     }
     renderPackInventory();
     showToast(packTotal() > 0
@@ -2113,22 +2411,28 @@
 
   /* Probabilités : générées depuis RARITIES pour rester toujours justes.
      En pack rare : +20 % de chances sur chaque rareté Rare+ (voir rarityWeight). */
-  function renderOdds(boosted) {
+  function renderOdds(boosted, pool, packType) {
     if (!packOdds) return;
     packOdds.replaceChildren();
-    const total = Object.keys(RARITIES).reduce((sum, key) => sum + rarityWeight(key, boosted), 0);
+    const list = pool && pool.length ? pool : cardsDatabase;
+    const total = Object.keys(RARITIES).reduce((sum, key) => sum + rarityWeight(key, boosted, list), 0);
     Object.entries(RARITIES).forEach(([key, r]) => {
+      const weight = rarityWeight(key, boosted, list);
+      if (weight <= 0) return;
       const row = el('span', `odds odds-${key}`);
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const pct = total > 0 ? (rarityWeight(key, boosted) / total) * 100 : r.weight;
+      const pct = total > 0 ? (weight / total) * 100 : r.weight;
       const label = `${r.label} ${pct.toFixed(1).replace(/\.0$/, '').replace('.', ',')} %`;
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
     if (boosted) {
       packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : +20 % DE CHANCES SUR RARE+'));
+    }
+    if (packType === 'video') {
+      packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 3 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
     }
   }
 
@@ -2251,11 +2555,7 @@
        freeUsed (défauts 0). Le premier pack offert (firstPack) devient
        1 pack classique en inventaire, une seule fois. */
     const stock = (d && d.packStock) || {};
-    state.packStock = {
-      classic: Math.max(0, Number(stock.classic) || 0),
-      rare: Math.max(0, Number(stock.rare) || 0),
-      legend: Math.max(0, Number(stock.legend) || 0)
-    };
+    state.packStock = packStockFrom(stock);
     if (state.firstPack) {
       state.packStock.classic += 1;
       state.firstPack = false;
@@ -2263,9 +2563,7 @@
     state.freeDate = typeof (d && d.freeDate) === 'string' ? d.freeDate : '';
     state.freeUsed = clamp(Number(d && d.freeUsed) || 0, 0, FREE_PER_DAY);
     refreshFreeQuota();
-    state.currentPackType = state.packStock.rare > 0 && state.packStock.classic <= 0 ? 'rare'
-      : state.packStock.legend > 0 && state.packStock.classic <= 0 && state.packStock.rare <= 0 ? 'legend'
-      : 'classic';
+    state.currentPackType = firstAvailablePackType();
     state.phase = 'pack';
     state.deck = [];
     state.loot = [];
@@ -2293,11 +2591,10 @@
         collection: state.collection.map((c) => c.id),
         friends,
         packsOpened: state.packsOpened || 0,
-        packStock: {
-          classic: Math.max(0, Number(state.packStock.classic) || 0),
-          rare: Math.max(0, Number(state.packStock.rare) || 0),
-          legend: Math.max(0, Number(state.packStock.legend) || 0)
-        },
+        packStock: PACK_TYPES.reduce((stock, type) => {
+          stock[type] = Math.max(0, Number(state.packStock[type]) || 0);
+          return stock;
+        }, {}),
         freeDate: state.freeDate || todayKey(),
         freeUsed: clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY),
         updatedAt: serverTimestamp()
@@ -2378,13 +2675,14 @@
     unsubscribeMarket();
     selectedFriendUid = null;
     rulesHelpShown = false;
-    state.packStock = { classic: 0, rare: 0, legend: 0 };
+    state.packStock = emptyPackStock();
     state.freeDate = '';
     state.freeUsed = 0;
     state.currentPackType = 'classic';
     shopQty.classic = 1;
     shopQty.rare = 1;
     shopQty.legend = 1;
+    shopQty.video = 1;
     renderShop();
     renderPackInventory();
     if (friendRequestsUnsub) {
@@ -2676,7 +2974,13 @@
   on(buyClassic, 'click', () => buyPacks('classic'));
   on(buyRare, 'click', () => buyPacks('rare'));
   on(buyLegend, 'click', () => buyPacks('legend'));
+  on(buyVideo, 'click', () => buyPacks('video'));
   function openFromInventory(type) {
+    if (!isPackAvailable(type)) {
+      setShopMsg('Le Pack Vidéo arrive bientôt : impossible de l’ouvrir pour le moment.');
+      showToast('Pack Vidéo : bientôt disponible !', 3000);
+      return;
+    }
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
     selectPackType(type);
@@ -2685,6 +2989,7 @@
   on(openClassic, 'click', () => openFromInventory('classic'));
   on(openRare, 'click', () => openFromInventory('rare'));
   on(openLegend, 'click', () => openFromInventory('legend'));
+  on(openVideo, 'click', () => openFromInventory('video'));
   on(inventoryGoShop, 'click', () => setTab('shop'));
   if (inventoryGrid) {
     on(inventoryGrid, 'click', (e) => {
@@ -3958,7 +4263,10 @@
   }
 
   function packName(packType) {
-    return packType === 'rare' ? 'Pack Rare doré' : 'Pack Classique';
+    return packType === 'rare' ? 'Pack Rare doré'
+      : packType === 'legend' ? 'Pack Légende'
+        : packType === 'video' ? 'Pack Vidéo'
+          : 'Pack Classique';
   }
 
   function listingName(listing) {
@@ -4375,11 +4683,9 @@
         const coins = Number(saveData.coins) || 0;
         const cards = Array.isArray(saveData.collection) ? [...saveData.collection] : [];
         const savedStock = (saveData && saveData.packStock) || {};
-        const packStock = {
-          classic: Math.max(0, Number(savedStock.classic) || 0),
-          rare: Math.max(0, Number(savedStock.rare) || 0),
-          legend: Math.max(0, Number(savedStock.legend) || 0)
-        };
+        /* On repart de TOUS les types (vidéo comprise) : une transaction sur
+           une carte ne doit jamais effacer un stock de packs vidéo. */
+        const packStock = packStockFrom(savedStock);
         /* On utilise la liste d'amis ENREGISTRÉE (celle que vérifient les
            règles Firestore), pas l'état mémoire qui peut être en avance. */
         const savedFriends = Array.isArray(saveData.friends) ? saveData.friends : [];
@@ -4447,13 +4753,9 @@
       state.coins = result.coins;
       state.collection = result.cards.map((cardId) => CardMutations.resolve(cardId)).filter(Boolean);
       if (result.packStock) {
-        state.packStock = {
-          classic: Math.max(0, Number(result.packStock.classic) || 0),
-          rare: Math.max(0, Number(result.packStock.rare) || 0),
-          legend: Math.max(0, Number(result.packStock.legend) || 0)
-        };
+        state.packStock = packStockFrom(result.packStock);
         if ((state.packStock[state.currentPackType] || 0) <= 0 && packTotal() > 0) {
-          selectPackType(state.packStock.classic > 0 ? 'classic' : state.packStock.rare > 0 ? 'rare' : 'legend', { silent: true });
+          selectPackType(firstAvailablePackType(), { silent: true });
         }
       }
       updateCoins(); renderCollection(); renderShop(); renderAccount(); renderPackInventory(); saveProfileSoon();
@@ -4716,6 +5018,10 @@
     } else if (demoParam === 'fusion') {
       sessionStorage.setItem('refs-demo', 'fusion');
       showToast('Mode démo fusion : ouvre le pack, un doublon prêt à fusionner t’attend.', 3600);
+    } else if (demoParam === 'video') {
+      sessionStorage.setItem('refs-demo', 'video');
+      selectPackType('video', { silent: true });
+      showToast('Mode démo vidéo : ouvre le Pack Vidéo pour voir fps, son et boucle.', 3800);
     }
     if (!cardsDatabase.length) {
       showToast('Ajoute des cartes dans cards.js pour commencer.');
