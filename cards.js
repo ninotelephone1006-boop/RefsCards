@@ -201,7 +201,7 @@ const cardsDatabase = [
     description: 'Fagar en mode chiki',
     rarity: 'epic',
     emoji: '😎',
-    image: 'assets/Cartes/chikifagar.png',
+    image: 'assets/Cartes/chikifagar.PNG',
     color: '#c6a0eb'
   }
 ];
