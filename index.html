@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-9">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-10">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -24,8 +24,9 @@
        module » et de « addEventListener of null » après une mise à jour). -->
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-3" defer></script>
+  <script src="quests.js?v=2026.11.24-1" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-6" defer></script>
+  <script src="app.js?v=2026.11.24-7" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -88,6 +89,13 @@
       </a>
       <div class="hud-right">
         <span class="season"><i></i>SAISON 01</span>
+        <button class="icon-btn notif-btn" id="notif-btn" type="button" aria-label="Notifications" aria-haspopup="dialog" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M18 9.5a6 6 0 1 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/>
+            <path d="M10.3 19.5a2 2 0 0 0 3.4 0"/>
+          </svg>
+          <i class="notif-badge" id="notif-badge" hidden></i>
+        </button>
         <button class="icon-btn" id="sound-btn" type="button" aria-pressed="false" aria-label="Couper le son">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path d="M3.5 9.5h3.2L11 5.8v12.4l-4.3-3.7H3.5z" fill="currentColor"/>
@@ -528,6 +536,31 @@
         </div>
       </div>
 
+      <!-- ============================== QUÊTES =============================== -->
+      <section class="view quests-view" id="quests-view" aria-label="Quêtes et succès">
+        <div class="page-scroll">
+          <div class="quests-head">
+            <p class="kicker"><span>✦</span> QUÊTES · SUCCÈS · NIVEAU <span>✦</span></p>
+            <h2>Progresser, <em>récompensé.</em></h2>
+            <div class="level-card">
+              <div class="level-top">
+                <span class="level-badge">NIV. <b id="level-value">1</b></span>
+                <span class="level-xp" id="level-xp" aria-live="polite">0 / 100 XP</span>
+              </div>
+              <div class="level-bar" aria-hidden="true"><i id="level-fill"></i></div>
+              <p class="quests-count" id="quests-count" aria-live="polite">Quête 1 / 20</p>
+            </div>
+            <div class="quests-tabs" role="tablist" aria-label="Sections des quêtes">
+              <button class="chip is-active" type="button" role="tab" aria-selected="true" data-quest-tab="quests">Quêtes</button>
+              <button class="chip" type="button" role="tab" aria-selected="false" data-quest-tab="achievements">Succès · <span id="ach-count">0 / 30</span></button>
+            </div>
+          </div>
+
+          <div class="quest-panel" id="quest-panel" role="tabpanel" aria-label="Quêtes"></div>
+          <div class="ach-panel" id="ach-panel" role="tabpanel" aria-label="Succès" hidden></div>
+        </div>
+      </section>
+
       <!-- ============================== FUSION ============================== -->
       <div class="fusion" id="fusion" hidden>
         <div class="fusion-backdrop" id="fusion-backdrop"></div>
@@ -561,6 +594,20 @@
           </div>
         </div>
       </div>
+
+      <!-- ========================= NOTIFICATIONS =========================== -->
+      <div class="sheet" id="notif-sheet" hidden>
+        <div class="sheet-backdrop" data-close-notif></div>
+        <div class="sheet-dialog sheet-notif" role="dialog" aria-modal="true" aria-labelledby="notif-title">
+          <p class="kicker"><span>✦</span> NOTIFICATIONS <span>✦</span></p>
+          <h3 id="notif-title">Notifications</h3>
+          <div class="notif-list" id="notif-list"></div>
+          <div class="sheet-actions">
+            <button class="mini-btn" type="button" data-close-notif>Fermer</button>
+            <button class="mini-btn primary" type="button" id="notif-read-all">Tout marquer comme lu</button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <!-- ============================ NAVIGATION ============================ -->
@@ -588,6 +635,11 @@
       <button class="tab" type="button" data-tab="online">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><path d="M16 5.4a3.2 3.2 0 0 1 0 5.9M17.8 14.8c1.7.6 2.7 1.9 3.1 4.2"/></svg>
         <span>En ligne</span>
+      </button>
+      <button class="tab" type="button" data-tab="quests">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 21V4"/><path d="M5 4.8h11.2l-2.4 3.2 2.4 3.2H5"/></svg>
+        <span>Quêtes</span>
+        <i class="tab-badge" id="tab-badge-quests" hidden aria-label="Quête prête à réclamer"></i>
       </button>
       <button class="tab" type="button" data-tab="account">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.4 7-5.4s6.2 1.8 7 5.4"/></svg>

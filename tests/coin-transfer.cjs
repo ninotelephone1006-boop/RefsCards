@@ -104,6 +104,7 @@ async function boot(store, uid) {
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('firebase-config.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('app.js', 'utf8'), context);
   await wait(40);
   await authState.onChange({ uid, email: `${uid}@test`, displayName: uid, photoURL: '' });

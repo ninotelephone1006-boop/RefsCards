@@ -12,6 +12,7 @@ w.HTMLCanvasElement.prototype.getContext = () => new Proxy({}, { get: () => noop
 w.Sound = new Proxy({}, { get: () => noop });
 const context = dom.getInternalVMContext();
 vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
 vm.runInContext(`
   const expectedRates = {
     common: .01, uncommon: .008, rare: .006, superrare: .0045,

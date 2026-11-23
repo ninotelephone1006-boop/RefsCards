@@ -24,6 +24,7 @@ function bootApp(url = 'https://refs-cards.test/') {
   w.Sound = new Proxy({}, { get: () => noop });
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
   /* Expose les fonctions internes à la fin du module, sans changer le code
      exécuté au démarrage. */
   const appSrc = fs.readFileSync('app.js', 'utf8').replace(

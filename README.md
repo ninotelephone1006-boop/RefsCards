@@ -21,11 +21,11 @@ Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'a
 
 ## Chargement des scripts
 
-`index.html` charge quatre fichiers locaux **comme scripts classiques, en `defer`**, dans cet ordre : `firebase-config.js`, `cards.js`, `audio.js`, puis `app.js`.
+`index.html` charge cinq fichiers locaux **comme scripts classiques, en `defer`**, dans cet ordre : `firebase-config.js`, `cards.js`, `quests.js`, `audio.js`, puis `app.js`.
 
-- **Pas de `type="module"`** : `cards.js`, `audio.js` et `app.js` partagent des variables globales (`cardsDatabase`, `Sound`, `demoDraw`, `window.REFS_FIREBASE_CONFIG`). En modules ES, chaque fichier aurait sa propre portée et `app.js` ne verrait plus ces variables. Aucun fichier n'utilise `import`/`export`, donc un script classique est le bon mode de chargement.
+- **Pas de `type="module"`** : `cards.js`, `quests.js`, `audio.js` et `app.js` partagent des variables globales (`cardsDatabase`, `RefsQuests`, `Sound`, `demoDraw`, `window.REFS_FIREBASE_CONFIG`). En modules ES, chaque fichier aurait sa propre portée et `app.js` ne verrait plus ces variables. Aucun fichier n'utilise `import`/`export`, donc un script classique est le bon mode de chargement.
 - **`defer`** : les scripts s'exécutent après l'analyse du DOM, sans bloquer l'affichage. `app.js` ajoute en plus un garde-fou (`DOMContentLoaded`) au cas où il serait déplacé dans `<head>` sans `defer`.
-- **`?v=…` sur chaque URL locale** : évite qu'un navigateur rejoue un ancien `app.js` resté en cache après une mise à jour. Incrémente ce numéro (dans `index.html`) quand tu modifies `app.js`, `cards.js` ou `audio.js` en production.
+- **`?v=…` sur chaque URL locale** : évite qu'un navigateur rejoue un ancien script resté en cache après une mise à jour. Incrémente le numéro (dans `index.html`) du fichier modifié (`app.js`, `cards.js`, `quests.js` ou `audio.js`) en production.
 - **Aucun `addEventListener` sur un élément nul** : `app.js` passe par les helpers `on()` / `qs()`, qui se contentent d'un avertissement si un élément manque, et l'écran de compte comme le bouton Google restent fonctionnels.
 - **Filet de sécurité** : un petit script inline de `index.html` affiche un message dans l'écran de compte si `app.js` n'a pas démarré (cache obsolète, script bloqué). `app.js` signale son démarrage via `window.REFS_CARDS_READY`.
 
@@ -63,17 +63,27 @@ node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-
 node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare +20 %
 node tests/video-pack.cjs            # Pack Vidéo : config fps/son/boucle, tirage, lecteur <video>
 node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
+node tests/quest-flow.cjs            # quêtes séquentielles, succès, niveaux, notifications, sauvegarde
 ```
 
 ## Page Shop (boutique + inventaire)
 
-La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**, **En ligne** et **Compte**.
+La barre de navigation compte sept onglets : **Pack**, **Shop**, **Inventaire**, **Collection**, **En ligne**, **Quêtes** et **Compte**.
 
 - **Achat direct supprimé** : le bouton « Ouvrir un booster » du récap (et celui de la fusion) renvoie désormais au Shop. Les packs achetés vont dans l'**inventaire** (compteur dans l'onglet Pack) et s'ouvrent depuis là — ouvrir un pack en consomme 1. Sans pack en inventaire, la déchirure est bloquée et un bouton « Aller au Shop » apparaît.
 - **Trois packs achetables + un pack en avant-première** : **Pack Classique** (`assets/packet.png`, **500 🪙**, 5 cartes), **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, 5 cartes, chances Rare et plus **+20 %** relatives, renormalisées — les pourcentages affichés sous le pack suivent le type choisi), **Pack Légende** (`assets/packetlegende.png`, **800 🪙**, 10 cartes, chances standards) et **Pack Vidéo** (`assets/packetvideo.png`, **1 000 🪙** à la publication, 3 cartes animées). Le Pack Vidéo est affiché dans le Shop avec le badge **BIENTÔT** et un message d'arrivée prochaine : boutons d'achat, de quantité et d'ouverture désactivés. Il n'est ni achetable ni ouvrable, et ses cartes ne sortent pas des autres boosters tant qu'il n'est pas publié. Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 classique, ≈ 419 🪙 rare, ≈ 788 🪙 légende pour 10 cartes, ≈ 803 🪙 vidéo pour 3 cartes ; 800 🪙 se situe juste au-dessus) pour éviter l'argent infini de l'ancien prix à 100 🪙.
 - **Achats multiples** : sélecteur de quantité (1 à 10, raccourcis ×1 / ×5 / ×10) par pack ; le bouton affiche le total et se désactive si le solde est insuffisant.
 - **3 gratuits par jour** : 3 packs classiques à récupérer un par un dans le Shop (bannière 🎁, pastilles de progression, quota `freeDate`/`freeUsed` par jour calendaire local, réinitialisé à minuit, pastille sur l'onglet Shop tant qu'il en reste). Le premier pack offert des nouveaux comptes arrive aussi dans l'inventaire.
 - **Sauvegarde** : `playerSaves/{uid}` gagne `packStock {classic, rare, legend, video}`, `freeDate` et `freeUsed` (les anciennes sauvegardes sans ces champs démarrent à 0, avec migration du premier pack offert). **Republie `firestore.rules`** pour les autoriser.
+
+## Quêtes, succès et niveaux
+
+- L’onglet **Quêtes** propose **20 objectifs** à difficulté croissante. Seule la quête active est affichée avec sa progression ; les quêtes suivantes restent invisibles jusqu’à ce que la précédente soit terminée et que sa récompense soit réclamée. Les quêtes terminées restent visibles dans l’historique.
+- Les actions du jeu mettent les objectifs à jour automatiquement : ouvertures et achats de packs, packs gratuits, fusions, collection, raretés, amis et ventes encaissées sur le marché. Chaque quête terminée donne les **pièces et l’XP** indiquées sur sa carte.
+- Les **30 succès** sont indépendants de l’ordre des quêtes : ils se débloquent dès que leur condition est remplie et rapportent de l’XP. Les succès déjà accomplis par un ancien compte sont repris silencieusement au premier chargement du système.
+- L’XP des quêtes et des succès fait progresser les niveaux. Il faut 100 XP pour passer du niveau 1 au niveau 2, puis 200 XP supplémentaires pour le niveau 3, 300 pour le niveau 4, etc. Le niveau donne une progression et des succès dédiés ; il ne crédite pas de pièces.
+- La cloche ouvre l’historique des **50 notifications les plus récentes** (quêtes prêtes ou réclamées, succès, niveaux, demandes d’ami, ventes encaissées et packs gratuits quotidiens). Le badge compte les notifications non lues ; « Tout marquer comme lu » les acquitte.
+- **Sauvegarde cloud** : quêtes terminées, succès, XP, notifications et base de progression sont enregistrés dans `playerSaves/{uid}`. Pour les comptes existants, cette base fige les compteurs cumulés au premier chargement afin que les anciennes ouvertures/achats ne valident pas toutes les quêtes d’un coup ; les succès, eux, sont rétroactifs. Republie `firestore.rules` après modification des règles Firestore.
 
 ## Pages Compte et En ligne (amis, marché, achats)
 
@@ -82,7 +92,7 @@ La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**,
 - **Photo de profil en grand** en haut : bouton 📷 pour téléverser une image (recadrée en carré, réduite à 256 px en JPEG, stockée dans le profil public — pas besoin de Firebase Storage). Bouton « Utiliser ma photo Google » pour revenir à la photo du compte Google. La photo est écrite dans le profil cloud dès le choix du fichier et s'affiche partout (page Compte **et** avatar du HUD) ; si l'écriture échoue, l'ancienne photo est restaurée et un message l'explique.
 - **Pseudo modifiable** (1 à 24 caractères), affiché en haut de la page et dans le HUD à la place de l'adresse e-mail. Cliquer sur l'avatar ou le nom dans le HUD ouvre cette page. Le pseudo est sauvegardé dans le profil cloud via le bouton « Enregistrer » **et automatiquement** après la frappe (sans attendre le bouton) ; en cas d'échec de sauvegarde, l'ancien pseudo est restauré avec un message d'erreur plutôt qu'un faux « mis à jour ».
 - **Code ami** stable de la forme `REFS-XXXXXX`, dérivé de l'uid du compte, avec bouton « Copier ». Il est enregistré dans l'annuaire `friendCodes/{code}` pour être retrouvé par les amis.
-- **Statistiques** : pièces, cartes totales, cartes uniques (x / total), doublons, valeur de la collection (somme des récompenses), meilleure rareté, boosters ouverts, nombre d'amis, plus le détail des cartes par rareté.
+- **Statistiques** : pièces, cartes totales, cartes uniques (x / total), doublons, valeur de la collection (somme des récompenses), meilleure rareté, boosters ouverts, amis, niveau et quêtes terminées, plus le détail des cartes par rareté.
 
 ### Page En ligne
 

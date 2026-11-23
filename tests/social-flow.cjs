@@ -118,6 +118,7 @@ async function boot() {
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('firebase-config.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('app.js', 'utf8'), context);
   await wait(40);
 
@@ -138,16 +139,16 @@ function buttonByText(root, text) {
   const { w, doc, store, db } = await boot();
 
   /* 1. Six onglets, page Compte : pseudo, code ami, stats. */
-  assert.equal(doc.querySelectorAll('.tab').length, 6, 'Pack, Shop, Inventaire, Collection, En ligne, Compte');
+  assert.equal(doc.querySelectorAll('.tab').length, 7, 'Pack, Shop, Inventaire, Collection, En ligne, Quêtes, Compte');
   doc.querySelector('[data-tab="account"]').click();
   await wait(30);
   assert.equal(doc.getElementById('profile-pseudo').textContent, 'Moi');
   assert.match(doc.getElementById('friend-code').textContent, /^REFS-[A-Z0-9]{6}$/);
-  assert.equal(doc.getElementById('stats-grid').children.length, 8, 'huit statistiques');
+  assert.equal(doc.getElementById('stats-grid').children.length, 10, 'dix statistiques');
   assert.match(doc.getElementById('stats-grid').textContent, /500/);
   assert.ok(store.playerProfiles.me, 'le profil public doit être créé');
   assert.match(store.playerProfiles.me.friendCode, /^REFS-[A-Z0-9]{6}$/);
-  console.log('PASS page Compte = pseudo, code ami REFS-XXXXXX, 8 statistiques');
+  console.log('PASS page Compte = pseudo, code ami REFS-XXXXXX, 10 statistiques');
 
   /* 2. Changement de pseudo : sauvegarde cloud + HUD. */
   const pseudoInput = doc.getElementById('pseudo-input');
@@ -208,6 +209,8 @@ function buttonByText(root, text) {
   await wait(120);
   assert.equal(store.marketListings['friend-ad'].status, 'sold');
   assert.equal(store.marketListings['friend-ad'].buyerUid, 'me');
+  /* Le marché débite exactement 120 pièces ; l'achat peut débloquer le succès
+     « Acheteur », qui rapporte de l'XP mais pas de pièces. */
   assert.equal(store.playerSaves.me.coins, 380, '120 pièces débitées sur les 500');
   assert.equal(store.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 2);
   assert.equal(Object.keys(store.trades).length, 0, 'aucun document trades/ créé');

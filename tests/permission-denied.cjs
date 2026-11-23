@@ -77,6 +77,7 @@ function makeStore() {
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('firebase-config.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('app.js', 'utf8'), context);
   await wait(40);
 
@@ -84,13 +85,13 @@ function makeStore() {
   await wait(200); // loadProfile / loadTrades refusés, mais le jeu démarre
 
   const doc = w.document;
-  assert.equal(doc.querySelectorAll('.tab').length, 6, 'le jeu démarre malgré les règles');
+  assert.equal(doc.querySelectorAll('.tab').length, 7, 'le jeu démarre malgré les règles');
   assert.ok(doc.querySelector('.app').classList.contains('is-authenticated'), 'partie affichée (playerSaves lisible)');
 
   /* Le compte reste utilisable : les stats sont calculées localement. */
   doc.querySelector('[data-tab="account"]').click();
   await wait(30);
-  assert.equal(doc.getElementById('stats-grid').children.length, 8, 'huit statistiques rendues');
+  assert.equal(doc.getElementById('stats-grid').children.length, 10, 'dix statistiques rendues');
 
   /* Le journal signale les règles, pas une « connexion ». */
   assert.ok(warnings.some((line) => /permission-denied|insuffisantes/i.test(line)), `avertissement « règles » attendu dans la console, vu : ${warnings.join(' | ')}`);
