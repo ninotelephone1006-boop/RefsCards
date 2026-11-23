@@ -158,6 +158,15 @@ const cardsDatabase = [
     emoji: '🤳',
     image: 'assets/Cartes/Piter selfie.jpg',
     color: '#8fc8ef'
+  },
+  {
+    id: 'mathis-date',
+    name: 'Mathis Date',
+    description: 'un gay refouler',
+    rarity: 'uncommon',
+    emoji: '💘',
+    image: 'assets/Cartes/mathis-date.jpg',
+    color: '#9dbfc4'
   }
 ];
 
