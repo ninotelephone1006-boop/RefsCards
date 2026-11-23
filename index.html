@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-3">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-4">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-2" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-4" defer></script>
+  <script src="app.js?v=2026.11.23-5" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -372,11 +372,18 @@
 
           <section class="market-block" aria-label="Mes ventes et cadeaux">
             <h3>Mes cartes à vendre</h3>
-            <p class="online-empty">Choisis une carte et fixe ton prix. Elle sera réservée jusqu’à la vente ou l’annulation.</p>
+            <p class="online-empty">Choisis une carte, combien d’exemplaires tu veux vendre et le prix par carte. Seule la quantité choisie est réservée jusqu’à la vente ou l’annulation.</p>
             <form id="market-list-form" class="market-form">
               <label for="market-card">Carte</label><select id="market-card" required></select>
-              <label for="market-price">Prix en pièces</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
-              <button class="mini-btn primary" type="submit">Mettre en vente</button>
+              <label for="market-qty">Combien en vendre</label>
+              <div class="market-qty-wrap">
+                <button class="qty-btn" id="market-qty-minus" type="button" aria-label="Vendre une carte de moins">−</button>
+                <input id="market-qty" class="market-qty-input" type="number" min="1" max="1" step="1" value="1" required inputmode="numeric">
+                <button class="qty-btn" id="market-qty-plus" type="button" aria-label="Vendre une carte de plus">+</button>
+                <span class="market-qty-hint" id="market-qty-hint" aria-live="polite"></span>
+              </div>
+              <label for="market-price">Prix par carte (en pièces)</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+              <button class="mini-btn primary" id="market-submit" type="submit">Mettre en vente</button>
             </form>
             <div id="my-listings" class="trades-list"></div>
             <h3>Pièces à récupérer</h3>
