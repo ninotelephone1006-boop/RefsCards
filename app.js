@@ -185,6 +185,7 @@
   const packOdds = $('pack-odds');
   const inspect = $('inspect');
   const inspectCard = $('inspect-card');
+  const inspectCounts = $('inspect-counts');
   const inspectX = $('inspect-x');
   const inspectBackdrop = $('inspect-backdrop');
   const authScreen = $('auth-screen');
@@ -1785,7 +1786,10 @@
     );
   }
 
-  function openInspect(card) {
+  /* L'inspection montre toujours la carte de base : les Shiny ne sont pas
+     exposés comme des cartes distinctes, seulement comme des exemplaires
+     supplémentaires de la même carte (voir renderInspectCounts). */
+  function openInspect(card, inventoryEntry = null) {
     if (!card) return;
     const info = RARITIES[card.rarity] || RARITIES.common;
     inspectCard.replaceChildren(cardFrame(card, { eager: true, alt: `${card.name} — ${info.label}` }));
@@ -1793,6 +1797,7 @@
     inspectCard.style.setProperty('--r-glow', info.glow);
     inspectCard.dataset.rarity = card.rarity;
     inspectCard.dataset.fx = info.fx || 'calm';
+    renderInspectCounts(inventoryEntry);
     if (cardVideoInfo(card)) activateCardAudio(inspectCard);
     resetInspTilt();
     inspectReturnFocus = document.activeElement;
@@ -1801,6 +1806,28 @@
     inspect.classList.add('is-open');
     SFX.tick();
     inspectX.focus({ preventScroll: true });
+  }
+
+  function renderInspectCounts(entry) {
+    if (!entry || !entry.total) {
+      inspectCounts.hidden = true;
+      inspectCounts.replaceChildren();
+      return;
+    }
+    const rows = [{ icon: '🃏', label: 'Normal', count: entry.normal }]
+      .concat((CardMutations.definitions || []).map((m) => ({
+        icon: m.icon,
+        label: m.label,
+        count: entry.copies.get(m.id) || 0,
+        mutation: m.id
+      })));
+    inspectCounts.replaceChildren(...rows.map((row) => {
+      const pill = el('span', `inspect-count${row.mutation ? ' is-mutation' : ''}`);
+      pill.append(el('span', 'inspect-count-icon', row.icon), document.createTextNode(`${row.label} ×${row.count}`));
+      if (row.mutation) pill.dataset.mutation = row.mutation;
+      return pill;
+    }));
+    inspectCounts.hidden = false;
   }
 
   function closeInspect() {
@@ -2113,6 +2140,35 @@
     const map = new Map();
     for (const card of state.collection) map.set(card.id, (map.get(card.id) || 0) + 1);
     return map;
+  }
+
+  /* Regroupe les exemplaires par carte de base pour l'inventaire : une
+     variante Shiny n'est jamais une carte séparée, seulement un exemplaire
+     de plus de la carte d'origine. `copies` conserve les quantités par
+     variante (clé null = carte normale) pour les compteurs d'inspection. */
+  function inventoryCountsFor(ids) {
+    const byBase = new Map();
+    for (const id of ids) {
+      const card = CardMutations.resolve(id);
+      if (!card) continue;
+      const base = CardMutations.resolve(card.baseId || card.id);
+      if (!base) continue;
+      let entry = byBase.get(base.id);
+      if (!entry) {
+        entry = { base, copies: new Map(), normal: 0, shiny: 0, total: 0 };
+        byBase.set(base.id, entry);
+      }
+      const key = card.mutation || null;
+      entry.copies.set(key, (entry.copies.get(key) || 0) + 1);
+      entry.total++;
+      if (key === 'shiny') entry.shiny++;
+      if (key === null) entry.normal++;
+    }
+    return byBase;
+  }
+
+  function inventoryCounts() {
+    return inventoryCountsFor(collectionIds());
   }
 
   function fusableEntries() {
@@ -3080,22 +3136,25 @@
   }
 
   function renderCollection() {
-    const owned = countMap();
+    const inventory = inventoryCounts();
     const total = cardsDatabase.length;
-    const got = new Set(state.collection.map((c) => c.baseId || c.id)).size;
-    collCount.textContent = `${got} / ${total}`;
-    collFill.style.transform = `scaleX(${total ? got / total : 0})`;
+    collCount.textContent = `${inventory.size} / ${total}`;
+    collFill.style.transform = `scaleX(${total ? inventory.size / total : 0})`;
     updateFusionChip();
 
     const frag = document.createDocumentFragment();
     let shown = 0;
-    const variants = CardMutations.owned(collectionIds()).filter((c) => c.mutation);
-    const baseOwned = new Set(state.collection.map((c) => c.baseId || c.id));
-    [...cardsDatabase.filter((c) => owned.has(c.id) || !baseOwned.has(c.id)), ...variants].forEach((card, i) => {
-      const n = owned.get(card.id) || 0;
-      // Filtre de rareté / possédées : jamais de carte verrouillée, pour ne rien dévoiler.
-      if (collFilter !== 'all' && (!n || (collFilter !== 'owned' && card.rarity !== collFilter && card.mutation !== collFilter))) return;
-      shown++;
+    // Une seule tuile par carte du catalogue : les Shiny sont comptés dans
+    // celle de leur carte d'origine, signalés par une petite étoile.
+    cardsDatabase.forEach((card) => {
+      const entry = inventory.get(card.id);
+      const n = entry ? entry.total : 0;
+      if (collFilter === 'shiny' && !(entry && entry.shiny)) return;
+      if (collFilter === 'owned' && !n) return;
+      if (RARITIES[collFilter] && card.rarity !== collFilter) return;
+      // Les filtres ne montrent jamais de carte verrouillée (rien à dévoiler).
+      if (collFilter !== 'all' && !n) return;
+      const i = shown++;
       if (!n) {
         const t = el('div', 'coll-tile is-locked');
         t.style.setProperty('--i', i);
@@ -3111,11 +3170,18 @@
       t.style.setProperty('--i', i);
       t.style.setProperty('--r-color', info.color);
       t.style.setProperty('--r-glow', info.glow);
-      t.setAttribute('aria-label', `${CardMutations.label(card)}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}. Voir en grand.`);
+      t.setAttribute('aria-label', `${card.name}, ${info.label}, ${n > 1 ? `${n} exemplaires` : '1 exemplaire'}${entry.shiny ? ` dont ${entry.shiny} shiny` : ''}. Voir en grand.`);
       t.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
       if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
-      if (fresh.has(card.id)) t.classList.add('is-fresh');
-      on(t, 'click', () => openInspect(card));
+      if (entry.shiny) {
+        const star = el('span', 'coll-shiny-star', '✦');
+        star.setAttribute('aria-hidden', 'true');
+        star.title = `${entry.shiny} shiny`;
+        t.append(star);
+      }
+      const isFresh = [...entry.copies.keys()].some((key) => fresh.has(key ? `${card.id}::${key}` : card.id));
+      if (isFresh) t.classList.add('is-fresh');
+      on(t, 'click', () => openInspect(card, entry));
       frag.append(t);
     });
     collGrid.replaceChildren(frag);
@@ -3123,8 +3189,10 @@
     collEmpty.textContent = collFilter === 'all'
       ? 'Aucune carte dans la base.'
       : collFilter === 'owned'
-        ? 'Rien pour l\'instant. Ouvre un booster pour commencer ta collection.'
-        : 'Aucune carte de cette rareté pour l\'instant.';
+        ? 'Rien pour l’instant. Ouvre un booster pour commencer ta collection.'
+        : collFilter === 'shiny'
+          ? 'Aucune carte shiny pour l’instant.'
+          : 'Aucune carte de cette rareté pour l’instant.';
   }
 
   tabs.forEach((t) => on(t, 'click', () => setTab(t.dataset.tab)));
@@ -4275,10 +4343,11 @@
       }));
     }
     if (friendCards) {
-      const owned = new Map();
-      for (const id of data.collection) owned.set(id, (owned.get(id) || 0) + 1);
-      const ownedCards = CardMutations.owned([...owned.keys()]);
-      friendCards.replaceChildren(...ownedCards.map((card, i) => {
+      // Même regroupement que notre inventaire : un Shiny n'apparaît pas
+      // comme une carte distincte dans la collection d'un ami non plus.
+      const entries = [...inventoryCountsFor(data.collection || []).values()];
+      friendCards.replaceChildren(...entries.map((entry, i) => {
+        const card = entry.base;
         const info = RARITIES[card.rarity] || RARITIES.common;
         const tile = el('div', 'friend-card');
         tile.style.setProperty('--i', i);
@@ -4288,15 +4357,20 @@
            les cartes se superposaient et débordaient de la fiche ami. */
         const frame = el('span', 'friend-card-frame');
         frame.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
-        const n = owned.get(card.id) || 0;
-        if (n > 1) frame.append(el('span', 'coll-pill', `x${n}`));
+        if (entry.total > 1) frame.append(el('span', 'coll-pill', `x${entry.total}`));
+        if (entry.shiny) {
+          const star = el('span', 'coll-shiny-star', '✦');
+          star.setAttribute('aria-hidden', 'true');
+          star.title = `${entry.shiny} shiny`;
+          frame.append(star);
+        }
         tile.append(frame);
         /* Pas de bouton « Échanger » : on ne peut plus demander une carte
            à un ami. Pour obtenir une de ses cartes, il faut l'acheter dans
            son marché (voir « Son marché » ci-dessus). */
         return tile;
       }));
-      if (friendCardsEmpty) friendCardsEmpty.hidden = ownedCards.length > 0;
+      if (friendCardsEmpty) friendCardsEmpty.hidden = entries.length > 0;
     }
   }
 
