@@ -1,7 +1,7 @@
-// Run with NODE_PATH pointing to a local jsdom installation: node tests/social-flow.cjs
-// Vérifie les pages Compte et En ligne : pseudo modifiable, code ami généré,
-// ajout d'ami par code, profil d'ami avec ses cartes, proposition d'échange
-// et d'achat (documents trades/ créés avec les bons champs).
+// Run with NODE_PATH pointing to a local jsdom installation: node tests/market-flow.cjs
+// Vérifie le marché : mise en vente (cartes au prix et au nombre choisis),
+// réservation, annulation, achat chez un ami depuis son profil, cadeaux
+// de pièces et récupération des recettes.
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function makeStore(collection = ['pieds-de-rapace', 'chasseur-royer'], coins = 500) {
+function makeStore(collection = ['pieds-de-rapace', 'chasseur-royer'], coins = 500, packs = { classic: 0, rare: 0 }) {
   return {
     playerSaves: {
       me: {
@@ -17,7 +17,8 @@ function makeStore(collection = ['pieds-de-rapace', 'chasseur-royer'], coins = 5
         firstPack: false,
         collection: [...collection],
         friends: ['friend1'],
-        packsOpened: 3
+        packsOpened: 3,
+        packStock: { classic: packs.classic || 0, rare: packs.rare || 0 }
       }
     },
     playerProfiles: {
@@ -89,8 +90,8 @@ function makeFirestore(store) {
   };
 }
 
-async function boot(collection, coins) {
-  const store = makeStore(collection, coins);
+async function boot(collection, coins, packs) {
+  const store = makeStore(collection, coins, packs);
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url: 'https://refs-cards.test/',
     runScripts: 'outside-only',
@@ -169,7 +170,7 @@ function buttonByText(root, text) {
   assert.equal(store.playerSaves.me.collection.filter(id => id === 'chasseur-royer').length, 2);
   assert.equal(store.marketListings.other.status, 'sold');
   assert.equal(store.marketListings.other.buyerUid, 'me');
-  assert.match(doc.getElementById('friend-listings').textContent, /Aucune carte/);
+  assert.match(doc.getElementById('friend-listings').textContent, /Aucune annonce/);
   // Une annonce affichée puis vendue entre-temps ne débite pas l'acheteur.
   store.marketListings.stale = { sellerUid: 'friend1', cardId: 'pieds-de-rapace', price: 20, buyerUid: '', status: 'open' };
   doc.getElementById('market-refresh').click(); await wait(40);
@@ -319,4 +320,66 @@ function buttonByText(root, text) {
   assert.match(doc2.getElementById('market-message').textContent, /pas assez/);
 
   w2.close(); console.log('PASS marché : choix de la quantité à vendre, retrait partiel/total et achat par quantité');
+
+  /* 3. Marché des packs : le vendeur choisit le type, le nombre et le prix. */
+  const s3 = await boot(['pieds-de-rapace'], 500, { classic: 2, rare: 1 });
+  const w3 = s3.w; const doc3 = s3.doc; const store3 = s3.store;
+  const submit3 = async (form) => { submitForm(w3, form); await wait(10); };
+  const confirm3 = async () => { assert.equal(doc3.getElementById('confirm-sheet').hidden, false); doc3.getElementById('confirm-ok').click(); await wait(150); };
+  doc3.querySelector('[data-tab="online"]').click();
+  await wait(30);
+
+  const typeSel = doc3.getElementById('pack-market-type');
+  const packQty = doc3.getElementById('pack-market-qty');
+  const packPlus = doc3.getElementById('pack-market-qty-plus');
+  const packHint = doc3.getElementById('pack-market-qty-hint');
+  assert.equal(packQty.value, '1');
+  packPlus.click();
+  assert.equal(packQty.value, '2');
+  assert.match(packHint.textContent, /2 sur 2.*restera 0/);
+
+  // Mettre 2 packs classiques en vente : le stock est réservé à la liste.
+  doc3.getElementById('pack-market-price').value = '77';
+  await submit3(doc3.getElementById('pack-market-form'));
+  assert.match(doc3.getElementById('confirm-message').textContent, /2.*Pack Classique.*77/);
+  await confirm3();
+  assert.equal(store3.playerSaves.me.packStock.classic, 0);
+  const packListings = Object.values(store3.marketListings).filter((l) => l.packType === 'classic');
+  assert.equal(packListings.length, 2);
+  assert.ok(packListings.every((l) => l.price === 77 && l.status === 'open'));
+  assert.match(doc3.getElementById('my-listings').textContent, /Pack Classique/);
+  assert.match(doc3.getElementById('my-listings').textContent, /×2/);
+
+  // Retirer l'annonce rend les packs au stock.
+  buttonByText(doc3.getElementById('my-listings'), 'Tout retirer').click();
+  await wait(150);
+  assert.equal(store3.playerSaves.me.packStock.classic, 2);
+  assert.equal(Object.values(store3.marketListings).filter((l) => l.status === 'open').length, 0);
+
+  // Vendre un pack Rare doré gratuit (prix 0) : autorisé comme tout prix entier.
+  typeSel.value = 'rare';
+  typeSel.dispatchEvent(new w3.Event('change', { bubbles: true }));
+  assert.equal(packQty.value, '1', 'changer de type réinitialise la quantité');
+  doc3.getElementById('pack-market-price').value = '0';
+  await submit3(doc3.getElementById('pack-market-form'));
+  await confirm3();
+  assert.equal(store3.playerSaves.me.packStock.rare, 0);
+  assert.ok(Object.values(store3.marketListings).some((l) => l.packType === 'rare' && l.price === 0 && l.status === 'open'));
+
+  // Achat côté ami d'un pack mis en vente : le pack va dans l'inventaire, pas les cartes.
+  store3.marketListings.frare = { sellerUid: 'friend1', packType: 'rare', price: 90, buyerUid: '', status: 'open' };
+  buttonByText(doc3.querySelector('.friend-row'), 'Voir').click(); await wait(60);
+  doc3.getElementById('market-refresh').click(); await wait(50);
+  const friendBox3 = doc3.getElementById('friend-listings');
+  assert.match(friendBox3.textContent, /Pack Rare doré/);
+  assert.match(friendBox3.textContent, /90/);
+  buttonByText(friendBox3, 'Acheter').click();
+  await wait(10);
+  assert.match(doc3.getElementById('confirm-message').textContent, /Pack Rare doré/);
+  await confirm3();
+  assert.equal(store3.playerSaves.me.coins, 410);
+  assert.equal(store3.playerSaves.me.packStock.rare, 1, 'le pack acheté arrive dans l’inventaire');
+  assert.equal(store3.marketListings.frare.status, 'sold');
+  assert.equal(store3.marketListings.frare.buyerUid, 'me');
+  w3.close(); console.log('PASS marché des packs : mise en vente, retrait, prix libre et achat chez l’ami');
 })().catch(error => { console.error(error); process.exitCode = 1; });
