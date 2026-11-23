@@ -9,13 +9,13 @@ const assert = require('node:assert/strict');
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function makeStore() {
+function makeStore(collection = ['pieds-de-rapace', 'chasseur-royer'], coins = 500) {
   return {
     playerSaves: {
       me: {
-        coins: 500,
+        coins,
         firstPack: false,
-        collection: ['pieds-de-rapace', 'chasseur-royer'],
+        collection: [...collection],
         friends: ['friend1'],
         packsOpened: 3
       }
@@ -89,8 +89,8 @@ function makeFirestore(store) {
   };
 }
 
-async function boot() {
-  const store = makeStore();
+async function boot(collection, coins) {
+  const store = makeStore(collection, coins);
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url: 'https://refs-cards.test/',
     runScripts: 'outside-only',
@@ -196,4 +196,127 @@ function buttonByText(root, text) {
   assert.equal(store.coinGifts.incoming.status, 'claimed');
   assert.equal(doc.querySelectorAll('#market-inbox button').length, 0);
   w.close(); console.log('PASS marché : réservation, annulation, cadeau, achat et récupération');
+
+  /* 2. Choix de la quantité à vendre (pas tout d'un coup), retrait partiel/total et achat par quantité. */
+  const s2 = await boot([
+    'chasseur-royer', 'chasseur-royer', 'chasseur-royer', 'chasseur-royer', 'chasseur-royer',
+    'pieds-de-rapace', 'pieds-de-rapace'
+  ], 500);
+  const w2 = s2.w;
+  const doc2 = s2.doc;
+  const store2 = s2.store;
+  const submit2 = async (form) => { submitForm(w2, form); await wait(10); };
+  const confirm2 = async () => { assert.equal(doc2.getElementById('confirm-sheet').hidden, false); doc2.getElementById('confirm-ok').click(); await wait(120); };
+
+  doc2.querySelector('[data-tab="online"]').click();
+  await wait(30);
+
+  const cardSel = doc2.getElementById('market-card');
+  const qtyInput = doc2.getElementById('market-qty');
+  const qtyMinus = doc2.getElementById('market-qty-minus');
+  const qtyPlus = doc2.getElementById('market-qty-plus');
+  const qtyHint = doc2.getElementById('market-qty-hint');
+  const submitBtn = doc2.getElementById('market-submit');
+
+  cardSel.value = 'chasseur-royer';
+  cardSel.dispatchEvent(new w2.Event('change', { bubbles: true }));
+  assert.equal(qtyInput.value, '1', 'quantité par défaut = 1 (pas toute la pile)');
+  assert.equal(qtyMinus.disabled, true);
+  assert.equal(qtyPlus.disabled, false);
+  assert.match(qtyHint.textContent, /1 sur 5.*restera 4/);
+
+  qtyPlus.click();
+  qtyPlus.click();
+  assert.equal(qtyInput.value, '3');
+  assert.match(qtyHint.textContent, /3 sur 5.*restera 2/);
+  assert.match(submitBtn.textContent, /×3/);
+  qtyMinus.click();
+  assert.equal(qtyInput.value, '2');
+  assert.match(qtyHint.textContent, /2 sur 5.*restera 3/);
+
+  // Changer de carte réinitialise la quantité à 1.
+  cardSel.value = 'pieds-de-rapace';
+  cardSel.dispatchEvent(new w2.Event('change', { bubbles: true }));
+  assert.equal(qtyInput.value, '1');
+  assert.match(qtyHint.textContent, /1 sur 2.*restera 1/);
+
+  // Quantité > stock ou <= 0 refusée sans rien vendre.
+  cardSel.value = 'chasseur-royer';
+  cardSel.dispatchEvent(new w2.Event('change', { bubbles: true }));
+  doc2.getElementById('market-price').value = '40';
+  qtyInput.value = '6';
+  await submit2(doc2.getElementById('market-list-form'));
+  assert.equal(doc2.getElementById('confirm-sheet').hidden, true);
+  assert.match(doc2.getElementById('market-message').textContent, /ne possèdes que 5/);
+  qtyInput.value = '0';
+  await submit2(doc2.getElementById('market-list-form'));
+  assert.equal(doc2.getElementById('confirm-sheet').hidden, true);
+  assert.equal(Object.keys(store2.marketListings).length, 0);
+
+  // Vendre exactement 2 exemplaires sur 5 laisse 3 exemplaires dans la collection.
+  qtyInput.value = '2';
+  await submit2(doc2.getElementById('market-list-form'));
+  assert.match(doc2.getElementById('confirm-message').textContent, /2 exemplaires.*restera 3/);
+  await confirm2();
+  assert.equal(store2.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 3, 'il doit rester exactement 3 exemplaires');
+  assert.equal(Object.values(store2.marketListings).filter((l) => l.status === 'open').length, 2, 'exactement 2 annonces créées');
+  assert.equal(qtyInput.value, '1', 'la quantité revient à 1 après la mise en vente');
+  assert.match(qtyHint.textContent, /1 sur 3.*restera 2/);
+
+  // Mes annonces sont regroupées : on peut retirer 1 seul exemplaire sans tout annuler.
+  assert.match(doc2.getElementById('my-listings').textContent, /×2/);
+  buttonByText(doc2.getElementById('my-listings'), 'Retirer 1').click();
+  await wait(120);
+  assert.equal(store2.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 4);
+  assert.equal(Object.values(store2.marketListings).filter((l) => l.status === 'open').length, 1);
+
+  // Mettre 2 autres exemplaires au même prix (total 3 en vente), puis tout retirer.
+  qtyInput.value = '2';
+  await submit2(doc2.getElementById('market-list-form'));
+  await confirm2();
+  assert.equal(store2.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 2);
+  assert.match(doc2.getElementById('my-listings').textContent, /×3/);
+  buttonByText(doc2.getElementById('my-listings'), 'Tout retirer').click();
+  await wait(150);
+  assert.equal(store2.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 5);
+  assert.equal(Object.values(store2.marketListings).filter((l) => l.status === 'open').length, 0);
+
+  // Côté acheteur : choisir combien d'exemplaires acheter sur un lot d'un ami.
+  buttonByText(doc2.querySelector('.friend-row'), 'Voir').click();
+  await wait(50);
+  store2.marketListings.f1 = { sellerUid: 'friend1', cardId: 'chasseur-royer', price: 30, buyerUid: '', status: 'open' };
+  store2.marketListings.f2 = { sellerUid: 'friend1', cardId: 'chasseur-royer', price: 30, buyerUid: '', status: 'open' };
+  store2.marketListings.f3 = { sellerUid: 'friend1', cardId: 'chasseur-royer', price: 30, buyerUid: '', status: 'open' };
+  doc2.getElementById('market-refresh').click();
+  await wait(50);
+  const friendBox = doc2.getElementById('friend-listings');
+  assert.match(friendBox.textContent, /×3 dispo/);
+  const buyQty = friendBox.querySelector('.market-row-qty');
+  assert.equal(buyQty.value, '1');
+  friendBox.querySelectorAll('.market-row-btn')[1].click(); // +
+  assert.equal(buyQty.value, '2');
+  buttonByText(friendBox, 'Acheter').click();
+  await wait(10);
+  assert.match(doc2.getElementById('confirm-message').textContent, /2 exemplaires.*60/);
+  await confirm2();
+  assert.equal(store2.playerSaves.me.coins, 440);
+  assert.equal(store2.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 7);
+  assert.equal([store2.marketListings.f1, store2.marketListings.f2, store2.marketListings.f3].filter((l) => l.status === 'open').length, 1);
+
+  // Solde insuffisant pour le lot demandé : aucun achat partiel.
+  store2.marketListings.exp1 = { sellerUid: 'friend1', cardId: 'pieds-de-rapace', price: 300, buyerUid: '', status: 'open' };
+  store2.marketListings.exp2 = { sellerUid: 'friend1', cardId: 'pieds-de-rapace', price: 300, buyerUid: '', status: 'open' };
+  doc2.getElementById('market-refresh').click();
+  await wait(50);
+  const expRow = [...friendBox.querySelectorAll('.trade-row')].find((r) => r.textContent.includes('300'));
+  expRow.querySelector('.market-row-qty').value = '2';
+  buttonByText(expRow, 'Acheter').click();
+  await wait(10);
+  await confirm2();
+  assert.equal(store2.playerSaves.me.coins, 440, 'aucun débit si le solde ne couvre pas la quantité choisie');
+  assert.equal(store2.marketListings.exp1.status, 'open');
+  assert.equal(store2.marketListings.exp2.status, 'open');
+  assert.match(doc2.getElementById('market-message').textContent, /pas assez/);
+
+  w2.close(); console.log('PASS marché : choix de la quantité à vendre, retrait partiel/total et achat par quantité');
 })().catch(error => { console.error(error); process.exitCode = 1; });
