@@ -273,10 +273,8 @@
     freeUsed: 0,
     packsOpened: 0,
     /* Compteurs alimentant les quêtes et les succès (cumuls, persistés).
-       Ils ne comptent que l'activité de la session la plus longue : le
-       joueur qui n'a pas encore de quête débloquée part de 0, et le baseline
-       (cf. questState) fige les valeurs au déploiement du système pour que
-       les quêtes restent à faire. */
+       Ils comptent toute l'activité du compte, y compris celle d'avant
+       l'arrivée des quêtes : rien n'est remis à zéro. */
     fusions: 0,
     packsBought: 0,
     freePacks: 0,
@@ -287,15 +285,14 @@
 
   /* Progression des quêtes / succès / niveau / notifications.
      - completed : ids des quêtes RÉCLAMÉES, dans l'ordre (séquentiel).
-     - baseline : valeurs de référence des métriques au déploiement du
-       système (une ancienne sauvegarde n'en a pas : on la fige alors sur les
-       compteurs actuels pour ne pas offrir des quêtes déjà faites).
      - xp : XP cumulée ; le niveau en est dérivé (RefsQuests.levelFromXp).
      - achievements : ids des succès débloqués.
-     - notifications : liste (plus récente en tête), lues ou non. */
+     - notifications : liste (plus récente en tête), lues ou non.
+     Les objectifs se mesurent à VIE (valeur absolue) : un joueur qui avait
+     déjà 5 cartes différentes avant les quêtes peut réclamer « Petite
+     collection » directement (cf. RefsQuests.questProgress). */
   const questState = {
     completed: [],
-    baseline: null,
     xp: 0,
     achievements: [],
     notifications: []
@@ -2661,14 +2658,10 @@
         read: Boolean(n.read)
       }))
       .slice(0, QUEST_NOTIFICATIONS_MAX);
-    questState.baseline = (d && d.questBaseline && typeof d.questBaseline === 'object')
-      ? normalizeBaseline(d.questBaseline)
-      : null;
+    /* Le champ `questBaseline` des anciennes sauvegardes est simplement
+       ignoré : les quêtes se mesurent désormais à vie (valeur absolue), donc
+       ce que le joueur avait déjà accompli compte dès maintenant. */
     questReadyNotified = false;
-    /* Figer le baseline à la première venue (joueur déjà avancé) : les
-       quêtes comptent alors depuis le déploiement, pas depuis le début du
-       compte. Pour un nouveau joueur, tout est à 0 → quêtes à faire. */
-    initQuestBaselineIfNeeded();
     /* Inventaire : les anciennes sauvegardes n'ont pas packStock/freeDate/
        freeUsed (défauts 0). Le premier pack offert (firstPack) devient
        1 pack classique en inventaire, une seule fois. */
@@ -2733,7 +2726,6 @@
         marketBuys: Math.max(0, Number(state.marketBuys) || 0),
         xp: Math.max(0, Math.floor(Number(questState.xp) || 0)),
         quests: questState.completed.slice(),
-        questBaseline: questState.baseline || {},
         achievements: questState.achievements.slice(),
         notifications: questState.notifications.slice(0, QUEST_NOTIFICATIONS_MAX),
         updatedAt: serverTimestamp()
@@ -2820,7 +2812,6 @@
     questState.achievements = [];
     questState.xp = 0;
     questState.notifications = [];
-    questState.baseline = null;
     questReadyNotified = false;
     notifSalesKnown = null;
     notifSalesSnapshot = false;
@@ -5204,17 +5195,12 @@
      demandé). Les succès sont libres : ils se débloquent dès que leur
      condition est remplie, y compris rétroactivement. Les récompenses de
      quêtes rapportent pièces + XP ; les succès rapportent de l'XP. L'XP fait
-     monter le niveau, qui est une progression distincte des pièces. */
+     monter le niveau, qui est une progression distincte des pièces.
 
-  function normalizeBaseline(raw) {
-    const out = {};
-    if (!raw || typeof raw !== 'object') return out;
-    (Quests.METRICS || []).forEach((metric) => {
-      const value = Math.floor(Number(raw[metric]));
-      if (Number.isFinite(value) && value > 0) out[metric] = value;
-    });
-    return out;
-  }
+     Les quêtes comme les succès mesurent des valeurs À VIE : les compteurs
+     ne repartent jamais de zéro, donc ce qu'un joueur a fait avant l'arrivée
+     des quêtes (ouvrir des boosters, collectionner, ajouter des amis…)
+     valide immédiatement les objectifs correspondants. */
 
   /* Niveau courant, dérivé de l'XP cumulée. */
   function levelInfo() {
@@ -5259,25 +5245,6 @@
     };
   }
 
-  /* Baseline = valeurs figées au déploiement du système. Sans lui, un joueur
-     qui a déjà beaucoup joué retrouverait ses quêtes déjà accomplies. */
-  function computeBaseline() {
-    const ctx = questCtx();
-    const out = {};
-    (Quests.METRICS || []).forEach((metric) => {
-      if (ctx[metric] > 0) out[metric] = ctx[metric];
-    });
-    return out;
-  }
-
-  function initQuestBaselineIfNeeded() {
-    if (!Quests.QUESTS.length) return;
-    /* Une sauvegarde sans baseline (joueur déjà avancé avant le système) le
-       fige sur ses compteurs actuels ; une fois persisté, il ne bouge plus
-       (sinon un compteur grimpant « referait » la progression à zéro). */
-    if (!questState.baseline) questState.baseline = computeBaseline();
-  }
-
   /* Quête à faire : la première pas encore réclamée (ordre strict). */
   function activeQuest() {
     if (!Quests.QUESTS.length) return null;
@@ -5291,7 +5258,7 @@
       updateQuestBadges();
       return;
     }
-    const progress = Quests.questProgress(quest, questCtx(), questState.baseline);
+    const progress = Quests.questProgress(quest, questCtx());
     if (progress.done && !questReadyNotified) {
       questReadyNotified = true;
       pushNotification('quest', 'Quête accomplie',
@@ -5363,7 +5330,7 @@
     const quest = activeQuest();
     if (!quest) return;
     const reward = quest.reward || { coins: 0, xp: 0 };
-    const progress = Quests.questProgress(quest, questCtx(), questState.baseline);
+    const progress = Quests.questProgress(quest, questCtx());
     if (!progress.done) {
       showToast('Objectif pas encore atteint : termine d’abord cette quête.');
       return;
@@ -5415,9 +5382,14 @@
     notifBadge.textContent = count > 99 ? '99+' : String(count);
   }
 
+  /* Badge de l'onglet Quêtes : allumé dès que la quête active est accomplie
+     et attend sa récompense. On recalcule la condition (et on ne se fie pas
+     au seul drapeau de notification) pour que la pastille reste juste même
+     quand une quête déjà valide se débloque juste après une réclamation. */
   function updateQuestBadges() {
     if (tabBadgeQuests) {
-      const ready = Boolean(Quests.QUESTS.length) && questReadyNotified;
+      const quest = activeQuest();
+      const ready = Boolean(quest) && Quests.questProgress(quest, questCtx()).done;
       tabBadgeQuests.hidden = !ready;
     }
     updateNotifBadge();
@@ -5487,11 +5459,13 @@
     }
     const doneCount = questState.completed.length;
     if (questsCount) {
+      const quest = activeQuest();
+      const ready = Boolean(quest) && Quests.questProgress(quest, questCtx()).done;
       questsCount.textContent = !Quests.QUESTS.length
         ? 'Quêtes indisponibles'
         : doneCount >= Quests.QUESTS.length
           ? `Toutes les quêtes sont terminées (${Quests.QUESTS.length} / ${Quests.QUESTS.length})`
-          : `Quête ${doneCount + 1} / ${Quests.QUESTS.length}`;
+          : `Quête ${doneCount + 1} / ${Quests.QUESTS.length}${ready ? ' · récompense prête' : ''}`;
     }
     if (achCount) achCount.textContent = `${questState.achievements.length} / ${Quests.ACHIEVEMENTS.length}`;
     renderQuestPanel();
@@ -5504,7 +5478,7 @@
     const quest = activeQuest();
     if (quest) {
       const reward = quest.reward || { coins: 0, xp: 0 };
-      const progress = Quests.questProgress(quest, questCtx(), questState.baseline);
+      const progress = Quests.questProgress(quest, questCtx());
       const card = el('article', 'quest-card' + (progress.done ? ' is-ready' : ''));
       const kicker = el('p', 'quest-kicker');
       kicker.append(

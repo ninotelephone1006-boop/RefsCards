@@ -10,11 +10,12 @@
      montre que les quêtes terminées et la quête en cours.
    - `ACHIEVEMENTS` : 30 succès, libres (non séquentiels). Ils se débloquent
      automatiquement dès que leur condition est remplie.
-   - Progression : les quêtes sont mesurées sur des compteurs CUMULÉS
-     (boosters ouverts, fusions…). Pour qu'un joueur qui a déjà beaucoup joué
-     ne retrouve pas toutes ses quêtes déjà faites, app.js fige un « baseline »
-     (valeur des compteurs au déploiement du système) et la progression compte
-     depuis cette base. Les succès, eux, restent des accomplissements absolus.
+   - Progression : les quêtes sont mesurées sur des valeurs À VIE (absolues),
+     exactement comme les succès. Le système a été ajouté après coup : tout ce
+     que le joueur a déjà fait avant (boosters ouverts, cartes possédées,
+     amis, ventes, fusions…) compte donc immédiatement. Un objectif déjà
+     atteint est réclamable tout de suite, sans devoir le refaire une seconde
+     fois ; les quêtes suivantes se débloquent une par une, à la réclamation.
    ========================================================================== */
 const RefsQuests = (() => {
   'use strict';
@@ -232,17 +233,17 @@ const RefsQuests = (() => {
     return METRIC_LABELS[metric] || metric;
   }
 
-  /* Progression d'une quête : valeur mesurée MOINS la base figée au
-     déploiement (baseline). `done` = objectif atteint (récompense réclamable). */
-  function questProgress(quest, ctx, baseline) {
-    const raw = metricValue(quest.metric, ctx);
-    const base = metricValue(quest.metric, baseline || {});
+  /* Progression d'une quête : valeur ABSOLUE (à vie), pas de remise à zéro.
+     Les compteurs comptent depuis le début du compte, donc une quête déjà
+     accomplie avant l'arrivée du système est immédiatement réclamable.
+     `done` = objectif atteint (récompense réclamable). */
+  function questProgress(quest, ctx) {
     const target = Math.max(1, Math.floor(Number(quest.target) || 1));
-    const value = Math.max(0, Math.min(raw - base, target));
-    return { value, target, done: raw - base >= target };
+    const value = Math.min(metricValue(quest.metric, ctx), target);
+    return { value, target, done: value >= target };
   }
 
-  /* Progression d'un succès : valeur absolue (pas de baseline). */
+  /* Progression d'un succès : même mesure absolue que les quêtes. */
   function achievementProgress(achievement, ctx) {
     const target = Math.max(1, Math.floor(Number(achievement.target) || 1));
     const value = Math.min(metricValue(achievement.metric, ctx), target);
