@@ -1,8 +1,7 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/quest-flow.cjs
 // Vérifie le système de quêtes / succès / niveau / notifications :
 // - quests.js : 20 quêtes, 30 succès, progression à vie (rétroactive), XP.
-// - intégration : onglet Quêtes, quête active verrouillée tant qu'elle n'est
-//   pas réclamée, récompenses (pièces + XP), déblocage séquentiel, badges,
+// - intégration : onglet Quêtes, cinq quêtes actives, réclamation libre, récompenses (pièces + XP), remplacement automatique, badges,
 //   succès qui se débloquent, panneau de notifications et persistance.
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
@@ -189,7 +188,7 @@ const freshSave = () => ({
     doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
     assert.equal(doc.getElementById('app').dataset.tab, 'quests');
-    assert.equal(doc.getElementById('quests-count').textContent, 'Quête 1 / 20');
+    assert.equal(doc.getElementById('quests-count').textContent, '0 / 20 terminées · 5 quêtes actives');
     assert.equal(doc.getElementById('level-value').textContent, '1');
     assert.equal(doc.getElementById('ach-count').textContent, '0 / 30');
     const claim = doc.querySelector('.quest-claim');
@@ -197,18 +196,18 @@ const freshSave = () => ({
     assert.equal(claim.disabled, true, 'quête 1 pas encore réclamable à 0 booster');
     assert.match(doc.querySelector('.quest-title').textContent, /Premier déchir/);
     assert.equal(doc.querySelectorAll('.quest-done-row').length, 0, 'aucune quête terminée au départ');
-    /* Les quêtes suivantes ne sont pas affichées (verrouillage). */
-    assert.equal(doc.querySelectorAll('.quest-card').length, 1, 'une seule quête visible : la suivante est verrouillée');
+    /* Les cinq premières quêtes sont affichées simultanément. */
+    assert.equal(doc.querySelectorAll('.quest-card').length, 5, 'cinq quêtes visibles en parallèle');
     /* Succès : 30 tuiles, toutes verrouillées. */
     doc.querySelector('[data-quest-tab="achievements"]').click();
     await wait(20);
     assert.equal(doc.querySelectorAll('.ach-tile').length, 30, '30 succès affichés');
     assert.equal(doc.querySelectorAll('.ach-tile.is-unlocked').length, 0, 'aucun succès débloqué au départ');
     w.close();
-    console.log('PASS page Quêtes : quête 1 active, suivantes verrouillées, 30 succès listés');
+    console.log('PASS page Quêtes : cinq quêtes actives, 30 succès listés');
   }
 
-  /* ---------- 3. Réclamation : pièces, XP, niveau, déblocage séquentiel. ---------- */
+  /* ---------- 3. Réclamation : pièces, XP, niveau, remplacement automatique. ---------- */
   {
     const { w, doc, store } = await boot(freshSave());
     doc.querySelector('[data-tab="quests"]').click();
@@ -232,7 +231,7 @@ const freshSave = () => ({
     await wait(60);
     assert.equal(hook.state.coins, 100, '100 pièces de quête, le niveau ne crédite pas');
     assert.equal(hook.questState.xp, 150, '50 (quête) + 50 (a01) + 50 (a26 niveau 2) = 150 XP');
-    assert.deepEqual(doc.getElementById('quests-count').textContent, 'Quête 2 / 20');
+    assert.deepEqual(doc.getElementById('quests-count').textContent, '1 / 20 terminées · 5 quêtes actives');
     assert.equal(doc.querySelector('.quest-title').textContent, 'Petite collection', 'quête 2 débloquée après la 1re');
     assert.equal(doc.querySelectorAll('.quest-done-row').length, 1, 'quête 1 dans les terminées');
     assert.equal(doc.querySelector('.quest-claim').disabled, true, 'quête 2 pas encore réclamable (0 carte unique)');
@@ -245,7 +244,7 @@ const freshSave = () => ({
     assert.equal(doc.querySelector('.quest-claim').disabled, true, '4 cartes uniques : toujours verrouillée');
     assert.match(doc.querySelector('.quest-progress-top').textContent, /4 \/ 5/);
     w.close();
-    console.log('PASS réclamation : pièces, XP, niveau 2, déblocage séquentiel, verrouillage');
+    console.log('PASS réclamation : pièces, XP, niveau 2, remplacement automatique, verrouillage');
   }
 
   /* ---------- 4. Joueur existant : quêtes ET succès rétroactifs. ---------- */
@@ -278,7 +277,7 @@ const freshSave = () => ({
        récompense disponible tout de suite. */
     assert.equal(doc.querySelector('.quest-claim').disabled, false, 'quête 1 rétroactive : réclamable sans rien refaire');
     assert.ok(doc.querySelector('.quest-card').classList.contains('is-ready'), 'carte marquée « prête »');
-    assert.match(doc.getElementById('quests-count').textContent, /Quête 1 \/ 20 · récompense prête/);
+    assert.match(doc.getElementById('quests-count').textContent, /0 \/ 20 terminées · 5 quêtes actives · récompense prête/);
     assert.equal(doc.getElementById('tab-badge-quests').hidden, false, 'badge de l’onglet allumé');
 
     /* Réclamation : +100 🪙, puis la quête 2 « 5 cartes différentes » est
@@ -301,7 +300,7 @@ const freshSave = () => ({
        elle qui s’affiche, avec un objectif à réaliser. */
     assert.equal(doc.querySelector('.quest-title').textContent, 'Le gratuit d’abord');
     assert.equal(doc.querySelector('.quest-claim').disabled, true, 'on s’arrête sur la première quête non accomplie');
-    assert.equal(doc.getElementById('tab-badge-quests').hidden, true, 'plus de récompense en attente');
+    assert.equal(doc.getElementById('tab-badge-quests').hidden, false, 'une autre quête active est prête malgré la première incomplète');
 
     /* Persistance : le champ `questBaseline` n’est plus écrit (les anciennes
        sauvegardes qui en ont un restent lisibles, il est simplement ignoré). */
@@ -401,11 +400,60 @@ const freshSave = () => ({
     assert.equal(hook2.questState.baseline, undefined, 'aucun baseline à restaurer');
     second.doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
-    assert.equal(second.doc.getElementById('quests-count').textContent, 'Quête 2 / 20', 'on reprend à la quête 2');
+    assert.equal(second.doc.getElementById('quests-count').textContent, '1 / 20 terminées · 5 quêtes actives', 'on reprend à la quête 2');
     assert.equal(second.doc.querySelector('.quest-title').textContent, 'Petite collection', 'pas de retour en arrière');
     assert.ok(hook2.questState.notifications.length >= 1, 'notifications rechargées');
     second.w.close();
     console.log('PASS rechargement : quêtes, XP et notifications restaurés');
+  }
+
+  /* Réclamation hors ordre, remplacement, anti-double gain et rechargement. */
+  {
+    const { w, doc, store } = await boot(freshSave());
+    doc.querySelector('[data-tab="quests"]').click();
+    const hook = w.__quest;
+    hook.setFreePacks(1);
+    hook.track();
+    const cards = () => Array.from(doc.querySelectorAll('.quest-card'), (c) => c.dataset.questId);
+    assert.deepEqual(cards(), ['q01', 'q02', 'q03', 'q04', 'q05']);
+    assert.equal(doc.querySelector('[data-quest-id="q01"] .quest-claim').disabled, true);
+    assert.equal(doc.querySelector('[data-quest-id="q03"] .quest-claim').disabled, false);
+    assert.equal(doc.getElementById('tab-badge-quests').hidden, false);
+    const notices = hook.questState.notifications.filter((n) => n.title === 'Quête accomplie').length;
+    hook.track();
+    assert.equal(hook.questState.notifications.filter((n) => n.title === 'Quête accomplie').length, notices);
+    const staleButton = doc.querySelector('[data-quest-id="q03"] .quest-claim');
+    staleButton.click();
+    assert.deepEqual(cards(), ['q01', 'q02', 'q04', 'q05', 'q06']);
+    assert.ok(doc.querySelector('[data-quest-id="q06"]').classList.contains('is-new'));
+    const coins = hook.state.coins;
+    const xp = hook.questState.xp;
+    staleButton.click();
+    hook.claim('q20'); // hors fenêtre, même si un appel contourne l'UI
+    assert.equal(hook.state.coins, coins);
+    assert.equal(hook.questState.xp, xp);
+    await wait(400);
+    assert.deepEqual(Array.from(store.playerSaves.me.quests), ['q03']);
+    const second = await boot(JSON.parse(JSON.stringify(store.playerSaves.me)));
+    assert.deepEqual(Array.from(second.doc.querySelectorAll('.quest-card'), (c) => c.dataset.questId), cards());
+    second.w.close();
+    w.close();
+    console.log('PASS cinq quêtes : choix hors ordre, pop, notifications uniques, anti-double gain, sauvegarde');
+  }
+
+  /* Fin de liste : moins de cinq actives, puis écran terminé. */
+  {
+    const save = freshSave();
+    save.quests = Array.from({ length: 18 }, (_, i) => `q${String(i + 1).padStart(2, '0')}`);
+    const { w, doc } = await boot(save);
+    assert.equal(doc.querySelectorAll('.quest-card').length, 2);
+    w.close();
+    save.quests.push('q19', 'q20');
+    const last = await boot(save);
+    assert.equal(last.doc.querySelectorAll('.quest-card').length, 0);
+    assert.ok(last.doc.querySelector('.quest-all-done'));
+    assert.equal(last.doc.getElementById('tab-badge-quests').hidden, true);
+    last.w.close();
   }
 
   console.log('PASS quest flow (quêtes, succès, niveaux, notifications)');

@@ -4,10 +4,14 @@
    Chargement : script classique avant app.js (index.html). Expose l'objet
    global `RefsQuests` lu par app.js ; les tests jsdom le chargent aussi.
 
-   - `QUESTS` : 20 quêtes jouées DANS L'ORDRE. Chaque quête pose un objectif
-     (`metric` + `target`) et une récompense (`coins`, `xp`). Tant qu'une
-     quête n'est pas réclamée, la suivante reste verrouillée : app.js ne
-     montre que les quêtes terminées et la quête en cours.
+   - `QUESTS` : 20 quêtes jouées 5 PAR 5. Chaque quête pose un objectif
+     (`metric` + `target`) et une récompense (`coins`, `xp`). app.js affiche
+     en même temps les 5 premières quêtes pas encore réclamées : le joueur
+     choisit l'ordre dans lequel il les fait (et les réclame dans n'importe
+     quel ordre). Dès qu'une quête est réclamée, la suivante « pop » pour
+     prendre sa place, de sorte qu'il y a toujours 5 quêtes en cours
+     (jusqu'à épuisement des 20). Les quêtes au-delà de la fenêtre restent
+     invisibles tant qu'elles ne sont pas entrées dans les 5.
    - `ACHIEVEMENTS` : 30 succès, libres (non séquentiels). Ils se débloquent
      automatiquement dès que leur condition est remplie.
    - Progression : les quêtes sont mesurées sur des valeurs À VIE (absolues),
@@ -62,10 +66,16 @@ const RefsQuests = (() => {
     coins: 'pièce(s) en poche'
   };
 
+  /* Nombre de quêtes visibles / faisables en même temps. Quand l'une des 5
+     est réclamée, la suivante de la liste pop pour la remplacer. */
+  const QUEST_WINDOW = 5;
+
   /* ------------------------------------------------------------- les 20 quêtes
      Ordre croissant de difficulté : les premières se bouclent en quelques
      minutes, les dernières demandent une vraie collection (et donc de
-     fusionner, vendre, ouvrir beaucoup de boosters). */
+     fusionner, vendre, ouvrir beaucoup de boosters). L'ordre ne bloque plus
+     : les 5 premières non réclamées sont actives en parallèle, dans n'importe
+     quel ordre de réclamation. */
   const QUESTS = [
     {
       id: 'q01', icon: '🎯', title: 'Premier déchir',
@@ -243,6 +253,22 @@ const RefsQuests = (() => {
     return { value, target, done: value >= target };
   }
 
+  /* Fenêtre de quêtes actives : les `windowSize` premières quêtes (dans
+     l'ordre de QUESTS) dont l'id n'est pas dans `completedIds`. Les quêtes
+     réclamées hors d'ordre sont simplement sautées : la suivante pop pour
+     garder la fenêtre pleine. Fonction pure (testable sans DOM). */
+  function activeQuests(completedIds, quests, windowSize) {
+    const done = new Set(Array.isArray(completedIds) ? completedIds : []);
+    const list = Array.isArray(quests) ? quests : QUESTS;
+    const size = Math.max(1, Math.floor(Number(windowSize) || QUEST_WINDOW));
+    const active = [];
+    for (const quest of list) {
+      if (active.length >= size) break;
+      if (quest && !done.has(quest.id)) active.push(quest);
+    }
+    return active;
+  }
+
   /* Progression d'un succès : même mesure absolue que les quêtes. */
   function achievementProgress(achievement, ctx) {
     const target = Math.max(1, Math.floor(Number(achievement.target) || 1));
@@ -254,6 +280,8 @@ const RefsQuests = (() => {
     METRICS,
     METRIC_LABELS,
     QUESTS,
+    QUEST_WINDOW,
+    activeQuests,
     ACHIEVEMENTS,
     xpForLevel,
     levelFromXp,

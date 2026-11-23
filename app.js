@@ -283,7 +283,8 @@
   };
 
   /* Progression des quêtes / succès / niveau / notifications.
-     - completed : ids des quêtes RÉCLAMÉES, dans l'ordre (séquentiel).
+     - completed : ids des quêtes RÉCLAMÉES (ordre de réclamation libre :
+       les quêtes se font 5 par 5, dans n'importe quel ordre).
      - xp : XP cumulée ; le niveau en est dérivé (RefsQuests.levelFromXp).
      - achievements : ids des succès débloqués.
      - notifications : liste (plus récente en tête), lues ou non.
@@ -296,7 +297,9 @@
     achievements: [],
     notifications: []
   };
-  let questReadyNotified = false; // quête active accomplie : toast déjà montré
+  const questReadyNotifiedIds = new Set(); // quêtes actives déjà annoncées « prêtes »
+  let questSeenInitialized = false;        // 1er rendu : pas d'animation pop
+  const questSeenIds = new Set();          // quêtes déjà affichées (détecte les pops)
   let notifSeq = 0;               // suffixe d'id local, évite les collisions
   let notifSalesKnown = null;     // ids des ventes 'sold' déjà vues (notif)
   let notifSalesSnapshot = false; // premier snapshot marché : pas de toast
@@ -315,6 +318,8 @@
       levelFromXp: () => ({ level: 1, into: 0, needed: 100 }),
       metricValue: () => 0,
       metricLabel: (m) => m,
+      QUEST_WINDOW: 5,
+      activeQuests: () => [],
       questProgress: () => ({ value: 0, target: 1, done: false }),
       achievementProgress: () => ({ value: 0, target: 1, done: false })
     };
@@ -2751,7 +2756,9 @@
     /* Le champ `questBaseline` des anciennes sauvegardes est simplement
        ignoré : les quêtes se mesurent désormais à vie (valeur absolue), donc
        ce que le joueur avait déjà accompli compte dès maintenant. */
-    questReadyNotified = false;
+    questReadyNotifiedIds.clear();
+    questSeenIds.clear();
+    questSeenInitialized = false;
     /* Inventaire : les anciennes sauvegardes n'ont pas packStock/freeDate/
        freeUsed (défauts 0). Le premier pack offert (firstPack) devient
        1 pack classique en inventaire, une seule fois. */
@@ -2904,7 +2911,9 @@
     questState.achievements = [];
     questState.xp = 0;
     questState.notifications = [];
-    questReadyNotified = false;
+    questReadyNotifiedIds.clear();
+    questSeenIds.clear();
+    questSeenInitialized = false;
     notifSalesKnown = null;
     notifSalesSnapshot = false;
     state.fusions = 0;
@@ -5591,12 +5600,10 @@
   on(inspectCard, 'pointercancel', resetInspTilt);
 
   /* ================================================== QUÊTES · SUCCÈS · NIVEAU
-     Les quêtes se jouent DANS l'ordre de QUESTS : tant que la quête active
-     n'est pas réclamée, la suivante reste verrouillée (et invisible, comme
-     demandé). Les succès sont libres : ils se débloquent dès que leur
-     condition est remplie, y compris rétroactivement. Les récompenses de
-     quêtes rapportent pièces + XP ; les succès rapportent de l'XP. L'XP fait
-     monter le niveau, qui est une progression distincte des pièces.
+     Les 5 premières quêtes non réclamées se jouent en parallèle, dans
+     l'ordre choisi par le joueur. Chaque réclamation libère une place pour
+     la suivante. Les succès sont libres et rétroactifs. Les récompenses de
+     quêtes rapportent pièces + XP ; les succès rapportent de l'XP.
 
      Les quêtes comme les succès mesurent des valeurs À VIE : les compteurs
      ne repartent jamais de zéro, donc ce qu'un joueur a fait avant l'arrivée
@@ -5646,25 +5653,20 @@
     };
   }
 
-  /* Quête à faire : la première pas encore réclamée (ordre strict). */
-  function activeQuest() {
-    if (!Quests.QUESTS.length) return null;
-    const index = questState.completed.length;
-    return index < Quests.QUESTS.length ? Quests.QUESTS[index] : null;
+  /* Les cinq premières quêtes non réclamées, quel que soit l'ordre joué. */
+  function activeQuests() {
+    return Quests.activeQuests(questState.completed);
   }
 
   function checkQuests({ silent = false } = {}) {
-    const quest = activeQuest();
-    if (!quest) {
-      updateQuestBadges();
-      return;
-    }
-    const progress = Quests.questProgress(quest, questCtx());
-    if (progress.done && !questReadyNotified) {
-      questReadyNotified = true;
-      pushNotification('quest', 'Quête accomplie',
-        `« ${quest.title} » est prête : réclame ta récompense dans l’onglet Quêtes.`);
-      if (!silent) showToast(`Quête accomplie : ${quest.title} !`, 4000);
+    const ctx = questCtx();
+    for (const quest of activeQuests()) {
+      if (Quests.questProgress(quest, ctx).done && !questReadyNotifiedIds.has(quest.id)) {
+        questReadyNotifiedIds.add(quest.id);
+        pushNotification('quest', 'Quête accomplie',
+          `« ${quest.title} » est prête : réclame ta récompense dans l’onglet Quêtes.`);
+        if (!silent) showToast(`Quête accomplie : ${quest.title} !`, 4000);
+      }
     }
     updateQuestBadges();
   }
@@ -5725,10 +5727,9 @@
     if (app && app.dataset.tab === 'quests') renderQuests();
   }
 
-  /* Réclamation de la quête active : pièces + XP, puis la suivante se
-     débloque. */
-  function claimActiveQuest() {
-    const quest = activeQuest();
+  /* Réclamation libre parmi les cinq actives : la suivante prend sa place. */
+  function claimActiveQuest(id) {
+    const quest = activeQuests().find((q) => q.id === id);
     if (!quest) return;
     const reward = quest.reward || { coins: 0, xp: 0 };
     const progress = Quests.questProgress(quest, questCtx());
@@ -5738,7 +5739,7 @@
     }
     if (questState.completed.indexOf(quest.id) >= 0) return;
     questState.completed.push(quest.id);
-    questReadyNotified = false;
+    questReadyNotifiedIds.delete(quest.id);
     const coins = Math.max(0, Math.floor(Number(reward.coins) || 0));
     const xp = Math.max(0, Math.floor(Number(reward.xp) || 0));
     if (coins) addCoins(coins);
@@ -5749,6 +5750,7 @@
     showToast(`Quête terminée : ${quest.title} ! +${fmt(coins)} 🪙`, 3800);
     save();
     checkAchievements();
+    checkQuests();
     renderQuests();
     updateQuestBadges();
   }
@@ -5783,14 +5785,14 @@
     notifBadge.textContent = count > 99 ? '99+' : String(count);
   }
 
-  /* Badge de l'onglet Quêtes : allumé dès que la quête active est accomplie
+  /* Badge de l'onglet Quêtes : allumé dès qu’une quête active est accomplie
      et attend sa récompense. On recalcule la condition (et on ne se fie pas
      au seul drapeau de notification) pour que la pastille reste juste même
      quand une quête déjà valide se débloque juste après une réclamation. */
   function updateQuestBadges() {
     if (tabBadgeQuests) {
-      const quest = activeQuest();
-      const ready = Boolean(quest) && Quests.questProgress(quest, questCtx()).done;
+      const ctx = questCtx();
+      const ready = activeQuests().some((quest) => Quests.questProgress(quest, ctx).done);
       tabBadgeQuests.hidden = !ready;
     }
     updateNotifBadge();
@@ -5860,13 +5862,13 @@
     }
     const doneCount = questState.completed.length;
     if (questsCount) {
-      const quest = activeQuest();
-      const ready = Boolean(quest) && Quests.questProgress(quest, questCtx()).done;
+      const ctx = questCtx();
+      const ready = activeQuests().some((quest) => Quests.questProgress(quest, ctx).done);
       questsCount.textContent = !Quests.QUESTS.length
         ? 'Quêtes indisponibles'
         : doneCount >= Quests.QUESTS.length
           ? `Toutes les quêtes sont terminées (${Quests.QUESTS.length} / ${Quests.QUESTS.length})`
-          : `Quête ${doneCount + 1} / ${Quests.QUESTS.length}${ready ? ' · récompense prête' : ''}`;
+          : `${doneCount} / ${Quests.QUESTS.length} terminées · ${activeQuests().length} quêtes actives${ready ? ' · récompense prête' : ''}`;
     }
     if (achCount) achCount.textContent = `${questState.achievements.length} / ${Quests.ACHIEVEMENTS.length}`;
     renderQuestPanel();
@@ -5876,15 +5878,19 @@
   function renderQuestPanel() {
     if (!questPanel) return;
     const frag = document.createDocumentFragment();
-    const quest = activeQuest();
-    if (quest) {
+    const active = activeQuests();
+    const ctx = questCtx();
+    for (const quest of active) {
       const reward = quest.reward || { coins: 0, xp: 0 };
-      const progress = Quests.questProgress(quest, questCtx());
+      const progress = Quests.questProgress(quest, ctx);
       const card = el('article', 'quest-card' + (progress.done ? ' is-ready' : ''));
+      card.dataset.questId = quest.id;
+      if (questSeenInitialized && !questSeenIds.has(quest.id)) card.classList.add('is-new');
+      questSeenIds.add(quest.id);
       const kicker = el('p', 'quest-kicker');
       kicker.append(
         el('span', 'quest-icon', quest.icon || '🎯'),
-        document.createTextNode(`QUÊTE ${questState.completed.length + 1} / ${Quests.QUESTS.length}`)
+        document.createTextNode(`QUÊTE ${Quests.QUESTS.indexOf(quest) + 1} / ${Quests.QUESTS.length}`)
       );
       card.append(kicker);
       card.append(el('h3', 'quest-title', quest.title));
@@ -5913,17 +5919,18 @@
       claim.setAttribute('aria-label', progress.done
         ? `Réclamer la récompense de la quête ${quest.title}`
         : `Quête ${quest.title} en cours`);
-      on(claim, 'click', claimActiveQuest);
+      on(claim, 'click', () => claimActiveQuest(quest.id));
       meta.append(rewards, claim);
       card.append(meta);
       frag.append(card);
-    } else if (Quests.QUESTS.length) {
+    }
+    questSeenInitialized = true;
+    if (!active.length && Quests.QUESTS.length) {
       frag.append(el('div', 'quest-all-done',
         '🏆 Toutes les quêtes sont terminées ! Reviens bientôt : la suite arrive avec une nouvelle saison.'));
     }
     /* Quêtes déjà réclamées (de la plus récente à la plus ancienne). Les
-       quêtes suivantes restent volontairement invisibles : elles se
-       débloquent une par une. */
+       quêtes au-delà des cinq actives restent invisibles. */
     const done = questState.completed.slice().reverse();
     if (done.length) {
       frag.append(el('p', 'quest-done-title', `QUÊTES TERMINÉES · ${done.length}`));
