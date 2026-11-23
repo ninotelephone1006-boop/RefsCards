@@ -168,14 +168,26 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   assert.ok(videoPool.every((card) => test.cardVideoInfo(card)), 'toutes les cartes du pool vidéo ont une vidéo');
   for (let i = 0; i < 30; i++) {
     const pack = test.drawPack(false, test.packPool('video'), 'video');
-    assert.equal(pack.length, 3, 'un Pack Vidéo contient 3 cartes');
+    assert.equal(pack.length, 2, 'un Pack Vidéo contient 2 cartes');
     pack.forEach((card) => {
       assert.ok(test.cardVideoInfo(card), `${card.id} doit être une carte vidéo`);
     });
+    assert.equal(
+      new Set(pack.map((card) => card.baseId || card.id)).size,
+      2,
+      'les 2 cartes vidéo sont différentes quand le catalogue le permet'
+    );
   }
-  /* Les autres packs restent complets et fonctionnels. */
+  /* Les autres packs restent complets et fonctionnels, mais ne contiennent
+     jamais de carte vidéo : celles-ci restent exclusives au Pack Vidéo. */
+  ['classic', 'rare', 'legend'].forEach((type) => {
+    assert.ok(
+      test.packPool(type).every((card) => !test.cardVideoInfo(card)),
+      `le pack ${type} ne contient aucune carte vidéo`
+    );
+  });
   assert.equal(test.drawPack(false, test.packPool('classic'), 'classic').length, 5, 'pack classique intact');
-  console.log('PASS tirage Pack Vidéo = 3 cartes vidéo, autres packs intacts');
+  console.log('PASS tirage Pack Vidéo = 2 cartes vidéo, autres packs intacts sans vidéo');
 
   /* 3. Lecteur : fps, son, boucle et variantes respectés par carte. */
   const byId = (id) => vm.runInContext('cardsDatabase', cardsContext).find((card) => card.id === id);
@@ -281,12 +293,12 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   test.selectPackType('video');
   assert.equal(test.state.currentPackType, 'video');
   assert.match(doc.getElementById('pack-img-main').getAttribute('src'), /packetvideo\.png/);
-  assert.equal(doc.querySelectorAll('.gap-cards i').length, 3, '3 cartes dans le booster vidéo');
+  assert.equal(doc.querySelectorAll('.gap-cards i').length, 2, '2 cartes dans le booster vidéo');
 
   /* 5. Ouverture réelle : la pile contient des cartes vidéo jouables. */
   test.showReveal();
   const stackCards = [...doc.querySelectorAll('#stack .card')];
-  assert.equal(stackCards.length, 3, '3 cartes révélées');
+  assert.equal(stackCards.length, 2, '2 cartes révélées');
   stackCards.forEach((node) => {
     assert.ok(node.querySelector('video.cf-video'), 'chaque carte de la pile a un lecteur vidéo');
   });
@@ -300,13 +312,18 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   assert.equal(demo.w.__videoTest.isPackAvailable('video'), true, 'la démo autorise la prévisualisation');
   assert.equal(demo.doc.getElementById('buy-video').disabled, true, 'achat toujours bloqué en démo');
   assert.match(demo.doc.getElementById('pack-img-main').getAttribute('src'), /packetvideo\.png/);
-  assert.equal(demo.doc.querySelectorAll('.gap-cards i').length, 3);
+  assert.equal(demo.doc.querySelectorAll('.gap-cards i').length, 2);
   demo.w.__videoTest.showReveal();
   const demoCards = [...demo.doc.querySelectorAll('#stack .card')];
-  assert.equal(demoCards.length, 3, 'la démo affiche 3 cartes animées');
+  assert.equal(demoCards.length, 2, 'la démo affiche 2 cartes animées');
   demoCards.forEach((node) => {
     assert.ok(node.querySelector('video.cf-video'), 'la démo n’affiche que des cartes vidéo');
   });
+  /* Même en mode démo, les autres packs ne contiennent jamais de carte vidéo. */
+  assert.ok(
+    demo.w.__videoTest.packPool('classic').every((card) => !demo.w.__videoTest.cardVideoInfo(card)),
+    'aucune carte vidéo dans le pack classique en mode démo'
+  );
   demo.w.close();
 
   /* 7. Sans aucune carte vidéo configurée : garde-fou, pas de pile vide. */
