@@ -12,13 +12,16 @@
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
-  const PACK_PRICES = { classic: 500, rare: 1000 };
+  const PACK_PRICES = { classic: 500, rare: 1000, legend: 800 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
   const RARE_BOOST = 1.2; // pack rare : chances d'obtenir une rareté Rare+ multipliées par 1,2 (+20 % réels)
   const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
-  const PACK_IMAGES = { classic: 'assets/packet.png', rare: 'assets/packetrare.png' };
+  const PACK_IMAGES = { classic: 'assets/packet.png', rare: 'assets/packetrare.png', legend: 'assets/packetlegende.png' };
   const CARD_COUNT = 5;
+  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10 };
+  function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
+  function packLabelFr(type) { return type === 'rare' ? 'rare' : type === 'legend' ? 'légende' : 'classique'; }
   const TEAR_THRESHOLD = 0.75;
 
   /* Dix raretés, du plus courant au plus rare. `weight` est la probabilité de
@@ -164,6 +167,10 @@
   const shopInventoryLabel = $('shop-inventory-label');
   const openClassic = $('open-classic');
   const openRare = $('open-rare');
+  const shopStockLegend = $('shop-stock-legend');
+  const qtyLegend = $('qty-legend');
+  const buyLegend = $('buy-legend');
+  const openLegend = $('open-legend');
   const shopMsg = $('shop-msg');
   const tabBadgeShop = $('tab-badge-shop');
   const inventoryView = $('inventory-view');
@@ -172,7 +179,7 @@
   const inventoryEmpty = $('inventory-empty');
   const inventoryGoShop = $('inventory-go-shop');
   const tabBadgeInventory = $('tab-badge-inventory');
-  const shopQty = { classic: 1, rare: 1 };
+  const shopQty = { classic: 1, rare: 1, legend: 1 };
 
   /* ----------------------------------------------------------------- state */
 
@@ -261,7 +268,7 @@
   }
 
   function packTotal() {
-    return (state.packStock.classic || 0) + (state.packStock.rare || 0);
+    return (state.packStock.classic || 0) + (state.packStock.rare || 0) + (state.packStock.legend || 0);
   }
 
   function isDemoMode() {
@@ -303,6 +310,7 @@
     const stockText = (n) => `Tu en as ${n}`;
     if (shopStockClassic) shopStockClassic.textContent = stockText(state.packStock.classic || 0);
     if (shopStockRare) shopStockRare.textContent = stockText(state.packStock.rare || 0);
+    if (shopStockLegend) shopStockLegend.textContent = stockText(state.packStock.legend || 0);
 
     const updateBuy = (type, qtyEl, btn) => {
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
@@ -318,14 +326,15 @@
     };
     updateBuy('classic', qtyClassic, buyClassic);
     updateBuy('rare', qtyRare, buyRare);
+    updateBuy('legend', qtyLegend, buyLegend);
 
     const total = packTotal();
     if (shopInventoryLabel) {
       shopInventoryLabel.textContent = total > 0
-        ? `Inventaire : ${state.packStock.classic || 0} classique${(state.packStock.classic || 0) > 1 ? 's' : ''} · ${state.packStock.rare || 0} rare${(state.packStock.rare || 0) > 1 ? 's' : ''}`
+        ? `Inventaire : ${state.packStock.classic || 0} classique${(state.packStock.classic || 0) > 1 ? 's' : ''} · ${state.packStock.rare || 0} rare${(state.packStock.rare || 0) > 1 ? 's' : ''} · ${state.packStock.legend || 0} légende${(state.packStock.legend || 0) > 1 ? 's' : ''}`
         : 'Inventaire vide — achète ou récupère tes packs gratuits.';
     }
-    [[openClassic, 'classic', 'CLASSIQUE'], [openRare, 'rare', 'RARE']].forEach(([button, type, label]) => {
+    [[openClassic, 'classic', 'CLASSIQUE'], [openRare, 'rare', 'RARE'], [openLegend, 'legend', 'LÉGENDE']].forEach(([button, type, label]) => {
       if (!button) return;
       const count = state.packStock[type] || 0;
       button.textContent = `OUVRIR ${label} · ×${count} →`;
@@ -336,17 +345,18 @@
   function renderPackInventory() {
     const classic = state.packStock.classic || 0;
     const rare = state.packStock.rare || 0;
-    const type = state.currentPackType === 'rare' ? 'rare' : 'classic';
-    const selected = type === 'rare' ? rare : classic;
+    const legend = state.packStock.legend || 0;
+    const type = state.currentPackType === 'legend' ? 'legend' : state.currentPackType === 'rare' ? 'rare' : 'classic';
+    const selected = state.packStock[type] || 0;
     const empty = selected <= 0 && !isDemoMode() && state.phase === 'pack';
     const head = document.querySelector('.pack-head');
-    if (head) head.hidden = classic + rare === 0 && !isDemoMode() && state.phase === 'pack';
-    if (packStockLabel) packStockLabel.textContent = classic + rare === 0 && !isDemoMode() ? 'Aucun booster' : '';
+    if (head) head.hidden = classic + rare + legend === 0 && !isDemoMode() && state.phase === 'pack';
+    if (packStockLabel) packStockLabel.textContent = classic + rare + legend === 0 && !isDemoMode() ? 'Aucun booster' : '';
     if (packArea) packArea.hidden = empty;
     if (packOdds) packOdds.hidden = empty;
     if (pack) {
       pack.classList.toggle('is-empty', empty);
-      pack.setAttribute('aria-label', `Booster ${type === 'rare' ? 'rare' : 'classique'}. Fais glisser vers la droite pour le déchirer.`);
+      pack.setAttribute('aria-label', `Booster ${packLabelFr(type)}. Fais glisser vers la droite pour le déchirer.`);
     }
     renderOdds(type === 'rare');
     renderInventory();
@@ -386,6 +396,14 @@
         img: PACK_IMAGES.rare,
         rare: true,
       },
+      {
+        type: 'legend',
+        count: state.packStock.legend || 0,
+        title: 'Booster Légende',
+        desc: '10 cartes aléatoires · chances standard de rareté.',
+        img: PACK_IMAGES.legend,
+        rare: false,
+      },
     ].filter((item) => item.count > 0);
     const canOpen = state.phase === 'pack' || state.phase === 'done';
     inventoryGrid.innerHTML = items.map((item) => `
@@ -402,13 +420,18 @@
   }
 
   function selectPackType(type) {
-    if (type !== 'classic' && type !== 'rare') return;
+    if (type !== 'classic' && type !== 'rare' && type !== 'legend') return;
     state.currentPackType = type;
     const src = PACK_IMAGES[type];
     if (packImgMain) packImgMain.src = src;
     if (packImgFlap) packImgFlap.src = src;
     SFX.tick();
     renderPackInventory();
+    const gapCards = document.querySelector('.gap-cards');
+    if (gapCards) {
+      const count = cardCountFor(type);
+      gapCards.replaceChildren(...Array.from({ length: count }, () => document.createElement('i')));
+    }
   }
 
   function claimFreePack() {
@@ -435,14 +458,14 @@
     const total = PACK_PRICES[type] * qty;
     if (state.coins < total) {
       SFX.snap();
-      setShopMsg(`Pas assez de pièces : il te manque ${fmt(total - state.coins)} 🪙 pour ${qty} pack${qty > 1 ? 's' : ''} ${type === 'rare' ? 'rare' : 'classique'}${qty > 1 ? 's' : ''}.`);
+      setShopMsg(`Pas assez de pièces : il te manque ${fmt(total - state.coins)} 🪙 pour ${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''}.`);
       return;
     }
     SFX.chaChing();
     addCoins(-total);
     state.packStock[type] = (state.packStock[type] || 0) + qty;
-    setShopMsg(`${qty} pack${qty > 1 ? 's' : ''} ${type === 'rare' ? 'rare' : 'classique'}${qty > 1 ? 's' : ''} ajouté${qty > 1 ? 's' : ''} à ton inventaire !`);
-    showToast(`${qty} pack${qty > 1 ? 's' : ''} ${type === 'rare' ? 'rare' : 'classique'}${qty > 1 ? 's' : ''} dans l'inventaire !`);
+    setShopMsg(`${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''} ajouté${qty > 1 ? 's' : ''} à ton inventaire !`);
+    showToast(`${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''} dans l'inventaire !`);
     save();
     renderShop();
     renderPackInventory();
@@ -498,12 +521,12 @@
       const demoList = demoMode === 'fusion' && typeof fusionDemoDraw !== 'undefined'
         ? fusionDemoDraw
         : (typeof demoDraw !== 'undefined' ? demoDraw : []);
-      demoList.slice(0, CARD_COUNT).forEach((id) => {
+      demoList.slice(0, cardCountFor(state.currentPackType)).forEach((id) => {
         const found = cardsDatabase.find((c) => c.id === id);
         if (found) drawn.push(found);
       });
     }
-    while (drawn.length < CARD_COUNT) {
+    while (drawn.length < cardCountFor(state.currentPackType)) {
       const card = pickCard(null, boosted);
       if (!card) break;
       drawn.push(card);
@@ -968,7 +991,7 @@
        gratuite pour les tests/apercus). Le tirage utilise ensuite le type
        choisi (rare = chances +20 %). */
     if (!isDemoMode()) {
-      const type = state.currentPackType === 'rare' ? 'rare' : 'classic';
+      const type = state.currentPackType === 'legend' ? 'legend' : state.currentPackType === 'rare' ? 'rare' : 'classic';
       if ((state.packStock[type] || 0) > 0) {
         state.packStock[type] -= 1;
         state.packsOpened = (state.packsOpened || 0) + 1;
@@ -1150,7 +1173,7 @@
     btn.style.setProperty('--r-color', info.color);
     btn.style.setProperty('--r-ink', info.ink);
     btn.style.setProperty('--r-glow', info.glow);
-    btn.setAttribute('aria-label', `Carte ${index + 1} sur ${CARD_COUNT}. Retourner la carte.`);
+    btn.setAttribute('aria-label', `Carte ${index + 1} sur ${state.deck.length}. Retourner la carte.`);
 
     const inner = el('span', 'card-inner');
     const tilt = el('span', 'card-tilt');
@@ -1332,7 +1355,7 @@
     if (isNew) { fresh.add(card.id); tabBadge.hidden = false; }
     addCoins(info.reward);
     state.packIndex = state.deck.indexOf(card) + 1;
-    pileLabel.textContent = `CARTE ${state.packIndex} / ${CARD_COUNT} · RÉVÉLÉE`;
+    pileLabel.textContent = `CARTE ${state.packIndex} / ${state.deck.length} · RÉVÉLÉE`;
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
       ? `${info.label.toUpperCase()} ! Touche la carte ou le bouton pour continuer.`
       : 'Touche la carte ou le bouton pour continuer.';
@@ -1424,7 +1447,7 @@
       setRecapCollapsed(false);
       fillSlot(state.loot.length, card);
       state.loot.push(card);
-      recapCount.textContent = `${state.loot.length} / ${CARD_COUNT}`;
+      recapCount.textContent = `${state.loot.length} / ${state.deck.length}`;
       btn.remove();
       remaining.shift();
       advanceStack();
@@ -1501,7 +1524,14 @@
     setRecapCollapsed(false);
     state.loot = [];
     state.packIndex = 0;
-    recapCount.textContent = `0 / ${CARD_COUNT}`;
+    recapCount.textContent = `0 / ${state.deck.length}`;
+    const slotCount = state.deck.length;
+    while (recapSlots.children.length < slotCount) {
+      const slot = document.createElement('span');
+      slot.className = 'slot';
+      recapSlots.append(slot);
+    }
+    while (recapSlots.children.length > slotCount) recapSlots.removeChild(recapSlots.lastElementChild);
     [...recapSlots.children].forEach((s) => {
       s.className = 'slot';
       s.style.removeProperty('--slot-color');
@@ -1516,7 +1546,7 @@
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
-    pileLabel.textContent = `CARTE 1 / ${CARD_COUNT}`;
+    pileLabel.textContent = `CARTE 1 / ${state.deck.length}`;
     buyBtn.hidden = true;
     fusionChip.hidden = true;
     recapMsg.textContent = '';
@@ -1549,7 +1579,8 @@
     current.node.classList.add('is-top', 'is-incoming');
     const incoming = current.node;
     window.setTimeout(() => incoming.classList.remove('is-incoming'), 600);
-    pileLabel.textContent = `CARTE ${state.packIndex + 1 > CARD_COUNT ? CARD_COUNT : state.packIndex + 1} / ${CARD_COUNT}`;
+    const total = state.deck.length;
+    pileLabel.textContent = `CARTE ${Math.min(state.packIndex + 1, total)} / ${total}`;
   }
 
   function updateHintForNext() {
@@ -1560,7 +1591,8 @@
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
     revealKicker.innerHTML = '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
-    pileLabel.textContent = `CARTE ${CARD_COUNT - remaining.length + 1} / ${CARD_COUNT}`;
+    const total = state.deck.length;
+    pileLabel.textContent = `CARTE ${total - remaining.length + 1} / ${total}`;
   }
 
   function finishPack() {
@@ -1569,9 +1601,9 @@
     revealTitle.innerHTML = 'Butin complet<em>.</em>';
     revealSub.textContent = 'Toutes les cartes sont à toi. Ouvre un autre booster ou tente une fusion.';
     revealKicker.innerHTML = '<span>✦</span> BOOSTER TERMINÉ <span>✦</span>';
-    pileLabel.textContent = `${CARD_COUNT} / ${CARD_COUNT} CARTES`;
+    pileLabel.textContent = `${state.deck.length} / ${state.deck.length} CARTES`;
     footRight.textContent = '✳ COLLECTION ENREGISTRÉE';
-    recapCount.textContent = `${state.loot.length} / ${CARD_COUNT}`;
+    recapCount.textContent = `${state.loot.length} / ${state.deck.length}`;
 
     window.setTimeout(() => {
       SFX.coin();
@@ -1642,7 +1674,7 @@
         s.style.removeProperty('--slot-color');
         s.replaceChildren();
       });
-      recapCount.textContent = `0 / ${CARD_COUNT}`;
+      recapCount.textContent = `0 / ${cardCountFor(state.currentPackType)}`;
     }, 420);
 
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
@@ -1650,7 +1682,7 @@
     SFX.deal();
     scheduleSizing(10);
     if (!state.packStock[state.currentPackType] && packTotal() > 0) {
-      selectPackType(state.packStock.classic > 0 ? 'classic' : 'rare');
+      selectPackType(state.packStock.classic > 0 ? 'classic' : state.packStock.rare > 0 ? 'rare' : 'legend');
     }
     renderPackInventory();
     showToast(packTotal() > 0
@@ -2182,7 +2214,8 @@
     const stock = (d && d.packStock) || {};
     state.packStock = {
       classic: Math.max(0, Number(stock.classic) || 0),
-      rare: Math.max(0, Number(stock.rare) || 0)
+      rare: Math.max(0, Number(stock.rare) || 0),
+      legend: Math.max(0, Number(stock.legend) || 0)
     };
     if (state.firstPack) {
       state.packStock.classic += 1;
@@ -2191,7 +2224,9 @@
     state.freeDate = typeof (d && d.freeDate) === 'string' ? d.freeDate : '';
     state.freeUsed = clamp(Number(d && d.freeUsed) || 0, 0, FREE_PER_DAY);
     refreshFreeQuota();
-    state.currentPackType = state.packStock.rare > 0 && state.packStock.classic <= 0 ? 'rare' : 'classic';
+    state.currentPackType = state.packStock.rare > 0 && state.packStock.classic <= 0 ? 'rare'
+      : state.packStock.legend > 0 && state.packStock.classic <= 0 && state.packStock.rare <= 0 ? 'legend'
+      : 'classic';
     state.phase = 'pack';
     state.deck = [];
     state.loot = [];
@@ -2221,7 +2256,8 @@
         packsOpened: state.packsOpened || 0,
         packStock: {
           classic: Math.max(0, Number(state.packStock.classic) || 0),
-          rare: Math.max(0, Number(state.packStock.rare) || 0)
+          rare: Math.max(0, Number(state.packStock.rare) || 0),
+          legend: Math.max(0, Number(state.packStock.legend) || 0)
         },
         freeDate: state.freeDate || todayKey(),
         freeUsed: clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY),
@@ -2304,12 +2340,13 @@
     unsubscribeMarket();
     selectedFriendUid = null;
     rulesHelpShown = false;
-    state.packStock = { classic: 0, rare: 0 };
+    state.packStock = { classic: 0, rare: 0, legend: 0 };
     state.freeDate = '';
     state.freeUsed = 0;
     state.currentPackType = 'classic';
     shopQty.classic = 1;
     shopQty.rare = 1;
+    shopQty.legend = 1;
     renderShop();
     renderPackInventory();
     if (tradesUnsub) {
@@ -2599,6 +2636,7 @@
   on(freeClaim, 'click', claimFreePack);
   on(buyClassic, 'click', () => buyPacks('classic'));
   on(buyRare, 'click', () => buyPacks('rare'));
+  on(buyLegend, 'click', () => buyPacks('legend'));
   function openFromInventory(type) {
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
@@ -2607,6 +2645,7 @@
   }
   on(openClassic, 'click', () => openFromInventory('classic'));
   on(openRare, 'click', () => openFromInventory('rare'));
+  on(openLegend, 'click', () => openFromInventory('legend'));
   on(inventoryGoShop, 'click', () => setTab('shop'));
   if (inventoryGrid) {
     on(inventoryGrid, 'click', (e) => {

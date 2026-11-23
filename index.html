@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-2" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-1" defer></script>
+  <script src="app.js?v=2026.11.24-2" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -131,7 +131,7 @@
               <img class="pack-img" id="pack-img-main" src="assets/packet.png" alt="Booster Refs Cards" draggable="false">
               <div class="pack-gap" aria-hidden="true">
                 <span class="gap-glow"></span>
-                <span class="gap-cards"><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="gap-cards" id="gap-cards"><i></i><i></i><i></i><i></i><i></i></span>
               </div>
               <div class="pack-flap" id="pack-flap" aria-hidden="true">
                 <img class="pack-img" id="pack-img-flap" src="assets/packet.png" alt="" draggable="false">
@@ -251,6 +251,29 @@
                 <button class="shop-buy shop-buy-rare" id="buy-rare" type="button">ACHETER · 1 000 🪙</button>
               </div>
             </article>
+
+            <article class="shop-card" data-pack="legend">
+              <div class="shop-img-wrap">
+                <img class="shop-img" src="assets/packetlegende.png" alt="Pack Légende Refs Cards" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Pack Légende</h3>
+                <p class="shop-desc">10 cartes · chances normales</p>
+                <p class="shop-odds">Valeur moyenne ≈ 788 🪙 par pack</p>
+                <p class="shop-stock" id="shop-stock-legend">Tu en as 0</p>
+                <div class="qty-row" role="group" aria-label="Quantité de packs légendes">
+                  <button class="qty-btn" type="button" data-pack="legend" data-delta="-1" aria-label="Moins">−</button>
+                  <span class="qty-val" id="qty-legend" aria-live="polite">1</span>
+                  <button class="qty-btn" type="button" data-pack="legend" data-delta="1" aria-label="Plus">+</button>
+                  <span class="qty-quick">
+                    <button class="qty-chip" type="button" data-pack="legend" data-qty="1">×1</button>
+                    <button class="qty-chip" type="button" data-pack="legend" data-qty="5">×5</button>
+                    <button class="qty-chip" type="button" data-pack="legend" data-qty="10">×10</button>
+                  </span>
+                </div>
+                <button class="shop-buy" id="buy-legend" type="button">ACHETER · 800 🪙</button>
+              </div>
+            </article>
           </div>
 
           <div class="shop-inventory">
@@ -258,6 +281,7 @@
             <div class="inventory-open-actions">
               <button class="shop-open" id="open-classic" type="button">OUVRIR CLASSIQUE · ×0 →</button>
               <button class="shop-open shop-open-rare" id="open-rare" type="button">OUVRIR RARE · ×0 →</button>
+              <button class="shop-open" id="open-legend" type="button">OUVRIR LÉGENDE · ×0 →</button>
             </div>
             <p class="shop-msg" id="shop-msg" role="status"></p>
           </div>

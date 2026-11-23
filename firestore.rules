@@ -23,13 +23,16 @@ service cloud.firestore {
         && request.resource.data.packsOpened >= 0
         && (!('packStock' in request.resource.data)
             || (request.resource.data.packStock is map
-                && request.resource.data.packStock.keys().hasOnly(['classic', 'rare'])
+                && request.resource.data.packStock.keys().hasOnly(['classic', 'rare', 'legend'])
                 && request.resource.data.packStock.classic is int
                 && request.resource.data.packStock.classic >= 0
                 && request.resource.data.packStock.classic <= 100000
                 && request.resource.data.packStock.rare is int
                 && request.resource.data.packStock.rare >= 0
-                && request.resource.data.packStock.rare <= 100000))
+                && request.resource.data.packStock.rare <= 100000
+                && request.resource.data.packStock.legend is int
+                && request.resource.data.packStock.legend >= 0
+                && request.resource.data.packStock.legend <= 100000))
         && (!('freeDate' in request.resource.data)
             || (request.resource.data.freeDate is string
                 && request.resource.data.freeDate.size() <= 10))
