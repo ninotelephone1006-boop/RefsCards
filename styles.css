@@ -2828,3 +2828,42 @@ body:has(.inspect.is-open) .update-banner{display:none}
   .update-banner{animation:none;opacity:1;transform:translate(-50%,0)}
   .update-banner-reload{transition:none}
 }
+
+
+/* ==========================================================================
+   ANIMATIONS BOOSTÉES
+   ========================================================================== */
+.coll-tile:not(.is-locked){animation:tile-pop .55s cubic-bezier(.2,1.3,.4,1) both;animation-delay:calc(min(var(--i,0),24) * 28ms);
+  transition:transform .25s cubic-bezier(.2,1.4,.4,1),box-shadow .25s}
+.coll-tile:not(.is-locked):hover{transform:translateY(-6px) scale(1.06) rotate(-1deg);box-shadow:0 16px 34px -8px var(--r-glow),0 0 0 1px var(--r-color)}
+.coll-shiny-dot{position:absolute;top:4px;right:4px;z-index:9;font-size:12px;line-height:1;color:#fff0aa;text-shadow:0 0 8px #ffd45e,0 0 14px #ffd45e;animation:shiny-twinkle 1.8s ease-in-out infinite}
+.coll-pill{animation:pill-bump .5s cubic-bezier(.2,1.6,.4,1) both}
+.cf.mutation-shiny{animation:shiny-pulse 2.6s ease-in-out infinite}
+.inspect.is-open .inspect-dialog{animation:insp-spring .55s cubic-bezier(.2,1.4,.35,1) both}
+.insp-count{display:flex;justify-content:center;gap:10px;margin-top:14px;animation:insp-rise .45s cubic-bezier(.2,1.3,.4,1) both}
+.ic-cell{min-width:92px;padding:8px 14px;border-radius:14px;background:#1a1226e6;border:1px solid #ffffff33;text-align:center;color:#fff}
+.ic-cell b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+.ic-cell small{font-size:11px;letter-spacing:.06em;opacity:.85}
+.ic-shiny{border-color:#fff0aa;color:#fff0aa;box-shadow:0 0 18px #f7dd8455;animation:shiny-pulse 2.2s ease-in-out infinite}
+.fusion-dialog.is-fusing{animation:fusion-shake .7s cubic-bezier(.36,.07,.19,.97) both}
+.fusion-dialog.is-fusing .fs-card.result{animation:fusion-burst 1s cubic-bezier(.2,1.5,.4,1) both}
+.fusion-row{transition:transform .2s cubic-bezier(.2,1.4,.4,1),box-shadow .2s}
+.fusion-row:hover{transform:translateX(4px)}
+.fusion-row.is-selected{animation:row-select .4s cubic-bezier(.2,1.5,.4,1)}
+.fs-arrow{animation:arrow-nudge 1.1s ease-in-out infinite}
+.fs-card.result{animation:result-glow 2s ease-in-out infinite}
+
+@keyframes tile-pop{from{opacity:0;transform:translateY(18px) scale(.8) rotate(-3deg)}to{opacity:1;transform:none}}
+@keyframes shiny-twinkle{0%,100%{opacity:.6;transform:scale(.85) rotate(0)}50%{opacity:1;transform:scale(1.25) rotate(25deg)}}
+@keyframes pill-bump{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes shiny-pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18) saturate(1.2)}}
+@keyframes insp-spring{from{opacity:0;transform:scale(.7) translateY(30px) rotateX(18deg)}to{opacity:1;transform:none}}
+@keyframes insp-rise{from{opacity:0;transform:translateY(14px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes fusion-shake{0%,100%{transform:none}15%{transform:translate(-5px,2px) rotate(-.8deg)}30%{transform:translate(6px,-3px) rotate(.8deg)}45%{transform:translate(-4px,3px)}60%{transform:translate(4px,-2px) scale(1.02)}80%{transform:scale(1.015)}}
+@keyframes fusion-burst{0%{transform:scale(.3) rotate(-25deg);filter:brightness(3)}60%{transform:scale(1.35) rotate(6deg);filter:brightness(1.8)}100%{transform:scale(1);filter:none}}
+@keyframes row-select{0%{transform:scale(.96)}60%{transform:scale(1.03)}100%{transform:none}}
+@keyframes arrow-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
+@keyframes result-glow{0%,100%{box-shadow:0 0 10px var(--fs-color,#fff)}50%{box-shadow:0 0 28px var(--fs-color,#fff),0 0 48px var(--fs-color,#fff)}}
+@media (prefers-reduced-motion:reduce){
+  .coll-tile,.coll-shiny-dot,.coll-pill,.cf.mutation-shiny,.insp-count,.ic-shiny,.fusion-dialog.is-fusing,.fusion-dialog.is-fusing .fs-card.result,.fs-arrow,.fs-card.result,.fusion-row.is-selected{animation:none!important}
+}
