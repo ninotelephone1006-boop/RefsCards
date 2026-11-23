@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.23-2">
+  <meta name="app-version" content="2026.11.23-3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.23-2">
+  <link rel="stylesheet" href="styles.css?v=2026.11.23-3">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.23-2" defer></script>
+  <script src="app.js?v=2026.11.23-3" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -45,6 +45,11 @@
       var message = 'Le jeu n’a pas pu démarrer (ancienne version en cache ou scripts bloqués). Recharge la page avec Ctrl+Maj+R, puis réessaie.';
       function warn() {
         if (window.REFS_CARDS_READY) return;
+        // L'écran de chargement ne doit pas rester bloqué : on passe à la page de connexion.
+        var loading = document.getElementById('loading-screen');
+        if (loading) loading.hidden = true;
+        var auth = document.getElementById('auth-screen');
+        if (auth) auth.hidden = false;
         var error = document.getElementById('auth-error');
         if (!error) return;
         error.textContent = message;
@@ -60,7 +65,18 @@
 </head>
 <body>
   <div class="app" id="app" data-tab="pack">
-    <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+    <!-- Écran de chargement : affiché dès l'ouverture de la page, le temps de savoir
+         si une session Google est déjà active. Ensuite : le jeu (connecté) ou la
+         page de connexion (non connecté). Il est masqué par app.js. -->
+    <section class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Chargement de Refs Cards">
+      <div class="loading-inner">
+        <span class="loading-mark" aria-hidden="true">✳</span>
+        <p class="loading-name">REFS<span>CARDS</span></p>
+        <span class="loading-bar" aria-hidden="true"><i></i></span>
+        <p class="loading-text" id="loading-text">Chargement…</p>
+      </div>
+    </section>
+    <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title" hidden>
       <div class="auth-card">
         <a class="brand auth-brand" href="./" aria-label="Refs Cards, accueil">
           <span class="brand-mark">✳</span>

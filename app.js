@@ -187,6 +187,8 @@
   const inspectX = $('inspect-x');
   const inspectBackdrop = $('inspect-backdrop');
   const authScreen = $('auth-screen');
+  const loadingScreen = $('loading-screen');
+  const loadingText = $('loading-text');
   const authError = $('auth-error');
   const googleSignIn = $('google-signin');
   const googleLabel = qs(googleSignIn, '.google-label');
@@ -2711,6 +2713,25 @@
       : '');
   }
 
+  /* Écran de chargement : affiché à l'ouverture de la page jusqu'à ce que
+     Firebase dise si la personne est déjà connectée. Ensuite, soit le jeu
+     (connecté), soit la page de connexion (pas de compte / déconnecté). Pendant
+     ce temps, ni la connexion ni le jeu ne sont visibles : pas de flash. */
+  const LOADING_TIMEOUT = 8000;
+  let loadingTimer = 0;
+  function hideLoading() {
+    window.clearTimeout(loadingTimer);
+    loadingTimer = 0;
+    if (loadingScreen) loadingScreen.hidden = true;
+  }
+  function showLoginPage() {
+    hideLoading();
+    if (authScreen) authScreen.hidden = false;
+  }
+  function setLoadingText(message) {
+    if (loadingText) loadingText.textContent = message || '';
+  }
+
   function applySave(d) {
     state.coins = Math.max(0, Number(d && d.coins) || 0);
     state.firstPack = !d || d.firstPack !== false;
@@ -2867,6 +2888,7 @@
     loadMarket();
     subscribeMarket();
     if (authScreen) authScreen.hidden = true;
+    hideLoading();
     gameRegions.forEach((region) => region.removeAttribute('inert'));
     app.classList.add('is-authenticated');
     setAuthBusy(false);
@@ -2947,7 +2969,7 @@
     }
     if (app) app.classList.remove('is-authenticated');
     gameRegions.forEach((region) => region.setAttribute('inert', ''));
-    if (authScreen) authScreen.hidden = false;
+    showLoginPage();
     setAuthBusy(false);
     resetAuthFeedback();
   }
@@ -3057,6 +3079,7 @@
         ? 'La configuration Firebase est incomplète. Vérifie firebase-config.js (voir la section Firebase du README), puis recharge la page.'
         : 'Les scripts Firebase n’ont pas pu être chargés (hors ligne, bloqueur de publicités ou réseau filtré). Vérifie ta connexion, puis recharge la page.');
       setAuthHint('Sans connexion, ta collection ne peut pas être enregistrée.');
+      showLoginPage(); // pas de vérification possible : on montre directement la connexion
       return;
     }
     try {
@@ -3064,6 +3087,15 @@
       firebaseAuth = firebase.auth();
       cloudDb = firebase.firestore();
       resetAuthFeedback();
+      // Filet de temps : si Firebase ne répond pas, on n'enferme pas la personne
+      // sur l'écran de chargement. La connexion reste utilisable, et le jeu
+      // s'ouvrira tout seul si la session est finalement retrouvée.
+      window.clearTimeout(loadingTimer);
+      loadingTimer = window.setTimeout(() => {
+        if (!loadingScreen || loadingScreen.hidden) return;
+        showLoginPage();
+        setAuthHint('La vérification de ton compte prend plus de temps que prévu. Si tu as déjà un compte, le jeu s’ouvrira dès que la connexion répondra.');
+      }, LOADING_TIMEOUT);
       // Connexion par redirection (repli des navigateurs sans pop-up).
       if (typeof firebaseAuth.getRedirectResult === 'function') {
         firebaseAuth.getRedirectResult().then((result) => {
@@ -3075,9 +3107,11 @@
       firebaseAuth.onAuthStateChanged(async (user) => {
         if (!user) {
           if (currentUser) showAuth();
+          else showLoginPage();
           return;
         }
         currentUser = user;
+        setLoadingText('Chargement de ta collection…');
         setAuthStatus('Chargement de ta collection…');
         try {
           const snapshot = await cloudDb.collection('playerSaves').doc(user.uid).get();
@@ -3095,6 +3129,7 @@
     } catch (error) {
       setAuthError(`Configuration Firebase invalide : ${error.message}`);
       setAuthHint('Vérifie les valeurs de firebase-config.js.');
+      showLoginPage();
     }
   }
 
@@ -6087,6 +6122,7 @@
     } catch (error) {
       console.error('[Refs Cards] initialisation Firebase impossible :', error);
       setAuthError(authErrorMessage(error));
+      showLoginPage();
     }
     // Signale au filet de sécurité de index.html que les écouteurs sont posés.
     window.REFS_CARDS_READY = true;
