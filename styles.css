@@ -2378,6 +2378,8 @@ html,body{background:var(--bg)}
 .pack.is-empty::after{opacity:.25}
 .pack-odds-rare-note{display:block;width:100%;text-align:center;font-size:8px;font-weight:700;letter-spacing:.8px;
   color:#fbbf24;padding-top:2px}
+.pack-odds-video-note{display:block;width:100%;text-align:center;font-size:8px;font-weight:700;letter-spacing:.8px;
+  color:#67e8f9;padding-top:2px}
 
 /* --- Page Shop --- */
 .shop-view{justify-content:flex-start;align-items:stretch}
@@ -2544,4 +2546,167 @@ html,body{background:var(--bg)}
 }
 @media (prefers-reduced-motion: reduce) {
   .cf.mutation-shiny::after { animation: none; }
+}
+
+/* ==========================================================================
+   CARTES VIDÉO & PACK VIDÉO
+   --------------------------------------------------------------------------
+   Le <video> se comporte comme l'image de carte : plein cadre 5:7, sous les
+   surcouches de rareté. L'image reste dessous comme affiche de secours.
+   ========================================================================== */
+.cf-video {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  background: #0b090e;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.cf.has-video .cf-video { opacity: 1; }
+.cf.has-video .cf-img { opacity: 0; transform: none; }
+
+/* Rappel discret des réglages de la carte (fps · son · boucle). */
+.cf-video-tags {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.35em 0.7em 0.3em;
+  border-radius: 99px;
+  border: 1px solid #22d3ee59;
+  background: #083344b8;
+  color: #a5f3fc;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(5px, 2.5cqw, 11px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Bouton son : uniquement sur les cartes vidéo avec `sound: true`. */
+.cf-audio {
+  position: absolute;
+  right: 3.2cqw;
+  bottom: 12.5cqw;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  width: clamp(24px, 11cqw, 46px);
+  height: clamp(24px, 11cqw, 46px);
+  padding: 0;
+  border: 1px solid #ffffff66;
+  border-radius: 50%;
+  background: #0b1224d9;
+  color: #fff;
+  font-size: clamp(11px, 4.6cqw, 20px);
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -4px #000;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.cf-audio:hover { background: #083344; border-color: #22d3ee; }
+.cf-audio[aria-pressed='true'] { border-color: #22d3ee; box-shadow: 0 0 16px -2px #22d3ee99; }
+.cf-mini .cf-audio { display: none; }
+
+/* Boutique : la carte du Pack Vidéo. */
+.shop-card-video {
+  border-color: #22d3ee55;
+  box-shadow: 0 0 34px -12px #22d3ee66;
+}
+.shop-badge-video {
+  background: linear-gradient(100deg, #0e7490, #22d3ee);
+  color: #04121a;
+}
+.shop-video-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #67e8f9;
+  text-transform: uppercase;
+}
+.shop-card-video .shop-img { box-shadow: 0 10px 24px -8px #000, 0 0 22px -4px #22d3ee99; }
+.shop-buy-video {
+  background: linear-gradient(100deg, #0e7490, #7c3aed);
+  box-shadow: 0 8px 24px -8px #22d3eecc;
+}
+.shop-open-video:not(:disabled) { border-color: #22d3ee80; color: #a5f3fc; }
+
+/* Inventaire : la carte du Pack Vidéo. */
+.inventory-card-video {
+  border-color: #22d3ee59;
+  background: linear-gradient(160deg, #082f3fcc, #0f0a1de6);
+}
+.inventory-card-video .inventory-qty-badge {
+  background: #22d3ee2e;
+  border-color: #22d3ee73;
+  color: #cffafe;
+}
+.inventory-card-video .inventory-open-btn {
+  border-color: #22d3ee80;
+  background: linear-gradient(135deg, #0e7490, #7c3aed);
+  color: #ecfeff;
+}
+
+/* Pack annoncé : visible dans le Shop, mais ni achetable ni ouvrable. */
+.shop-card.is-coming-soon {
+  border-style: dashed;
+  border-color: #22d3ee66;
+  background: linear-gradient(155deg, #0b1a28f2, #0f0b14f5);
+}
+.shop-card.is-coming-soon .shop-img {
+  filter: saturate(0.7) brightness(0.82);
+}
+.shop-card.is-coming-soon .qty-row {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.shop-card.is-coming-soon .qty-btn,
+.shop-card.is-coming-soon .qty-chip {
+  cursor: not-allowed;
+}
+.shop-soon-note {
+  margin: 2px 0 0;
+  padding: 7px 10px;
+  border: 1px dashed #22d3ee66;
+  border-radius: 9px;
+  background: #08334466;
+  color: #a5f3fc;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+}
+.shop-buy.is-coming-soon,
+.shop-buy:disabled.is-coming-soon {
+  background: linear-gradient(100deg, #0e7490, #164e63);
+  color: #ecfeff;
+  box-shadow: none;
+  cursor: not-allowed;
+  filter: none;
+  opacity: 1;
+}
+.shop-open.is-coming-soon {
+  border-color: #22d3ee66;
+  color: #a5f3fc;
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+.inventory-card.is-coming-soon {
+  border-style: dashed;
+  border-color: #22d3ee66;
+}
+.inventory-card.is-coming-soon .inventory-open-btn {
+  background: #164e63;
+  color: #cffafe;
+  cursor: not-allowed;
+  opacity: 0.9;
 }

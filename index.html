@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-8">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-9">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-3" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-5" defer></script>
+  <script src="app.js?v=2026.11.24-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -274,6 +274,31 @@
                 <button class="shop-buy" id="buy-legend" type="button">ACHETER · 800 🪙</button>
               </div>
             </article>
+
+            <article class="shop-card shop-card-video is-coming-soon" data-pack="video" aria-label="Pack Vidéo — bientôt disponible, aperçu uniquement">
+              <span class="shop-badge shop-badge-video" aria-hidden="true">BIENTÔT</span>
+              <div class="shop-img-wrap">
+                <img class="shop-img" src="assets/packetvideo.png" alt="Pack Vidéo Refs Cards" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Pack Vidéo <span class="shop-video-tag">▶ aperçu</span></h3>
+                <p class="shop-desc">3 cartes animées · fps, son et boucle réglés carte par carte</p>
+                <p class="shop-soon-note">⏳ Arrivée bientôt — visible, mais pas encore achetable ni ouvrable.</p>
+                <p class="shop-odds">Avant-première : lecteur vidéo, son au clic 🔊</p>
+                <p class="shop-stock" id="shop-stock-video">Bientôt disponible — aperçu uniquement</p>
+                <div class="qty-row" role="group" aria-label="Quantité de packs vidéo">
+                  <button class="qty-btn" type="button" data-pack="video" data-delta="-1" aria-label="Moins" disabled>−</button>
+                  <span class="qty-val" id="qty-video" aria-live="polite">—</span>
+                  <button class="qty-btn" type="button" data-pack="video" data-delta="1" aria-label="Plus" disabled>+</button>
+                  <span class="qty-quick">
+                    <button class="qty-chip" type="button" data-pack="video" data-qty="1" disabled>×1</button>
+                    <button class="qty-chip" type="button" data-pack="video" data-qty="5" disabled>×5</button>
+                    <button class="qty-chip" type="button" data-pack="video" data-qty="10" disabled>×10</button>
+                  </span>
+                </div>
+                <button class="shop-buy shop-buy-video is-coming-soon" id="buy-video" type="button" disabled>BIENTÔT DISPONIBLE</button>
+              </div>
+            </article>
           </div>
 
           <div class="shop-inventory">
@@ -282,6 +307,7 @@
               <button class="shop-open" id="open-classic" type="button">OUVRIR CLASSIQUE · ×0 →</button>
               <button class="shop-open shop-open-rare" id="open-rare" type="button">OUVRIR RARE · ×0 →</button>
               <button class="shop-open" id="open-legend" type="button">OUVRIR LÉGENDE · ×0 →</button>
+              <button class="shop-open shop-open-video is-coming-soon" id="open-video" type="button" disabled>OUVRIR VIDÉO · BIENTÔT</button>
             </div>
             <p class="shop-msg" id="shop-msg" role="status"></p>
           </div>

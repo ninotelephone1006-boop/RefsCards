@@ -23,6 +23,135 @@ const CARTE_DIR = 'assets/Cartes/';
 /* Extensions testées, dans l'ordre, quand `image` est donné sans extension. */
 const CARTE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'avif'];
 
+/* ==========================================================================
+   CARTES VIDÉO (Pack Vidéo)
+   --------------------------------------------------------------------------
+   Une carte peut rester une simple image (rien ne change) OU porter en plus un
+   bloc `video`. Une carte avec `video` valide devient une carte vidéo : elle
+   s'affiche avec un lecteur <video> dans la révélation, le récap, l'inventaire
+   et l'aperçu grand format, tout en gardant sa rareté, sa valeur, ses effets
+   et la fusion.
+
+   Configuration par carte (tout est optionnel sauf une source) :
+
+   video: {
+     src: 'assets/Cartes/videos/ma-video.mp4', // source principale
+     srcByFps: { 24: '...mp4', 60: '...mp4' }, // variantes par fréquence
+     fps: 30 | 24 | 60 | null,                 // null = fréquence native
+     sourceFps: 60,                            // fps du fichier : ajuste la
+                                               // vitesse de lecture (fps/sourceFps)
+     sound: true | false,                      // son activé ?
+     hasAudio: true | false,                   // alias accepté de `sound`
+     loop: true | false,                       // lecture en boucle ?
+     poster: 'assets/Cartes/mon-affiche.jpg',  // image fixe de secours
+     autoplay: true | false,                   // lecture auto (défaut : true)
+     preload: 'metadata' | 'auto' | 'none'
+   }
+
+   Si `src` est un simple nom de fichier (« ma-video »), il est cherché dans
+   assets/Cartes/videos/ avec les extensions .mp4 et .webm. Sans `poster`, la
+   propriété `image` de la carte sert d'affiche fixe.
+   ========================================================================== */
+
+const CARTE_VIDEO_DIR = 'assets/Cartes/videos/';
+const CARTE_VIDEO_EXTENSIONS = ['mp4', 'webm'];
+/* Fréquences proposées dans l'interface ; une autre valeur reste acceptée. */
+const VIDEO_FPS_PRESETS = [24, 30, 60];
+
+/* Normalise le bloc `video` d'une carte. Renvoie null si la carte n'a pas de
+   vidéo exploitable, sinon un objet complet et sûr à lire pour l'affichage. */
+function normalizeVideoConfig(video) {
+  if (!video || typeof video !== 'object' || Array.isArray(video)) return null;
+  const src = typeof video.src === 'string' ? video.src.trim() : '';
+  const srcByFps = {};
+  if (video.srcByFps && typeof video.srcByFps === 'object' && !Array.isArray(video.srcByFps)) {
+    Object.keys(video.srcByFps).forEach((key) => {
+      const fps = Number(key);
+      const value = video.srcByFps[key];
+      if (Number.isFinite(fps) && fps > 0 && typeof value === 'string' && value.trim()) {
+        srcByFps[fps] = value.trim();
+      }
+    });
+  }
+  if (!src && !Object.keys(srcByFps).length) return null;
+
+  const fpsValue = video.fps == null || video.fps === '' ? null : Number(video.fps);
+  const sourceFpsValue = video.sourceFps == null || video.sourceFps === '' ? null : Number(video.sourceFps);
+  const fps = Number.isFinite(fpsValue) && fpsValue > 0 ? fpsValue : null;
+  const sourceFps = Number.isFinite(sourceFpsValue) && sourceFpsValue > 0 ? sourceFpsValue : null;
+  /* `sound` est la clé officielle ; `hasAudio` reste accepté (alias demandé). */
+  const sound = typeof video.sound === 'boolean'
+    ? video.sound
+    : typeof video.hasAudio === 'boolean'
+      ? video.hasAudio
+      : false;
+
+  return {
+    src,
+    srcByFps,
+    poster: typeof video.poster === 'string' ? video.poster.trim() : '',
+    fps,
+    sourceFps,
+    sound,
+    loop: typeof video.loop === 'boolean' ? video.loop : true,
+    autoplay: video.autoplay !== false,
+    preload: typeof video.preload === 'string' ? video.preload : 'metadata'
+  };
+}
+
+/* Raccourci : config normalisée d'une carte, ou null pour une carte image. */
+function cardVideoConfig(card) {
+  return normalizeVideoConfig(card && card.video);
+}
+
+function isVideoCard(card) {
+  return Boolean(cardVideoConfig(card));
+}
+
+/* Chemin complet d'une source vidéo (chemin explicite ou fichier du dossier). */
+function cardVideoPath(value) {
+  const src = String(value || '').trim();
+  if (!src) return '';
+  if (/^([a-z]+:|\/)/i.test(src) || src.includes('/')) return src;
+  return CARTE_VIDEO_DIR + src;
+}
+
+/* Liste ordonnée des sources à essayer pour une carte vidéo :
+   1. la variante `srcByFps` la plus proche de `fps` (correspondance exacte
+      d'abord), 2. la source principale `src`. Les chemins sans extension sont
+      déclinés en .mp4 puis .webm. */
+function cardVideoSources(card) {
+  const config = cardVideoConfig(card);
+  if (!config) return [];
+  const target = config.fps;
+  const variants = Object.keys(config.srcByFps)
+    .map((key) => ({ fps: Number(key), src: config.srcByFps[key] }))
+    .sort((a, b) => {
+      if (target == null) return b.fps - a.fps;
+      return Math.abs(a.fps - target) - Math.abs(b.fps - target);
+    })
+    .map((entry) => entry.src);
+  const raw = [...variants, config.src].filter(Boolean);
+  const expanded = [];
+  raw.forEach((value) => {
+    const path = cardVideoPath(value);
+    if (!path) return;
+    if (/\.[a-z0-9]{2,4}$/i.test(path)) {
+      expanded.push(path);
+    } else {
+      CARTE_VIDEO_EXTENSIONS.forEach((ext) => expanded.push(`${path}.${ext}`));
+    }
+  });
+  return expanded.filter((src, i) => expanded.indexOf(src) === i);
+}
+
+/* Source vidéo « nominale » (celle que le lecteur tentera en premier), utile
+   pour l'aperçu et les tests. */
+function cardVideoSource(card) {
+  const sources = cardVideoSources(card);
+  return sources.length ? sources[0] : '';
+}
+
 const cardsDatabase = [
   {
     id: 'pieds-de-rapace',
@@ -210,8 +339,78 @@ const cardsDatabase = [
     description: 'pas de bourré',
     rarity: 'divine',
     emoji: '🕺',
-    image: 'babaultdancing',
+    image: 'assets/Cartes/babaultdancing.png',
     color: '#bff3ff'
+  },
+
+  /* ------------------------------------------------------------------------
+     CARTES VIDÉO · exclusives au Pack Vidéo
+     ------------------------------------------------------------------------
+     `image` sert d'affiche (poster) et de secours si la vidéo ne charge pas.
+     Chaque carte règle librement fps / sound / loop. */
+  {
+    id: 'babault-dancing-live',
+    name: 'Babault Dancing Live',
+    description: 'La chorégraphie en direct, 24 images par seconde.',
+    rarity: 'divine',
+    emoji: '🕺',
+    image: 'assets/Cartes/babaultdancing.png',
+    color: '#bff3ff',
+    video: {
+      src: 'babault-dancing-live', // → assets/Cartes/videos/babault-dancing-live.mp4
+      fps: 24,
+      sound: false,
+      loop: true
+    }
+  },
+  {
+    id: 'karate-fagar-film',
+    name: 'Karate Fagar : le film',
+    description: 'Ça frappe. Et cette fois, il y a le son.',
+    rarity: 'legendary',
+    emoji: '🎬',
+    image: 'assets/Cartes/karate-fagar.jpg',
+    color: '#f5d979',
+    video: {
+      src: 'karate-fagar-le-film',
+      fps: 30,
+      sound: true, // son activé : bouton 🔊 sur la carte + lecture au clic
+      loop: true
+    }
+  },
+  {
+    id: 'royer-rizz-cam',
+    name: 'Royer Rizz Cam',
+    description: '60 images par seconde de pur charisme.',
+    rarity: 'ultraepic',
+    emoji: '📹',
+    image: 'assets/Cartes/royer-rizz.jpg',
+    color: '#ff8fd1',
+    video: {
+      /* Variantes fournies : le lecteur choisit celle qui correspond au fps
+         demandé par la carte, avec repli sur `src`. */
+      src: 'royer-rizz-cam',
+      srcByFps: { 24: 'royer-rizz-cam-24', 60: 'royer-rizz-cam' },
+      fps: 60,
+      sound: false,
+      loop: true
+    }
+  },
+  {
+    id: 'chasseur-royer-slowmo',
+    name: 'Chasseur Royer au ralenti',
+    description: 'Un tir mythique, étiré à 24 images par seconde.',
+    rarity: 'mythic',
+    emoji: '🎞️',
+    image: 'assets/Cartes/chasseur-royer.jpg',
+    color: '#ffa469',
+    video: {
+      src: 'chasseur-royer-slowmo',
+      fps: 24,        // fréquence cible…
+      sourceFps: 60,  // …du fichier source : lecture ralentie ×0,4
+      sound: false,
+      loop: false      // joue une fois puis s'arrête sur la dernière image
+    }
   }
 ];
 
@@ -224,6 +423,10 @@ const demoDraw = ['chasseur-royer', 'gros-plan-royer', 'kawai-rapace', 'karate-f
    Contient deux paires fusionnables : chasseur-royer (commune) ×2 et
    toilet-call (inhabituelle) ×2, plus une rare pour varier les visuels. */
 const fusionDemoDraw = ['chasseur-royer', 'chasseur-royer', 'toilet-call', 'toilet-call', 'gros-plan-royer'];
+
+/* Tirage de démonstration du Pack Vidéo : ?demo=video (ou le bouton Démo)
+   ouvre directement trois cartes animées, une par réglage fps / son / boucle. */
+const videoDemoDraw = ['babault-dancing-live', 'karate-fagar-film', 'royer-rizz-cam'];
 
 /* Résout les chemins d'image possibles pour une carte : chemin explicite,
    ou nom de fichier sans extension décliné sur les extensions courantes.

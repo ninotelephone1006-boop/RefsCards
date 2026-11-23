@@ -17,7 +17,7 @@ Il faut un projet Firebase partagé par toutes les versions du jeu. Le plan Spar
 
 `npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, le bouton reste cliquable mais explique ce qui manque (voir le dépannage ci-dessous).
 
-Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙** (5 cartes), Pack Rare doré **1 000 🪙** (5 cartes, chances Rare et plus **+20 %**) et Pack Légende **800 🪙** (`assets/packetlegende.png`, 10 cartes, chances standards). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 en classique, ≈ 419 🪙 en rare, ≈ 788 🪙 en légende pour 10 cartes) pour que l'argent reste un défi — à l'ancien prix de 100 🪙, chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait infini. Chaque jour, **3 packs classiques gratuits** sont à récupérer dans le Shop (un par un, se réinitialisent à minuit). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
+Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙** (5 cartes), Pack Rare doré **1 000 🪙** (5 cartes, chances Rare et plus **+20 %**), Pack Légende **800 🪙** (`assets/packetlegende.png`, 10 cartes, chances standards). Le **Pack Vidéo** (`assets/packetvideo.png`, 3 cartes animées, **1 000 🪙** à sa publication) est pour l'instant visible dans le Shop en **avant-première** avec la mention **BIENTÔT** : on peut le voir, mais pas l'acheter ni l'ouvrir. Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 en classique, ≈ 419 🪙 en rare, ≈ 788 🪙 en légende pour 10 cartes, ≈ 803 🪙 en vidéo pour 3 cartes à sa publication) pour que l'argent reste un défi — à l'ancien prix de 100 🪙, chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait infini. Chaque jour, **3 packs classiques gratuits** sont à récupérer dans le Shop (un par un, se réinitialisent à minuit). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
 
 ## Chargement des scripts
 
@@ -61,6 +61,7 @@ node tests/friend-requests.cjs       # demandes d'ami : acceptation/refus, fiche
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
 node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare +20 %
+node tests/video-pack.cjs            # Pack Vidéo : config fps/son/boucle, tirage, lecteur <video>
 node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
 ```
 
@@ -69,10 +70,10 @@ node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouve
 La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**, **En ligne** et **Compte**.
 
 - **Achat direct supprimé** : le bouton « Ouvrir un booster » du récap (et celui de la fusion) renvoie désormais au Shop. Les packs achetés vont dans l'**inventaire** (compteur dans l'onglet Pack) et s'ouvrent depuis là — ouvrir un pack en consomme 1. Sans pack en inventaire, la déchirure est bloquée et un bouton « Aller au Shop » apparaît.
-- **Trois packs** : **Pack Classique** (`assets/packet.png`, **500 🪙**, 5 cartes), **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, 5 cartes, chances Rare et plus **+20 %** relatives, renormalisées — les pourcentages affichés sous le pack suivent le type choisi) et **Pack Légende** (`assets/packetlegende.png`, **800 🪙**, 10 cartes, chances standards). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 classique, ≈ 419 🪙 rare, ≈ 788 🪙 légende pour 10 cartes ; 800 🪙 se situe juste au-dessus) pour éviter l'argent infini de l'ancien prix à 100 🪙.
+- **Trois packs achetables + un pack en avant-première** : **Pack Classique** (`assets/packet.png`, **500 🪙**, 5 cartes), **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, 5 cartes, chances Rare et plus **+20 %** relatives, renormalisées — les pourcentages affichés sous le pack suivent le type choisi), **Pack Légende** (`assets/packetlegende.png`, **800 🪙**, 10 cartes, chances standards) et **Pack Vidéo** (`assets/packetvideo.png`, **1 000 🪙** à la publication, 3 cartes animées). Le Pack Vidéo est affiché dans le Shop avec le badge **BIENTÔT** et un message d'arrivée prochaine : boutons d'achat, de quantité et d'ouverture désactivés. Il n'est ni achetable ni ouvrable, et ses cartes ne sortent pas des autres boosters tant qu'il n'est pas publié. Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 classique, ≈ 419 🪙 rare, ≈ 788 🪙 légende pour 10 cartes, ≈ 803 🪙 vidéo pour 3 cartes ; 800 🪙 se situe juste au-dessus) pour éviter l'argent infini de l'ancien prix à 100 🪙.
 - **Achats multiples** : sélecteur de quantité (1 à 10, raccourcis ×1 / ×5 / ×10) par pack ; le bouton affiche le total et se désactive si le solde est insuffisant.
 - **3 gratuits par jour** : 3 packs classiques à récupérer un par un dans le Shop (bannière 🎁, pastilles de progression, quota `freeDate`/`freeUsed` par jour calendaire local, réinitialisé à minuit, pastille sur l'onglet Shop tant qu'il en reste). Le premier pack offert des nouveaux comptes arrive aussi dans l'inventaire.
-- **Sauvegarde** : `playerSaves/{uid}` gagne `packStock {classic, rare, legend}`, `freeDate` et `freeUsed` (les anciennes sauvegardes sans ces champs démarrent à 0, avec migration du premier pack offert). **Republie `firestore.rules`** pour les autoriser.
+- **Sauvegarde** : `playerSaves/{uid}` gagne `packStock {classic, rare, legend, video}`, `freeDate` et `freeUsed` (les anciennes sauvegardes sans ces champs démarrent à 0, avec migration du premier pack offert). **Republie `firestore.rules`** pour les autoriser.
 
 ## Pages Compte et En ligne (amis, marché, achats)
 
@@ -115,6 +116,7 @@ Tout est synthétisé en direct avec la Web Audio API (aucun fichier audio) : d�
 
 - `?demo=1` : force un tirage de démonstration (aperçu de plusieurs raretés).
 - `?demo=fusion` : pack de démonstration contenant deux paires identiques ; la **demande de fusion** s'ouvre toute seule après les cinq cartes (aucun pack consommé).
+- `?demo=video` : sélectionne le **Pack Vidéo** et ouvre une démo de trois cartes animées (fps 24 / 30 / 60, avec ou sans son, en boucle ou non).
 - Clavier : `Entrée`/`Espace` sur le booster ouvre la déchirure, `→` fait progresser la coupe, `Maj+Entrée` sur une carte révélée l'ouvre en grand, `Échap` ferme l'inspection ou la fusion.
 - Inspection : double-clic (ou double-tap) sur une carte révélée, ou clic sur une vignette du butin, pour l'afficher en grand.
 
@@ -140,6 +142,55 @@ Chaque carte possède un identifiant, un nom, une description, une rareté, un e
 
 **Format d'une carte** : ratio strict **5:7** partout (révélation, miniature du butin, inspection en grand, aperçus de fusion), coins arrondis, image plein cadre en `object-fit: cover`. Le titre est posé en haut sur un dégradé sombre avec un badge de rareté coloré ; la description est posée en bas sur un dégradé progressif ; l'identifiant apparaît en tout petit en bas à droite. Les effets de rareté (bordure, reflet holographique, lueurs, rayons) passent par-dessus ou autour de l'image sans la masquer.
 
+
+### Cartes vidéo (Pack Vidéo)
+
+Une carte reste une carte normale : on ajoute simplement un bloc `video`. Elle conserve donc sa rareté, sa récompense, ses effets, la fusion, la collection et le marché. Le Pack Vidéo ne tire que les cartes qui possèdent un bloc `video` valide. Tant que le pack est en avant-première, ces cartes ne sortent pas non plus des autres boosters (elles restent visibles, verrouillées, dans la collection) ; une fois publié, tout le catalogue redevient tirable normalement. Une carte vidéo peut aussi être **Shiny** : la mutation conserve le lecteur et les réglages `fps` / `sound` / `loop`.
+
+```js
+{
+  id: 'mon-clip',
+  name: 'Mon clip',
+  description: 'Une carte qui bouge.',
+  rarity: 'epic',
+  emoji: '🎬',
+  image: 'assets/Cartes/mon-affiche.jpg', // affiche fixe + secours
+  color: '#b47bff',
+  video: {
+    src: 'mon-clip',                  // → assets/Cartes/videos/mon-clip.mp4
+    fps: 30,                         // 24, 30, 60 ou null (fréquence native)
+    sound: true,                     // false par défaut
+    loop: true                       // true par défaut
+  }
+}
+```
+
+| Clé `video` | Rôle | Défaut |
+| --- | --- | --- |
+| `src` | Source principale. Nom simple → `assets/Cartes/videos/<nom>.mp4` (puis `.webm`) ; un chemin complet est utilisé tel quel. | — |
+| `srcByFps` | Variantes par fréquence, ex. `{ 24: 'clip-24', 60: 'clip-60' }`. Le lecteur prend la variante qui correspond à `fps` (la plus proche sinon). | `{}` |
+| `fps` | Fréquence demandée. Choisit la variante `srcByFps` ; affichée sur la carte. `null` = native. | `null` |
+| `sourceFps` | Fréquence réelle du fichier. Si elle diffère de `fps`, la vitesse de lecture est ajustée (`playbackRate = fps / sourceFps`) : 24 i/s sur un fichier 60 i/s donne un vrai ralenti ×0,4. | `null` |
+| `sound` (ou `hasAudio`) | Active le son. Le lecteur démarre **muet** (politique d'autoplay des navigateurs) puis un bouton 🔊 ou le clic de révélation active l'audio. | `false` |
+| `loop` | Lecture en boucle. `false` laisse la vidéo s'arrêter sur sa dernière image. | `true` |
+| `poster` | Affiche fixe explicite. Sinon `image` sert d'affiche. | `image` |
+| `autoplay` | Lecture automatique (muette) dès que la carte est visible. | `true` |
+| `preload` | `metadata`, `auto` ou `none`, transmis au `<video>`. | `metadata` |
+
+Le lecteur est utilisé partout : révélation, récap miniature, collection, inspection en grand. Les miniatures ne décodent la vidéo que lorsqu'elles sont visibles, et le son ne se cumule jamais : il faut un clic sur la carte ou sur 🔊. Les fichiers d'exemple vivent dans `assets/Cartes/videos/` et les quatre cartes de démonstration dans `cardsDatabase` (`babault-dancing-live`, `karate-fagar-film`, `royer-rizz-cam`, `chasseur-royer-slowmo`).
+
+> **Règles Firestore** : `packStock` accepte maintenant la clé `video`. Republie `firestore.rules` (`firebase deploy --only firestore:rules`) avant de sauvegarder un Pack Vidéo, sinon le cloud refusera l'écriture.
+
+#### Publier le Pack Vidéo quand il sera prêt
+
+L'avant-première est pilotée par un seul drapeau dans `app.js` :
+
+```js
+const PACK_COMING_SOON = { video: true }; // passer à false (ou retirer la clé)
+```
+
+Avec `video: true` : carte visible dans le Shop, badge **BIENTÔT**, prix et quantités désactivés, achat et ouverture bloqués. Avec `video: false` : le Pack Vidéo devient achetable et ouvrable normalement, et ses cartes réintègrent le tirage des autres boosters. `?demo=video` reste disponible même en avant-première pour prévisualiser le pack et le lecteur sans rien débloquer.
+
 ### Les dix raretés
 
 | Clé | Libellé | Tirage | Récompense | Palier d'effets |
@@ -157,7 +208,7 @@ Chaque carte possède un identifiant, un nom, une description, une rareté, un e
 
 Le tirage est pondéré par `weight` dans `RARITIES` (`app.js`) : si une rareté ne contient aucune carte, son poids est simplement ignoré et les autres se partagent le tirage. La fusion remonte la chaîne `next` (une Commune fusionne vers une Inhabituelle, etc.), la Secrète étant au sommet. Les couleurs de cadre, de badge et de lueur viennent aussi de `RARITIES`.
 
-L'image `assets/packet.png` fournie ici est un visuel temporaire créé pour le prototype : remplacez-la par votre propre image en conservant le même chemin.
+L'image `assets/packet.png` fournie ici est un visuel temporaire créé pour le prototype : remplacez-la par votre propre image en conservant le même chemin. Le Pack Vidéo utilise `assets/packetvideo.png` : remplacez ce fichier par votre visuel en gardant le même chemin.
 
 > **Visuels de démonstration** : le dossier `assets/Cartes/` contient pour l'instant des images de substitution aux bonnes dimensions (500 × 700, soit 5:7) et aux bons noms de fichiers. Remplacez chaque fichier par le vrai visuel en gardant le même nom, sans rien changer au code.
 
