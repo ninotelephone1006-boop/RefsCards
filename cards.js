@@ -183,7 +183,7 @@ const cardsDatabase = [
     description: 'skibidi gros plan de fagar',
     rarity: 'rare',
     emoji: '🔍',
-    image: 'assets/Cartes/fagarzoom.jpeg',
+    image: 'assets/Cartes/fagarzoom.JPEG',
     color: '#8fc8ef'
   }
 ];
