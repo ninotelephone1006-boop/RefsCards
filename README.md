@@ -128,7 +128,7 @@ service cloud.firestore {
 
 `npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, le bouton reste cliquable mais explique ce qui manque (voir le dépannage ci-dessous).
 
-Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙**, Pack Rare doré **1 000 🪙** (chances Rare et plus **+20 %**). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 en classique, ≈ 419 🪙 en rare) pour que l'argent reste un défi — à l'ancien prix de 100 🪙, chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait infini. Chaque jour, **3 packs classiques gratuits** sont à récupérer dans le Shop (un par un, se réinitialisent à minuit). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
+Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙**, Pack Rare doré **1 000 🪙** (20 % de chance que chaque carte gagne un grade). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 en classique, ≈ 433 🪙 en rare) pour que l'argent reste un défi — à l'ancien prix de 100 🪙, chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait infini. Chaque jour, **3 packs classiques gratuits** sont à récupérer dans le Shop (un par un, se réinitialisent à minuit). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
 
 ## Chargement des scripts
 
@@ -168,7 +168,7 @@ node tests/social-flow.cjs           # page Compte / En ligne (amis, échanges, 
 node tests/friend-requests.cjs       # demandes d'ami : acceptation/refus, fiche ami
 node tests/permission-denied.cjs     # règles non publiées : message explicite, pas de crash
 node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-sauvegarde, HUD, échec)
-node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare +20 %
+node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare 20 % grade +1
 node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
 ```
 
@@ -177,7 +177,7 @@ node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouve
 La barre de navigation compte cinq onglets : **Pack**, **Shop**, **Collection**, **En ligne** et **Compte**.
 
 - **Achat direct supprimé** : le bouton « Ouvrir un booster » du récap (et celui de la fusion) renvoie désormais au Shop. Les packs achetés vont dans l'**inventaire** (compteur dans l'onglet Pack) et s'ouvrent depuis là — ouvrir un pack en consomme 1. Sans pack en inventaire, la déchirure est bloquée et un bouton « Aller au Shop » apparaît.
-- **Deux packs** : **Pack Classique** (`assets/packet.png`, **500 🪙**) et **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, chances Rare et plus **+20 %** relatives, renormalisées — les pourcentages affichés sous le pack suivent le type choisi). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 / ≈ 419 🪙) pour éviter l'argent infini de l'ancien prix à 100 🪙.
+- **Deux packs** : **Pack Classique** (`assets/packet.png`, **500 🪙**) et **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, 20 % de chance que chaque carte gagne un grade — les pourcentages affichés sous le pack suivent le type choisi). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 394 🪙 / ≈ 433 🪙) pour éviter l'argent infini de l'ancien prix à 100 🪙.
 - **Achats multiples** : sélecteur de quantité (1 à 10, raccourcis ×1 / ×5 / ×10) par pack ; le bouton affiche le total et se désactive si le solde est insuffisant.
 - **3 gratuits par jour** : 3 packs classiques à récupérer un par un dans le Shop (bannière 🎁, pastilles de progression, quota `freeDate`/`freeUsed` par jour calendaire local, réinitialisé à minuit, pastille sur l'onglet Shop tant qu'il en reste). Le premier pack offert des nouveaux comptes arrive aussi dans l'inventaire.
 - **Sauvegarde** : `playerSaves/{uid}` gagne `packStock {classic, rare}`, `freeDate` et `freeUsed` (les anciennes sauvegardes sans ces champs démarrent à 0, avec migration du premier pack offert). **Republie `firestore.rules`** pour les autoriser.

@@ -1,7 +1,8 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/shop-flow.cjs
 // Vérifie la boutique : prix équilibrés (500 / 1 000), achats multiples dans
-// l'inventaire, 3 packs gratuits par jour, pack rare (+20 %) et navigation
-// « Aller au Shop » depuis le récap (plus d'achat direct à 100 🪙).
+// l'inventaire, 3 packs gratuits par jour, pack rare doré (20 % de chance
+// que chaque carte gagne un grade) et navigation « Aller au Shop » depuis
+// le récap (plus d'achat direct à 100 🪙).
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -99,8 +100,11 @@ function todayKey() {
   assert.match(appSrc, /classic:\s*500/, 'pack classique à 500');
   assert.match(appSrc, /rare:\s*1000/, 'pack rare à 1000');
   assert.match(appSrc, /FREE_PER_DAY\s*=\s*3/, '3 gratuits par jour');
-  assert.match(appSrc, /RARE_BOOST\s*=\s*1\.2/, 'pack rare +20 %');
-  console.log('PASS prix boutique (500 / 1 000), 3 gratuits, rare +20 %');
+  assert.match(appSrc, /GOLDEN_UPGRADE_CHANCE\s*=\s*0\.2/, 'pack rare doré : 20 % chance de gagner un grade');
+  assert.match(appSrc, /upgradeRarity/, 'logique d\'upgrade présente');
+  assert.match(html, /20 %.*grade/i, 'pack rare affiche 20 % grade');
+  assert.match(html, /433/, 'valeur moyenne rare ≈ 433');
+  console.log('PASS prix boutique (500 / 1 000), 3 gratuits, rare 20 % grade +1');
 
   /* 1. Achat multiple : quantité 5 classique = 2 500 🪙, inventaire +5. */
   {
@@ -171,14 +175,18 @@ function todayKey() {
     assert.equal(doc.getElementById('app').dataset.tab, 'pack');
     await wait(20);
     assert.match(doc.getElementById('pack-img-main').getAttribute('src'), /packetrare\.png/);
-    assert.match(doc.getElementById('pack-odds').textContent, /\+20 %/);
+    assert.match(doc.getElementById('pack-odds').textContent, /20 %/);
+    assert.match(doc.getElementById('pack-odds').textContent, /GAGNER UN GRADE/i);
+    // Vérifie que les pourcentages ne sont plus l'ancien +20 % renormalisé mais le nouvel effet grade+1
+    // Commune doit passer de 30 % à 24 % en pack rare
+    assert.match(doc.getElementById('pack-odds').textContent, /Commune 24,0 %/);
     // Achat rare ×1 = 1 000 🪙.
     doc.getElementById('buy-rare').click();
     await wait(400);
     assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '4 000');
     assert.match(doc.getElementById('open-rare').textContent, /×2/);
     w.close();
-    console.log('PASS pack rare : image dorée, chances +20 %, achat 1 000');
+    console.log('PASS pack rare : image dorée, grade +1 (20 %), achat 1 000');
   }
 
   /* 5. Inventaire vide : bouton « Aller au Shop » visible dans l'onglet Pack. */

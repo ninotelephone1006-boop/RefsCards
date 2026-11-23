@@ -8,13 +8,13 @@
 
   /* Boutique : les packs s'achètent dans le Shop et vont dans l'inventaire
      (onglet Pack). Les prix sont réglés AU-DESSUS de la valeur moyenne d'un
-     pack (classique ≈ 394 🪙, rare ≈ 419 🪙 pour 5 cartes) : à 100 🪙,
+     pack (classique ≈ 394 🪙, rare ≈ 433 🪙 pour 5 cartes) : à 100 🪙,
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer les 3 packs gratuits quotidiens. */
   const PACK_PRICES = { classic: 500, rare: 1000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
-  const RARE_BOOST = 1.2; // pack rare : poids des raretés Rare+ multipliés par 1,2 (+20 %)
+  const GOLDEN_UPGRADE_CHANCE = 0.20; // pack rare doré : 20 % de chance que chaque carte gagne un grade
   const FREE_PER_DAY = 3; // packs classiques gratuits par jour, à récupérer dans le Shop
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
   const PACK_IMAGES = { classic: 'assets/packet.png', rare: 'assets/packetrare.png' };
@@ -382,7 +382,7 @@
         type: 'rare',
         count: rare,
         title: 'Booster Rare',
-        desc: '5 cartes aléatoires · +20 % de chances sur les raretés.',
+        desc: '5 cartes aléatoires · 20 % de chance que chaque carte gagne un grade.',
         img: PACK_IMAGES.rare,
         rare: true,
       },
@@ -450,14 +450,24 @@
 
   /* --------------------------------------------------------------- tirage */
 
-  /* Poids effectifs d'une rareté pour un type de pack. Pack rare : les
-     raretés Rare et plus (rank >= 2) voient leur poids multiplié par
-     RARE_BOOST (1,2 = +20 % relatif), puis tout est renormalisé — les
-     Communes/Inhabituelles baissent donc légèrement en part relative. */
-  function rarityWeight(key, boosted) {
+  /* Poids de base d'une rareté (en %). Le pack rare doré ne change pas les
+     poids : il ajoute après tirage 20 % de chance que chaque carte gagne un
+     grade (rare → super rare, etc.). */
+  function rarityWeight(key) {
     const info = RARITIES[key];
-    if (!info) return 0;
-    return boosted && info.rank >= RARITIES.rare.rank ? info.weight * RARE_BOOST : info.weight;
+    return info ? info.weight : 0;
+  }
+
+  function upgradeRarity(key, available) {
+    const info = RARITIES[key];
+    if (!info || !info.next) return key;
+    let next = info.next;
+    // Saute les raretés sans cartes (au cas où cardsDatabase ne couvre pas tout).
+    while (next && available && !available.includes(next)) {
+      const nxtInfo = RARITIES[next];
+      next = nxtInfo ? nxtInfo.next : null;
+    }
+    return next || key;
   }
 
   function pickCard(forcedRarity, boosted) {
@@ -467,14 +477,19 @@
     if (!rarity || !available.includes(rarity)) {
       // Tirage pondéré : chaque rareté garde exactement son pourcentage annoncé,
       // puis la carte est tirée au hasard à l'intérieur de la rareté.
-      const total = available.reduce((sum, r) => sum + rarityWeight(r, boosted), 0);
+      const total = available.reduce((sum, r) => sum + rarityWeight(r), 0);
       let roll = Math.random() * total;
       rarity = available[available.length - 1];
       for (const r of available) {
-        if ((roll -= rarityWeight(r, boosted)) < 0) {
+        if ((roll -= rarityWeight(r)) < 0) {
           rarity = r;
           break;
         }
+      }
+      // Pack rare doré : 20 % de chance que la carte gagne un grade.
+      if (boosted && Math.random() < GOLDEN_UPGRADE_CHANCE) {
+        const upgraded = upgradeRarity(rarity, available);
+        if (upgraded !== rarity) rarity = upgraded;
       }
     }
     const pool = cardsDatabase.filter((c) => c.rarity === rarity);
@@ -959,7 +974,7 @@
   function openPack() {
     /* Consomme 1 pack de l'inventaire (sauf en démo, où l'ouverture est
        gratuite pour les tests/apercus). Le tirage utilise ensuite le type
-       choisi (rare = chances +20 %). */
+       choisi (rare = 20 % de chance de gagner un grade par carte). */
     if (!isDemoMode()) {
       const type = state.currentPackType === 'rare' ? 'rare' : 'classic';
       if ((state.packStock[type] || 0) > 0) {
@@ -2032,17 +2047,33 @@
   });
 
   /* Probabilités : générées depuis RARITIES pour rester toujours justes.
-     En pack rare, les pourcentages sont renormalisés (+20 % sur Rare+). */
+     En pack rare, chaque carte a 20 % de chance de gagner un grade — les
+     pourcentages affichés sont l'effet net (ex. Commune 30 % → 24 %). */
   function renderOdds(boosted) {
     if (!packOdds) return;
     packOdds.replaceChildren();
-    const total = Object.keys(RARITIES).reduce((sum, key) => sum + rarityWeight(key, boosted), 0);
+    // Calcule les pourcentages effectifs du pack rare (upgrade 20 %)
+    let effective = null;
+    if (boosted) {
+      effective = {};
+      Object.keys(RARITIES).forEach((k) => { effective[k] = 0; });
+      Object.entries(RARITIES).forEach(([key, r]) => {
+        const base = r.weight;
+        const next = RARITIES[r.next] ? r.next : null;
+        if (next && RARITIES[next]) {
+          effective[key] += base * (1 - GOLDEN_UPGRADE_CHANCE);
+          effective[next] += base * GOLDEN_UPGRADE_CHANCE;
+        } else {
+          effective[key] += base;
+        }
+      });
+    }
     Object.entries(RARITIES).forEach(([key, r]) => {
       const row = el('span', `odds odds-${key}`);
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const pct = boosted ? (rarityWeight(key, true) / total) * 100 : r.weight;
+      const pct = boosted ? effective[key] : r.weight;
       const label = boosted
         ? `${r.label} ${pct.toFixed(1).replace('.', ',')} %`
         : `${r.label} ${String(r.weight).replace('.', ',')} %`;
@@ -2050,7 +2081,7 @@
       packOdds.append(row);
     });
     if (boosted) {
-      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : CHANCES RARE+ +20 %'));
+      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : 20 % DE CHANCE DE GAGNER UN GRADE'));
     }
   }
 
