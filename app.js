@@ -1092,16 +1092,8 @@
     const inner = el('span', 'card-inner');
     const tilt = el('span', 'card-tilt');
 
-    /* dos */
+    /* dos : le visuel assets/derriere.png (voir .card-back) */
     const back = el('span', 'card-face card-back');
-    const backTop = el('span', 'back-row');
-    backTop.append(el('span', null, 'REFS CARDS'), el('span', null, '✳'));
-    const emblem = el('span', 'back-emblem');
-    emblem.append(el('i'), el('i'), el('span', 'back-star', '✳'));
-    const backBottom = el('span', 'back-row bottom');
-    backBottom.append(el('span', null, 'UNE SURPRISE T\'ATTEND'), el('span', null, `0${index + 1}`));
-    const backNum = el('span', 'back-num', `0${index + 1}`);
-    back.append(backTop, emblem, backBottom, backNum);
 
     /* face : le visuel plein cadre + les surcouches titre / description / id */
     const front = el('span', 'card-face card-front');
