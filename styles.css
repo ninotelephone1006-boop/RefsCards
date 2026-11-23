@@ -2653,7 +2653,7 @@ html,body{background:var(--bg)}
    ========================================================================== */
 
 /* --- page Quêtes --- */
-.quests-view{position:relative;z-index:10;justify-content:flex-start;align-items:stretch}
+.quests-view{z-index:10;justify-content:flex-start;align-items:stretch}
 .quests-head{text-align:center;margin-bottom:18px}
 .quests-head .kicker{margin:0 0 8px}
 .quests-head h2{margin:0;font-family:'Space Grotesk',sans-serif;font-size:clamp(24px,5.4vw,32px);letter-spacing:-.8px}
