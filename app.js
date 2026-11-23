@@ -160,6 +160,7 @@
   const cut = $('cut');
   const hintPct = $('hint-pct');
   const hintText = $('hint-text');
+  const packBulkHint = $('pack-bulk-hint');
   const coinsEl = $('coins');
   const wallet = $('wallet');
   const coinFloat = $('coin-float');
@@ -250,6 +251,16 @@
   const inventoryEmpty = $('inventory-empty');
   const inventoryGoShop = $('inventory-go-shop');
   const tabBadgeInventory = $('tab-badge-inventory');
+  /* Ouverture éclair (appui long 2 s sur une carte de l'inventaire). */
+  const bulkOverlay = $('bulk-open');
+  const bulkClose = $('bulk-close');
+  const bulkCloseX = $('bulk-close-x');
+  const bulkTitle = $('bulk-title');
+  const bulkSub = $('bulk-sub');
+  const bulkGrid = $('bulk-grid');
+  const bulkPackImg = $('bulk-pack-img');
+  const bulkPackCount = $('bulk-pack-count');
+  const bulkSummary = $('bulk-summary');
   const shopQty = { classic: 1, rare: 1, legend: 1, video: 1 };
   /* Quêtes, succès, niveau, notifications (blocs tolérants : un HTML en
      cache obsolète peut ne pas les avoir). */
@@ -628,7 +639,15 @@
     if (packOdds) packOdds.hidden = empty;
     if (pack) {
       pack.classList.toggle('is-empty', empty);
-      pack.setAttribute('aria-label', `Booster ${packLabelFr(type)}. Fais glisser vers la droite pour le déchirer.`);
+      pack.setAttribute('aria-label', `Booster ${packLabelFr(type)}. Fais glisser vers la droite pour le déchirer, ou maintiens 2 secondes pour tout ouvrir d'un coup.`);
+    }
+    if (packBulkHint) {
+      const inStock = Number(state.packStock[type]) || 0;
+      packBulkHint.textContent = inStock > 1
+        ? `ou maintiens 2 s sur le pack pour ouvrir les ${inStock} d’un coup`
+        : inStock === 1
+          ? 'ou maintiens 2 s sur le pack pour l’ouvrir d’un coup'
+          : 'ou maintiens 2 s sur le pack pour tout ouvrir d’un coup';
     }
     renderOdds(type === 'rare', packPool(type), type);
     renderInventory();
@@ -681,17 +700,35 @@
       }))
       .filter((item) => item.count > 0);
     const canOpen = state.phase === 'pack' || state.phase === 'done';
-    inventoryGrid.innerHTML = items.map((item) => `
-      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}" data-pack-type="${item.type}">
+    inventoryGrid.innerHTML = items.map((item) => {
+      /* L'appui long (2 s) ouvre TOUS les packs de ce type d'un coup : on
+         l'annonce sur la carte, avec une barre de progression pendant l'appui.
+         Le bouton ⚡ fait la même chose au clic (clavier / accessibilité). */
+      const bulkLabel = item.count > 1
+        ? `⚡ OUVRIR LES ${item.count} D'UN COUP`
+        : '⚡ OUVERTURE ÉCLAIR';
+      const holdHint = item.count > 1
+        ? `ou maintiens 2 s sur le pack pour ouvrir les ${item.count}`
+        : 'ou maintiens 2 s sur le pack';
+      return `
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}"
+        data-pack-type="${item.type}" data-pack-count="${item.count}"
+        aria-label="${item.title}, ${item.count} en stock. Appuie 2 secondes pour tout ouvrir d'un coup.">
         <span class="inventory-qty-badge">×${item.count}</span>
-        <img class="inventory-card-img" src="${item.img}" alt="${item.title}">
+        <img class="inventory-card-img" src="${item.img}" alt="${item.title}" draggable="false">
         <h3 class="inventory-card-title">${item.title}</h3>
         <p class="inventory-card-desc">${item.desc}</p>
         <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen ? '' : 'disabled'}>
           OUVRIR UN PACK →
         </button>
+        <button class="inventory-bulk-btn" type="button" data-bulk-open="${item.type}" ${canOpen ? '' : 'disabled'}>
+          ${bulkLabel}
+        </button>
+        <span class="inventory-hold-hint" aria-hidden="true">${holdHint}</span>
+        <span class="inventory-hold-bar" aria-hidden="true"><i></i></span>
       </article>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function selectPackType(type, { silent = false } = {}) {
@@ -707,6 +744,253 @@
       const count = cardCountFor(type);
       gapCards.replaceChildren(...Array.from({ length: count }, () => document.createElement('i')));
     }
+  }
+
+  /* ============================================ OUVERTURE ÉCLAIR · APPUI LONG
+     Maintiens 2 s sur une carte de l'inventaire (ou clique le bouton ⚡) :
+     tous les packs de ce type s'ouvrent d'un coup, le butin est crédité
+     immédiatement et toutes les cartes s'affichent en grand dans une grille,
+     avec une petite animation rapide (stagger de ~20 ms par carte).
+     Le simple clic sur « Ouvrir un pack » garde le rituel normal (déchirure,
+     révélation carte par carte). */
+
+  const BULK_PRESS_MS = 2000;      // durée de l'appui long
+  const BULK_MOVE_TOLERANCE = 14;  // px : au-delà, c'est un scroll, on annule
+  const BULK_TILE_MAX = 240;       // garde-fou d'affichage (perf mobile)
+  let bulkPress = null;            // appui en cours
+  let bulkClickGuardUntil = 0;     // ignore le clic qui suit un appui long
+  let bulkReturnFocus = null;      // focus rendu à la fermeture
+  let bulkHideTimer = 0;
+
+  function detachBulkPressListeners() {
+    window.removeEventListener('pointermove', onBulkPressMove);
+    window.removeEventListener('pointerup', onBulkPressEnd);
+    window.removeEventListener('pointercancel', onBulkPressEnd);
+  }
+
+  function cancelBulkPress() {
+    if (!bulkPress) return;
+    window.clearTimeout(bulkPress.timer);
+    bulkPress.card.classList.remove('is-holding');
+    bulkPress = null;
+    detachBulkPressListeners();
+  }
+
+  function onBulkPressMove(event) {
+    if (!bulkPress || event.pointerId !== bulkPress.pointerId) return;
+    if (Math.abs(event.clientX - bulkPress.x) > BULK_MOVE_TOLERANCE
+        || Math.abs(event.clientY - bulkPress.y) > BULK_MOVE_TOLERANCE) {
+      cancelBulkPress();
+    }
+  }
+
+  function onBulkPressEnd(event) {
+    if (!bulkPress) return;
+    if (event && event.pointerId != null && event.pointerId !== bulkPress.pointerId) return;
+    cancelBulkPress();
+  }
+
+  function startBulkPress(event) {
+    if (!inventoryGrid || !event.target || typeof event.target.closest !== 'function') return;
+    const card = event.target.closest('.inventory-card');
+    if (!card || !inventoryGrid.contains(card)) return;
+    const type = card.dataset.packType;
+    if (!isPackType(type)) return;
+    if (event.button != null && event.pointerType === 'mouse' && event.button !== 0) return;
+    /* Même règle que l'ouverture classique : un seul booster à la fois. */
+    if (state.phase !== 'pack' && state.phase !== 'done') return;
+    if ((Number(state.packStock[type]) || 0) <= 0) return;
+    cancelBulkPress();
+    card.classList.add('is-holding');
+    card.style.setProperty('--hold-ms', `${BULK_PRESS_MS}ms`);
+    bulkPress = {
+      card,
+      type,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      timer: window.setTimeout(finishBulkPress, BULK_PRESS_MS)
+    };
+    window.addEventListener('pointermove', onBulkPressMove, { passive: true });
+    window.addEventListener('pointerup', onBulkPressEnd);
+    window.addEventListener('pointercancel', onBulkPressEnd);
+  }
+
+  function finishBulkPress() {
+    const press = bulkPress;
+    if (!press) return;
+    window.clearTimeout(press.timer);
+    press.card.classList.remove('is-holding');
+    press.card.classList.add('is-bulk-fired');
+    window.setTimeout(() => press.card.classList.remove('is-bulk-fired'), 420);
+    bulkPress = null;
+    detachBulkPressListeners();
+    /* Le clic généré au relâchement ne doit pas ouvrir un pack en plus. */
+    bulkClickGuardUntil = performance.now() + 900;
+    try { if (navigator.vibrate) navigator.vibrate(25); } catch (error) { /* pas de vibreur */ }
+    SFX.unlock();
+    SFX.tick();
+    bulkOpenPacks(press.type);
+  }
+
+  /* Ouvre d'un coup les `count` packs du type donné, crédite tout de suite
+     les cartes et les pièces, puis affiche la grille géante. */
+  function bulkOpenPacks(type) {
+    if (!isPackType(type)) return;
+    if (state.phase !== 'pack' && state.phase !== 'done') {
+      SFX.snap();
+      showToast('Termine le booster en cours avant d’ouvrir tout d’un coup.', 3400);
+      return;
+    }
+    const count = Math.max(0, Math.floor(Number(state.packStock[type]) || 0));
+    if (count <= 0) { denyNoPack(); return; }
+    if (!cardsDatabase.some((card) => RARITIES[card.rarity])) {
+      showToast('Ajoute au moins une carte valide dans cards.js.');
+      return;
+    }
+
+    const pool = packPool(type);
+    const cards = [];
+    let opened = 0;
+    for (let i = 0; i < count; i++) {
+      const drawn = drawPack(type === 'rare', pool, type);
+      if (!drawn.length) break;
+      cards.push(...drawn);
+      opened++;
+    }
+    if (!cards.length) {
+      SFX.snap();
+      showToast(type === 'video'
+        ? 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).'
+        : 'Aucune carte à tirer.');
+      return;
+    }
+
+    let coins = 0;
+    let newCards = 0;
+    cards.forEach((card) => {
+      const info = RARITIES[card.rarity] || RARITIES.common;
+      const isNew = !state.collection.some((owned) => owned.id === card.id);
+      state.collection.push(card);
+      if (isNew) { fresh.add(card.id); newCards++; }
+      coins += Math.max(0, Math.round(CardMutations.multiply(card, info.reward, 'reward')));
+    });
+
+    state.packStock[type] = Math.max(0, (Number(state.packStock[type]) || 0) - opened);
+    state.packsOpened = (state.packsOpened || 0) + opened;
+    if ((state.packStock[state.currentPackType] || 0) <= 0 && packTotal() > 0) {
+      selectPackType(firstAvailablePackType(), { silent: true });
+    }
+    if (newCards) tabBadge.hidden = false;
+
+    addCoins(coins);
+    renderCollection();
+    renderShop();
+    renderPackInventory();
+    save();
+    /* Quêtes « Premier déchir », « Ouverture intensive », succès « Accro »… */
+    trackProgress();
+
+    SFX.rip();
+    SFX.pop();
+    if (newCards) SFX.chaChing();
+    showBulkOpen(type, cards, { packs: opened, coins, newCards });
+  }
+
+  function showBulkOpen(type, cards, stats) {
+    if (!bulkOverlay) return;
+    window.clearTimeout(bulkHideTimer);
+    bulkReturnFocus = document.activeElement;
+    bulkOverlay.hidden = false;
+    bulkOverlay.classList.remove('is-out', 'is-in');
+    void bulkOverlay.offsetWidth;
+    bulkOverlay.classList.add('is-in');
+    bulkOverlay.dataset.type = type;
+
+    const plural = stats.packs > 1;
+    if (bulkTitle) {
+      bulkTitle.innerHTML = `${stats.packs} pack${plural ? 's' : ''} ${packLabelFr(type)}${plural ? 's' : ''} ouvert${plural ? 's' : ''}<em>.</em>`;
+    }
+    if (bulkSub) {
+      bulkSub.textContent = `${cards.length} carte${cards.length > 1 ? 's' : ''} d’un coup · appuie sur une carte pour la voir en grand`;
+    }
+    if (bulkPackImg) {
+      bulkPackImg.src = PACK_IMAGES[type];
+      bulkPackImg.alt = '';
+    }
+    if (bulkPackCount) bulkPackCount.textContent = `×${stats.packs}`;
+
+    if (bulkGrid) {
+      const frag = document.createDocumentFragment();
+      const shown = cards.slice(0, BULK_TILE_MAX);
+      shown.forEach((card, i) => {
+        const info = RARITIES[card.rarity] || RARITIES.common;
+        const tile = el('button', 'bulk-tile');
+        tile.type = 'button';
+        tile.dataset.rarity = card.rarity;
+        tile.style.setProperty('--i', String(i));
+        tile.style.setProperty('--r-color', info.color);
+        tile.style.setProperty('--r-glow', info.glow);
+        tile.setAttribute('aria-label', `${card.name}, ${info.label}. Voir la carte en grand.`);
+        tile.append(cardFrame(card, { mini: true, alt: `${card.name} — ${info.label}` }));
+        on(tile, 'click', () => openInspect(card));
+        frag.append(tile);
+      });
+      if (cards.length > shown.length) {
+        const more = el('span', 'bulk-more', `+${cards.length - shown.length}`);
+        more.setAttribute('aria-hidden', 'true');
+        frag.append(more);
+      }
+      bulkGrid.replaceChildren(frag);
+    }
+
+    if (bulkSummary) {
+      const bits = [`+${fmt(stats.coins)} 🪙`];
+      if (stats.newCards) {
+        bits.push(`${stats.newCards} nouvelle${stats.newCards > 1 ? 's' : ''} carte${stats.newCards > 1 ? 's' : ''}`);
+      }
+      bits.push(`${cards.length} carte${cards.length > 1 ? 's' : ''} ajoutée${cards.length > 1 ? 's' : ''}`);
+      bulkSummary.textContent = bits.join(' · ');
+    }
+
+    if (bulkClose) {
+      bulkClose.textContent = packTotal() > 0
+        ? `ENCORE ${packTotal()} PACK${packTotal() > 1 ? 'S' : ''} À OUVRIR →`
+        : 'TOUT RÉCUPÉRER →';
+    }
+
+    if (!reduceMotion.matches) {
+      /* Petit halo de confirmation derrière le pack, très court. */
+      const packBox = bulkOverlay.querySelector('.bulk-open-pack');
+      if (packBox) {
+        packBox.classList.remove('is-burst');
+        void packBox.offsetWidth;
+        packBox.classList.add('is-burst');
+      }
+    }
+
+    window.setTimeout(() => {
+      const target = bulkClose || bulkCloseX;
+      if (target && typeof target.focus === 'function') {
+        try { target.focus({ preventScroll: true }); } catch (error) { /* ignore */ }
+      }
+    }, 60);
+  }
+
+  function closeBulkOpen() {
+    if (!bulkOverlay || bulkOverlay.hidden) return;
+    bulkOverlay.classList.remove('is-in');
+    bulkOverlay.classList.add('is-out');
+    window.clearTimeout(bulkHideTimer);
+    bulkHideTimer = window.setTimeout(() => {
+      bulkOverlay.hidden = true;
+      bulkOverlay.classList.remove('is-out');
+      if (bulkGrid) bulkGrid.replaceChildren();
+      if (bulkReturnFocus && typeof bulkReturnFocus.focus === 'function') {
+        try { bulkReturnFocus.focus({ preventScroll: true }); } catch (error) { /* ignore */ }
+      }
+      bulkReturnFocus = null;
+    }, reduceMotion.matches ? 0 : 170);
   }
 
   function claimFreePack() {
@@ -1195,6 +1479,57 @@
     hintPct.classList.remove('hot');
   }
 
+  /* Appui long sur le gros booster : même ouverture éclair que dans
+     l'inventaire, mais pour le type affiché (tous les packs de ce type). */
+  let packHoldTimer = 0;
+  let packHoldRaf = 0;
+
+  function stopPackHold() {
+    window.clearTimeout(packHoldTimer);
+    packHoldTimer = 0;
+    if (packHoldRaf) cancelAnimationFrame(packHoldRaf);
+    packHoldRaf = 0;
+    pack.classList.remove('is-holding-pack');
+  }
+
+  function startPackHold() {
+    stopPackHold();
+    if (isDemoMode()) return;
+    pack.classList.add('is-holding-pack');
+    hintText.textContent = 'Maintiens pour tout ouvrir d’un coup…';
+    const start = performance.now();
+    const step = (now) => {
+      const k = clamp((now - start) / BULK_PRESS_MS, 0, 1);
+      hintPct.textContent = `${Math.round(k * 100)} %`;
+      hintPct.classList.toggle('hot', k >= TEAR_THRESHOLD);
+      if (k < 1) packHoldRaf = requestAnimationFrame(step);
+    };
+    packHoldRaf = requestAnimationFrame(step);
+    packHoldTimer = window.setTimeout(completePackHold, BULK_PRESS_MS);
+  }
+
+  function completePackHold() {
+    /* Un vrai geste de découpe a commencé : on laisse la déchirure classique. */
+    if (!drag || drag.started || tearP > 0.02) { stopPackHold(); return; }
+    const held = drag;
+    drag = null;
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragEnd);
+    window.removeEventListener('pointercancel', onDragEnd);
+    if (held.id !== 'kbd') {
+      try { pack.releasePointerCapture(held.id); } catch (err) {}
+    }
+    pack.classList.remove('is-dragging');
+    stopPackHold();
+    resetTear();
+    pack.style.transform = '';
+    packFlap.style.transform = '';
+    bulkClickGuardUntil = performance.now() + 900;
+    try { if (navigator.vibrate) navigator.vibrate(25); } catch (error) { /* pas de vibreur */ }
+    SFX.tick();
+    bulkOpenPacks(state.currentPackType);
+  }
+
   function emitCutSparks() {
     const r = cut.getBoundingClientRect();
     const s = stage.getBoundingClientRect();
@@ -1245,6 +1580,8 @@
     window.addEventListener('pointermove', onDragMove, { passive: false });
     window.addEventListener('pointerup', onDragEnd);
     window.addEventListener('pointercancel', onDragEnd);
+    /* Sans mouvement pendant 2 s : ouverture éclair de tout le stock. */
+    startPackHold();
     e.preventDefault();
   }
 
@@ -1263,6 +1600,7 @@
 
     if (!drag.started && dx > 3) {
       drag.started = true;
+      stopPackHold();
       SFX.tearStart();
     }
     if (drag.started) {
@@ -1287,7 +1625,14 @@
     const started = drag.started;
     const wasDrag = drag;
     drag = null;
+    stopPackHold();
     pack.classList.remove('is-dragging');
+    if (!started) {
+      /* Appui relâché trop tôt : on remet l'astuce de découpe. */
+      hintText.textContent = 'Trace la ligne de découpe d\'un doigt ou à la souris';
+      hintPct.textContent = '0 %';
+      hintPct.classList.remove('hot');
+    }
     if (wasDrag.id !== 'kbd') {
       try { pack.releasePointerCapture(wasDrag.id); } catch (err) {}
     }
@@ -3302,6 +3647,8 @@
 
   function setTab(tab) {
     if (app.dataset.tab === tab) return;
+    /* Changer d'onglet referme l'ouverture éclair (le butin reste acquis). */
+    if (bulkOverlay && !bulkOverlay.hidden) closeBulkOpen();
     if (tab === 'pack' && state.phase === 'done' && packTotal() > 0) {
       resetToPack();
     }
@@ -3571,10 +3918,50 @@
   on(inventoryGoShop, 'click', () => setTab('shop'));
   if (inventoryGrid) {
     on(inventoryGrid, 'click', (e) => {
+      /* Un clic pendant/juste après l'ouverture éclair ne doit rien relancer. */
+      if ((bulkOverlay && !bulkOverlay.hidden) || performance.now() < bulkClickGuardUntil) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      const bulkBtn = e.target.closest('[data-bulk-open]');
+      if (bulkBtn) {
+        if (bulkBtn.disabled) return;
+        bulkOpenPacks(bulkBtn.dataset.bulkOpen);
+        return;
+      }
       const btn = e.target.closest('[data-open-pack]');
       if (!btn || btn.disabled) return;
       openFromInventory(btn.dataset.openPack);
     });
+    /* Appui long 2 s sur une carte : ouverture éclair de tous les packs du type. */
+    on(inventoryGrid, 'pointerdown', startBulkPress);
+    on(inventoryGrid, 'contextmenu', (e) => {
+      if (e.target.closest && e.target.closest('.inventory-card')) e.preventDefault();
+    });
+    on(inventoryGrid, 'dragstart', (e) => {
+      if (e.target.closest && e.target.closest('.inventory-card')) e.preventDefault();
+    });
+    /* Un appui long n'a de sens que tactile/souris : on coupe la sélection. */
+    on(inventoryGrid, 'selectstart', (e) => {
+      if (e.target.closest && e.target.closest('.inventory-card')) e.preventDefault();
+    });
+  }
+  if (bulkOverlay) {
+    on(bulkClose, 'click', closeBulkOpen);
+    on(bulkCloseX, 'click', closeBulkOpen);
+    /* Clic hors du panneau = fermeture (le butin est déjà crédité). */
+    on(bulkOverlay, 'click', (e) => {
+      if (e.target === bulkOverlay) closeBulkOpen();
+    });
+    /* En capture : on passe après l'inspection / la fusion si elles sont
+       ouvertes au-dessus (leur propre Échap doit les fermer en premier). */
+    on(document, 'keydown', (e) => {
+      if (e.key !== 'Escape' || bulkOverlay.hidden) return;
+      if (!inspect.hidden || state.fusionOpen || (confirmSheet && !confirmSheet.hidden)) return;
+      e.preventDefault();
+      closeBulkOpen();
+    }, true);
   }
   if (shopView) {
     on(shopView, 'click', (e) => {
