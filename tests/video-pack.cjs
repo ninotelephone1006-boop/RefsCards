@@ -1,10 +1,11 @@
 // Run with NODE_PATH pointing to a local jsdom installation:
 // node tests/video-pack.cjs
 //
-// Vérifie le Pack Vidéo de bout en bout. Aucune carte vidéo n'est livrée avec
-// le projet : on injecte ici des cartes de test dans cardsDatabase pour
-// contrôler structure des données, tirage, lecteur <video>, réglages par
-// carte et stock sauvegardable.
+// Vérifie le Pack Vidéo de bout en bout. Le projet livre une carte vidéo
+// (« Le Sapin George », voir cards.js) : on la compte dans les pools et on
+// l'injecte aussi dans les cas dédiés. On injecte également des cartes de
+// test dans cardsDatabase pour contrôler structure des données, tirage,
+// lecteur <video>, réglages par carte et stock sauvegardable.
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -68,7 +69,26 @@ function injectCards(context, cards) {
   vm.runInContext(`cardsDatabase.push(...${JSON.stringify(cards)});`, context);
 }
 
-function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
+/* Nombre de cartes vidéo déjà livrées avec le projet (avant toute injection). */
+function builtinVideoCount() {
+  const ctx = vm.createContext({});
+  vm.runInContext(fs.readFileSync('cards.js', 'utf8'), ctx);
+  return vm.runInContext(
+    'cardsDatabase.filter((card) => Boolean(cardVideoConfig(card))).length',
+    ctx
+  );
+}
+
+/* Retire du catalogue les cartes vidéo livrées avec le projet (utile pour
+   simuler un catalogue sans aucune carte vidéo). */
+function stripBuiltinVideos(context) {
+  vm.runInContext(
+    'cardsDatabase.splice(0, cardsDatabase.length, ...cardsDatabase.filter((card) => !cardVideoConfig(card)))',
+    context
+  );
+}
+
+function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuiltins = false) {
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url,
     runScripts: 'outside-only',
@@ -84,6 +104,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
   injectCards(context, extraCards);
+  if (stripBuiltins) stripBuiltinVideos(context);
   /* Expose les fonctions internes à la fin du module, sans changer le code
      exécuté au démarrage. */
   const appSrc = fs.readFileSync('app.js', 'utf8').replace(
@@ -164,7 +185,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   const test = w.__videoTest;
   assert.ok(test, 'helpers exposés');
   const videoPool = test.packPool('video');
-  assert.equal(videoPool.length, SAMPLE_VIDEO_CARDS.length, 'toutes les cartes vidéo configurées sont dans le pool');
+  assert.equal(videoPool.length, SAMPLE_VIDEO_CARDS.length + builtinVideoCount(), 'toutes les cartes vidéo (injectées + livrées) sont dans le pool');
   assert.ok(videoPool.every((card) => test.cardVideoInfo(card)), 'toutes les cartes du pool vidéo ont une vidéo');
   for (let i = 0; i < 30; i++) {
     const pack = test.drawPack(false, test.packPool('video'), 'video');
@@ -326,8 +347,9 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null) {
   );
   demo.w.close();
 
-  /* 7. Sans aucune carte vidéo configurée : garde-fou, pas de pile vide. */
-  const empty = bootApp('https://refs-cards.test/', []);
+  /* 7. Sans aucune carte vidéo configurée : garde-fou, pas de pile vide.
+     On retire la carte vidéo livrée avec le projet pour ce cas. */
+  const empty = bootApp('https://refs-cards.test/', [], true);
   await wait(40);
   assert.equal(empty.w.__videoTest.packPool('video').length, 0, 'pool vidéo vide sans carte configurée');
   empty.w.__videoTest.selectPackType('video');
