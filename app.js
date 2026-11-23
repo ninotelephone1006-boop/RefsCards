@@ -234,6 +234,22 @@
   const inventoryGoShop = $('inventory-go-shop');
   const tabBadgeInventory = $('tab-badge-inventory');
   const shopQty = { classic: 1, rare: 1, legend: 1, video: 1 };
+  /* Quêtes, succès, niveau, notifications (blocs tolérants : un HTML en
+     cache obsolète peut ne pas les avoir). */
+  const questsView = $('quests-view');
+  const questPanel = $('quest-panel');
+  const achPanel = $('ach-panel');
+  const levelValue = $('level-value');
+  const levelXp = $('level-xp');
+  const levelFill = $('level-fill');
+  const questsCount = $('quests-count');
+  const achCount = $('ach-count');
+  const tabBadgeQuests = $('tab-badge-quests');
+  const notifBtn = $('notif-btn');
+  const notifBadge = $('notif-badge');
+  const notifSheet = $('notif-sheet');
+  const notifList = $('notif-list');
+  const notifReadAll = $('notif-read-all');
 
   /* ----------------------------------------------------------------- state */
 
@@ -255,8 +271,59 @@
     currentPackType: 'classic',
     freeDate: '',
     freeUsed: 0,
-    packsOpened: 0
+    packsOpened: 0,
+    /* Compteurs alimentant les quêtes et les succès (cumuls, persistés).
+       Ils ne comptent que l'activité de la session la plus longue : le
+       joueur qui n'a pas encore de quête débloquée part de 0, et le baseline
+       (cf. questState) fige les valeurs au déploiement du système pour que
+       les quêtes restent à faire. */
+    fusions: 0,
+    packsBought: 0,
+    freePacks: 0,
+    marketSales: 0,
+    marketEarned: 0,
+    marketBuys: 0
   };
+
+  /* Progression des quêtes / succès / niveau / notifications.
+     - completed : ids des quêtes RÉCLAMÉES, dans l'ordre (séquentiel).
+     - baseline : valeurs de référence des métriques au déploiement du
+       système (une ancienne sauvegarde n'en a pas : on la fige alors sur les
+       compteurs actuels pour ne pas offrir des quêtes déjà faites).
+     - xp : XP cumulée ; le niveau en est dérivé (RefsQuests.levelFromXp).
+     - achievements : ids des succès débloqués.
+     - notifications : liste (plus récente en tête), lues ou non. */
+  const questState = {
+    completed: [],
+    baseline: null,
+    xp: 0,
+    achievements: [],
+    notifications: []
+  };
+  let questReadyNotified = false; // quête active accomplie : toast déjà montré
+  let notifSeq = 0;               // suffixe d'id local, évite les collisions
+  let notifSalesKnown = null;     // ids des ventes 'sold' déjà vues (notif)
+  let notifSalesSnapshot = false; // premier snapshot marché : pas de toast
+
+  /* Données quêtes/succès (quests.js, chargé avant app.js). Tolérant : si le
+     fichier manque (ancien HTML en cache, chargement partiel), le système se
+     désactive proprement — le jeu reste jouable sans quêtes. */
+  const Quests = (typeof RefsQuests !== 'undefined' && RefsQuests && Array.isArray(RefsQuests.QUESTS))
+    ? RefsQuests
+    : {
+      QUESTS: [],
+      ACHIEVEMENTS: [],
+      METRICS: [],
+      METRIC_LABELS: {},
+      xpForLevel: () => 0,
+      levelFromXp: () => ({ level: 1, into: 0, needed: 100 }),
+      metricValue: () => 0,
+      metricLabel: (m) => m,
+      questProgress: () => ({ value: 0, target: 1, done: false }),
+      achievementProgress: () => ({ value: 0, target: 1, done: false })
+    };
+  const NOTIF_ICONS = { quest: '🗺️', achievement: '🏆', level: '⭐', friend: '👥', market: '🪙', system: '✦' };
+  const QUEST_NOTIFICATIONS_MAX = 50;
 
   /* --------------------------------------------------------------- comptes */
 
@@ -541,6 +608,7 @@
       return;
     }
     state.freeUsed += 1;
+    state.freePacks = (state.freePacks || 0) + 1;
     state.packStock.classic = (state.packStock.classic || 0) + 1;
     if ((state.packStock[state.currentPackType] || 0) <= 0) {
       selectPackType('classic', { silent: true });
@@ -551,6 +619,8 @@
     save();
     renderShop();
     renderPackInventory();
+    /* Quête « Le gratuit d'abord » + succès « Quotidien », « Fidèle… » */
+    trackProgress();
   }
 
   function buyPacks(type) {
@@ -570,6 +640,7 @@
     }
     SFX.chaChing();
     state.packStock[type] = (state.packStock[type] || 0) + qty;
+    state.packsBought = (state.packsBought || 0) + qty;
     if ((state.packStock[state.currentPackType] || 0) <= 0) {
       selectPackType(type, { silent: true });
     }
@@ -578,6 +649,8 @@
     showToast(`${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''} dans l'inventaire !`);
     renderShop();
     renderPackInventory();
+    /* Quête « Premier achat », « Grossiste » + succès « Client », « Accro… » */
+    trackProgress();
   }
 
   /* --------------------------------------------------------------- tirage */
@@ -1144,6 +1217,8 @@
         save();
         renderShop();
         renderPackInventory();
+        /* Quête « Premier déchir », « Rythme régulier », « Ouverture intensive »… */
+        trackProgress();
       }
     }
     SFX.tearStop();
@@ -2234,8 +2309,11 @@
     }
 
     state.fusionSelection = null;
+    state.fusions = (state.fusions || 0) + 1;
     renderFusion();
     renderRecapFromCollection();
+    /* Quête « Doublon radieux », « Alchimiste » + succès fusion. */
+    trackProgress();
     window.setTimeout(() => {
       showToast(`Fusion réussie : ${result.name} (${RARITIES[result.rarity].label}) !`, 3600);
       flashScreen();
@@ -2551,6 +2629,46 @@
       ? d.friends.filter((u) => typeof u === 'string')
       : [];
     state.packsOpened = Math.max(0, Number(d && d.packsOpened) || 0);
+    /* Compteurs quêtes/succès (absents des anciennes sauvegardes → 0). */
+    state.fusions = Math.max(0, Number(d && d.fusions) || 0);
+    state.packsBought = Math.max(0, Number(d && d.packsBought) || 0);
+    state.freePacks = Math.max(0, Number(d && d.freePacks) || 0);
+    state.marketSales = Math.max(0, Number(d && d.marketSales) || 0);
+    state.marketEarned = Math.max(0, Number(d && d.marketEarned) || 0);
+    state.marketBuys = Math.max(0, Number(d && d.marketBuys) || 0);
+    /* Quêtes / succès / niveau / notifications. Une sauvegarde corrompue
+       (id étranger, forme improbable) est ignorée sans casser le jeu. */
+    questState.completed = (Array.isArray(d && d.quests) ? d.quests : [])
+      .filter((id) => typeof id === 'string')
+      .filter((id) => Quests.QUESTS.some((q) => q.id === id))
+      .slice(0, Math.max(1, Quests.QUESTS.length));
+    questState.achievements = (Array.isArray(d && d.achievements) ? d.achievements : [])
+      .filter((id) => typeof id === 'string')
+      .filter((id) => Quests.ACHIEVEMENTS.some((a) => a.id === id))
+      .slice(0, Math.max(1, Quests.ACHIEVEMENTS.length));
+    questState.xp = Math.max(0, Math.floor(Number(d && d.xp) || 0));
+    questState.notifications = (Array.isArray(d && d.notifications) ? d.notifications : [])
+      .filter((n) => n && typeof n === 'object'
+        && typeof n.title === 'string'
+        && typeof n.message === 'string'
+        && Number.isFinite(Number(n.at)))
+      .map((n) => ({
+        id: typeof n.id === 'string' ? n.id : `n-${notifSeq++}`,
+        type: NOTIF_ICONS[n.type] ? n.type : 'system',
+        title: n.title.slice(0, 120),
+        message: n.message.slice(0, 400),
+        at: Number(n.at),
+        read: Boolean(n.read)
+      }))
+      .slice(0, QUEST_NOTIFICATIONS_MAX);
+    questState.baseline = (d && d.questBaseline && typeof d.questBaseline === 'object')
+      ? normalizeBaseline(d.questBaseline)
+      : null;
+    questReadyNotified = false;
+    /* Figer le baseline à la première venue (joueur déjà avancé) : les
+       quêtes comptent alors depuis le déploiement, pas depuis le début du
+       compte. Pour un nouveau joueur, tout est à 0 → quêtes à faire. */
+    initQuestBaselineIfNeeded();
     /* Inventaire : les anciennes sauvegardes n'ont pas packStock/freeDate/
        freeUsed (défauts 0). Le premier pack offert (firstPack) devient
        1 pack classique en inventaire, une seule fois. */
@@ -2562,7 +2680,11 @@
     }
     state.freeDate = typeof (d && d.freeDate) === 'string' ? d.freeDate : '';
     state.freeUsed = clamp(Number(d && d.freeUsed) || 0, 0, FREE_PER_DAY);
+    const previousFreeDate = state.freeDate;
     refreshFreeQuota();
+    /* Nouveau jour calendaire : les packs gratuits se réinitialisent — on
+       prévient (une fois par session) pour ne pas les laisser passer. */
+    const newDay = Boolean(previousFreeDate) && previousFreeDate !== state.freeDate;
     state.currentPackType = firstAvailablePackType();
     state.phase = 'pack';
     state.deck = [];
@@ -2574,6 +2696,10 @@
     renderShop();
     renderPackInventory();
     selectPackType(state.currentPackType);
+    /* Chargement initial : succès repris en compte (rétroactif), quête
+       active mesurée, badges à jour — sans toast ni notification intempestive
+       (le joueur vient d'ouvrir la page, il voit l'onglet Quêtes). */
+    initQuestProgress({ newDay });
   }
 
   function saveNow(force = false) {
@@ -2597,6 +2723,19 @@
         }, {}),
         freeDate: state.freeDate || todayKey(),
         freeUsed: clamp(Number(state.freeUsed) || 0, 0, FREE_PER_DAY),
+        /* Quêtes / succès / niveau / notifications + compteurs alimentant
+           leur progression. */
+        fusions: Math.max(0, Number(state.fusions) || 0),
+        packsBought: Math.max(0, Number(state.packsBought) || 0),
+        freePacks: Math.max(0, Number(state.freePacks) || 0),
+        marketSales: Math.max(0, Number(state.marketSales) || 0),
+        marketEarned: Math.max(0, Number(state.marketEarned) || 0),
+        marketBuys: Math.max(0, Number(state.marketBuys) || 0),
+        xp: Math.max(0, Math.floor(Number(questState.xp) || 0)),
+        quests: questState.completed.slice(),
+        questBaseline: questState.baseline || {},
+        achievements: questState.achievements.slice(),
+        notifications: questState.notifications.slice(0, QUEST_NOTIFICATIONS_MAX),
         updatedAt: serverTimestamp()
       };
     saveQueue = saveQueue.then(async () => {
@@ -2675,6 +2814,22 @@
     unsubscribeMarket();
     selectedFriendUid = null;
     rulesHelpShown = false;
+    /* Quêtes / succès / notifications : on repart de zéro à la déconnexion
+       pour ne pas laisser traîner l'état d'un autre joueur sur cet appareil. */
+    questState.completed = [];
+    questState.achievements = [];
+    questState.xp = 0;
+    questState.notifications = [];
+    questState.baseline = null;
+    questReadyNotified = false;
+    notifSalesKnown = null;
+    notifSalesSnapshot = false;
+    state.fusions = 0;
+    state.packsBought = 0;
+    state.freePacks = 0;
+    state.marketSales = 0;
+    state.marketEarned = 0;
+    state.marketBuys = 0;
     state.packStock = emptyPackStock();
     state.freeDate = '';
     state.freeUsed = 0;
@@ -2869,7 +3024,9 @@
         ? shopView
         : tab === 'inventory'
           ? inventoryView
-          : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
+          : tab === 'quests'
+            ? questsView
+            : state.phase === 'reveal' || state.phase === 'done' ? revealView : packView;
     if (view) {
       view.classList.remove('view-in');
       void view.offsetWidth;
@@ -2883,6 +3040,9 @@
       renderShop();
     } else if (tab === 'inventory') {
       renderInventory();
+    } else if (tab === 'quests') {
+      renderQuests();
+      updateQuestBadges();
     } else if (tab === 'online') {
       renderOnline();
       loadMarket();
@@ -3375,7 +3535,9 @@
         ['💎 Valeur', `${fmt(stats.value)} 🪙`],
         ['👑 Meilleure', stats.best ? RARITIES[stats.best.rarity].label : '—'],
         ['📦 Boosters', fmt(state.packsOpened || 0)],
-        ['👥 Amis', fmt(friends.length)]
+        ['👥 Amis', fmt(friends.length)],
+        ['⭐ Niveau', String(levelInfo().level)],
+        ['🗺️ Quêtes', `${questState.completed.length} / ${Quests.QUESTS.length}`]
       ];
       statsGrid.replaceChildren(...defs.map(([label, value]) => {
         const card = el('div', 'stat-card');
@@ -3625,6 +3787,8 @@
     const data = await fetchFriendProfile(uid);
     if (announce) showToast(`${data.pseudo} : vous êtes maintenant amis !`);
     renderOnline();
+    /* Quête « Premier contact », « Popularité » + succès amis. */
+    trackProgress();
     return true;
   }
 
@@ -3706,7 +3870,11 @@
     knownRequestIds = new Set(friendRequests.map((r) => r.id));
     if (fresh.length && hadRequests) {
       const who = friendProfiles.get(fresh[0].fromUid);
-      showToast(`${who ? who.pseudo : 'Un joueur'} veut t’ajouter en ami — va dans « En ligne » pour accepter.`, 4200);
+      const name = who ? who.pseudo : 'Un joueur';
+      showToast(`${name} veut t’ajouter en ami — va dans « En ligne » pour accepter.`, 4200);
+      /* Notification persistante : la demande survit à la fermeture de la page. */
+      pushNotification('friend', 'Demande d’ami reçue',
+        `${name} veut t’ajouter en ami. Accepte-la dans « En ligne → Demandes reçues ».`);
     }
     hadRequests = true;
     renderOnline();
@@ -4480,6 +4648,27 @@
     }
   }
 
+  /* Annonces vendues : on prévient (notification + toast) quand une annonce
+     passe à « sold » pendant la session. Le premier snapshot ne prévient pas
+     (sinon chaque annonce vendue avant l'ouverture ressortirait d'un coup). */
+  function announceSoldListings(list) {
+    const sold = (list || []).filter((l) => l.status === 'sold');
+    const known = notifSalesKnown || new Set();
+    const fresh = sold.filter((l) => !known.has(l.id));
+    notifSalesKnown = new Set(sold.map((l) => l.id));
+    if (!notifSalesSnapshot) {
+      notifSalesSnapshot = true;
+      return;
+    }
+    if (!fresh.length) return;
+    const total = fresh.reduce((sum, l) => sum + (Number(l.price) || 0), 0);
+    pushNotification('market', 'Vente conclue',
+      fresh.length === 1
+        ? `Une de tes annonces a été achetée : ${fmt(total)} 🪙 à récupérer dans « En ligne ».`
+        : `${fresh.length} de tes annonces ont été achetées : ${fmt(total)} 🪙 à récupérer dans « En ligne ».`);
+    showToast(`💰 ${fmt(total)} 🪙 de ventes à récupérer !`, 4200);
+  }
+
   /* Charge mes annonces, mes cadeaux reçus et mes cadeaux envoyés.
      Chaque requête est indépendante : un refus de règles sur l'une d'elles
      ne doit pas laisser tout le marché vide (c'était le cas avant : une
@@ -4501,7 +4690,10 @@
       fetchAll('coinGifts', 'fromUid', uid, 'Cadeaux envoyés illisibles')
     ]);
     if (!currentUser || currentUser.uid !== uid) return false;
-    if (listings) marketListings = listings;
+    if (listings) {
+      marketListings = listings;
+      announceSoldListings(marketListings);
+    }
     if (gifts) {
       marketGifts = gifts;
       knownGiftIds = new Set(marketGifts.map((g) => g.id));
@@ -4544,6 +4736,7 @@
           try {
             if (!currentUser || currentUser.uid !== uid) return;
             assign(snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })));
+            if (collName === 'marketListings') announceSoldListings(marketListings);
             if (marketBusy) return; // la transaction en cours va rafraîchir elle-même
             renderMarket();
             announceIncomingGifts();
@@ -4838,6 +5031,19 @@
           claimGift: 'Cadeau récupéré !'
         }[action]);
       }
+      /* Compteurs quêtes/succès : ventes encaissées (paiement récupéré) et
+         achats sur le marché. `claimSale` rapporte le prix de l'annonce. */
+      if (action === 'claimSale') {
+        const sold = marketListings.find((l) => l.id === id);
+        state.marketSales = (state.marketSales || 0) + 1;
+        state.marketEarned = (state.marketEarned || 0) + Math.max(0, Number(sold && sold.price) || 0);
+      } else if (action === 'buy') {
+        state.marketBuys = (state.marketBuys || 0) + doneCount;
+      }
+      if (action === 'claimSale' || action === 'buy') {
+        trackProgress();
+        save();
+      }
       await loadMarket();
       if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
     } catch (error) {
@@ -4991,6 +5197,444 @@
   });
   on(inspectCard, 'pointerleave', resetInspTilt);
   on(inspectCard, 'pointercancel', resetInspTilt);
+
+  /* ================================================== QUÊTES · SUCCÈS · NIVEAU
+     Les quêtes se jouent DANS l'ordre de QUESTS : tant que la quête active
+     n'est pas réclamée, la suivante reste verrouillée (et invisible, comme
+     demandé). Les succès sont libres : ils se débloquent dès que leur
+     condition est remplie, y compris rétroactivement. Les récompenses de
+     quêtes rapportent pièces + XP ; les succès rapportent de l'XP. L'XP fait
+     monter le niveau, qui est une progression distincte des pièces. */
+
+  function normalizeBaseline(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    (Quests.METRICS || []).forEach((metric) => {
+      const value = Math.floor(Number(raw[metric]));
+      if (Number.isFinite(value) && value > 0) out[metric] = value;
+    });
+    return out;
+  }
+
+  /* Niveau courant, dérivé de l'XP cumulée. */
+  function levelInfo() {
+    return Quests.levelFromXp(questState.xp);
+  }
+
+  /* Toutes les métriques mesurables, calculées depuis l'état du jeu. */
+  function questCtx() {
+    const owned = CardMutations.owned(collectionIds());
+    const uniqueIds = new Set();
+    let rarePlus = 0;
+    let epicPlus = 0;
+    let legendaryPlus = 0;
+    let shiny = 0;
+    for (const card of owned) {
+      uniqueIds.add(card.baseId || card.id);
+      const info = RARITIES[card.rarity];
+      if (!info) continue;
+      if (info.rank >= RARITIES.rare.rank) rarePlus++;
+      if (info.rank >= RARITIES.epic.rank) epicPlus++;
+      if (info.rank >= RARITIES.legendary.rank) legendaryPlus++;
+      if (card.mutation) shiny++;
+    }
+    return {
+      packsOpened: Math.max(0, Number(state.packsOpened) || 0),
+      packsBought: Math.max(0, Number(state.packsBought) || 0),
+      freePacks: Math.max(0, Number(state.freePacks) || 0),
+      fusions: Math.max(0, Number(state.fusions) || 0),
+      marketSales: Math.max(0, Number(state.marketSales) || 0),
+      marketEarned: Math.max(0, Number(state.marketEarned) || 0),
+      marketBuys: Math.max(0, Number(state.marketBuys) || 0),
+      friends: friends.length,
+      unique: uniqueIds.size,
+      total: owned.length,
+      rarePlus,
+      epicPlus,
+      legendaryPlus,
+      shiny,
+      questsDone: questState.completed.length,
+      level: levelInfo().level,
+      coins: Math.max(0, Number(state.coins) || 0)
+    };
+  }
+
+  /* Baseline = valeurs figées au déploiement du système. Sans lui, un joueur
+     qui a déjà beaucoup joué retrouverait ses quêtes déjà accomplies. */
+  function computeBaseline() {
+    const ctx = questCtx();
+    const out = {};
+    (Quests.METRICS || []).forEach((metric) => {
+      if (ctx[metric] > 0) out[metric] = ctx[metric];
+    });
+    return out;
+  }
+
+  function initQuestBaselineIfNeeded() {
+    if (!Quests.QUESTS.length) return;
+    /* Une sauvegarde sans baseline (joueur déjà avancé avant le système) le
+       fige sur ses compteurs actuels ; une fois persisté, il ne bouge plus
+       (sinon un compteur grimpant « referait » la progression à zéro). */
+    if (!questState.baseline) questState.baseline = computeBaseline();
+  }
+
+  /* Quête à faire : la première pas encore réclamée (ordre strict). */
+  function activeQuest() {
+    if (!Quests.QUESTS.length) return null;
+    const index = questState.completed.length;
+    return index < Quests.QUESTS.length ? Quests.QUESTS[index] : null;
+  }
+
+  function checkQuests({ silent = false } = {}) {
+    const quest = activeQuest();
+    if (!quest) {
+      updateQuestBadges();
+      return;
+    }
+    const progress = Quests.questProgress(quest, questCtx(), questState.baseline);
+    if (progress.done && !questReadyNotified) {
+      questReadyNotified = true;
+      pushNotification('quest', 'Quête accomplie',
+        `« ${quest.title} » est prête : réclame ta récompense dans l’onglet Quêtes.`);
+      if (!silent) showToast(`Quête accomplie : ${quest.title} !`, 4000);
+    }
+    updateQuestBadges();
+  }
+
+  /* Débloquage des succès. `silent` évite le toast au chargement (les
+     succès repris rétroactivement ne doivent pas affoler le joueur). Les
+     succès de niveau débloqués par l'XP gagnée sont rattrapés par l'appel
+     récursif (borné). */
+  function checkAchievements({ silent = false } = {}, depth = 0) {
+    if (!Quests.ACHIEVEMENTS.length || depth > 5) return;
+    const ctx = questCtx();
+    const fresh = [];
+    let xp = 0;
+    for (const achievement of Quests.ACHIEVEMENTS) {
+      if (questState.achievements.indexOf(achievement.id) >= 0) continue;
+      const progress = Quests.achievementProgress(achievement, ctx);
+      if (!progress.done) continue;
+      questState.achievements.push(achievement.id);
+      fresh.push(achievement);
+      xp += Math.max(0, Math.floor(Number(achievement.xp) || 0));
+    }
+    if (!fresh.length) return;
+    fresh.forEach((achievement) => {
+      pushNotification('achievement', 'Succès débloqué',
+        `${achievement.icon || '🏆'} ${achievement.title} — +${fmt(achievement.xp)} XP.`);
+    });
+    if (!silent) {
+      showToast(fresh.length === 1
+        ? `Succès débloqué : ${fresh[0].title} !`
+        : `${fresh.length} succès débloqués !`, 4200);
+    }
+    if (xp) gainXp(xp, { silent: true });
+    checkAchievements({ silent: true }, depth + 1);
+  }
+
+  /* L'XP fait monter le niveau. Le niveau est sa propre récompense (prestige,
+     succès associés) : il ne crédite pas de pièces, pour ne pas brouiller
+     l'économie du marché ni les soldes affichés. */
+  function gainXp(amount, { silent = false } = {}) {
+    const xp = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!xp) return;
+    const before = levelInfo().level;
+    questState.xp += xp;
+    const after = levelInfo().level;
+    if (after > before) {
+      pushNotification('level', `Niveau ${after} atteint !`,
+        'Les quêtes et les succès continuent à rapporter de l’XP.');
+      if (!silent) showToast(`Niveau ${after} atteint !`, 4200);
+    }
+    updateQuestBadges();
+  }
+
+  /* Appelé après chaque action qui peut faire progresser quêtes et succès. */
+  function trackProgress({ silent = false } = {}) {
+    if (!questsView) return;
+    checkQuests({ silent });
+    checkAchievements({ silent });
+    if (app && app.dataset.tab === 'quests') renderQuests();
+  }
+
+  /* Réclamation de la quête active : pièces + XP, puis la suivante se
+     débloque. */
+  function claimActiveQuest() {
+    const quest = activeQuest();
+    if (!quest) return;
+    const reward = quest.reward || { coins: 0, xp: 0 };
+    const progress = Quests.questProgress(quest, questCtx(), questState.baseline);
+    if (!progress.done) {
+      showToast('Objectif pas encore atteint : termine d’abord cette quête.');
+      return;
+    }
+    if (questState.completed.indexOf(quest.id) >= 0) return;
+    questState.completed.push(quest.id);
+    questReadyNotified = false;
+    const coins = Math.max(0, Math.floor(Number(reward.coins) || 0));
+    const xp = Math.max(0, Math.floor(Number(reward.xp) || 0));
+    if (coins) addCoins(coins);
+    pushNotification('quest', 'Quête terminée',
+      `« ${quest.title} » : +${fmt(coins)} 🪙 et +${fmt(xp)} XP.`);
+    if (xp) gainXp(xp);
+    if (SFX && typeof SFX.chaChing === 'function') SFX.chaChing();
+    showToast(`Quête terminée : ${quest.title} ! +${fmt(coins)} 🪙`, 3800);
+    save();
+    checkAchievements();
+    renderQuests();
+    updateQuestBadges();
+  }
+
+  /* ----------------------------------------------------------- notifications
+     Historique persisté (50 max, plus récent en tête). Le badge de la cloche
+     compte les non lues ; le badge de l'onglet Quêtes signale une récompense
+     à réclamer. */
+
+  function pushNotification(type, title, message) {
+    questState.notifications.unshift({
+      id: `n-${Date.now()}-${++notifSeq}`,
+      type: NOTIF_ICONS[type] ? type : 'system',
+      title: String(title || ''),
+      message: String(message || ''),
+      at: Date.now(),
+      read: false
+    });
+    questState.notifications = questState.notifications.slice(0, QUEST_NOTIFICATIONS_MAX);
+    updateNotifBadge();
+    save();
+  }
+
+  function unreadNotificationCount() {
+    return questState.notifications.reduce((sum, n) => sum + (n.read ? 0 : 1), 0);
+  }
+
+  function updateNotifBadge() {
+    if (!notifBadge) return;
+    const count = unreadNotificationCount();
+    notifBadge.hidden = count <= 0;
+    notifBadge.textContent = count > 99 ? '99+' : String(count);
+  }
+
+  function updateQuestBadges() {
+    if (tabBadgeQuests) {
+      const ready = Boolean(Quests.QUESTS.length) && questReadyNotified;
+      tabBadgeQuests.hidden = !ready;
+    }
+    updateNotifBadge();
+  }
+
+  function timeAgo(timestamp) {
+    const diff = Math.max(0, Date.now() - Number(timestamp || 0));
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return 'à l’instant';
+    if (minutes < 60) return `il y a ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `il y a ${hours} h`;
+    return `il y a ${Math.floor(hours / 24)} j`;
+  }
+
+  function renderNotifications() {
+    if (!notifList) return;
+    if (!questState.notifications.length) {
+      notifList.replaceChildren(el('p', 'notif-empty',
+        'Aucune notification pour le moment. Tes quêtes, tes succès et tes récompenses apparaîtront ici.'));
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    questState.notifications.forEach((notification) => {
+      const row = el('div', 'notif-row' + (notification.read ? '' : ' is-unread'));
+      row.append(el('span', 'notif-icon', NOTIF_ICONS[notification.type] || '✦'));
+      const body = el('div', 'notif-body');
+      body.append(
+        el('p', 'notif-title', notification.title),
+        el('p', 'notif-msg', notification.message),
+        el('p', 'notif-time', timeAgo(notification.at))
+      );
+      row.append(body);
+      if (!notification.read) row.append(el('span', 'notif-unread-dot'));
+      frag.append(row);
+    });
+    notifList.replaceChildren(frag);
+  }
+
+  function markAllNotificationsRead() {
+    questState.notifications.forEach((notification) => { notification.read = true; });
+    updateNotifBadge();
+    renderNotifications();
+    save();
+  }
+
+  function openNotifSheet() {
+    renderNotifications();
+    openSheet(notifSheet);
+    if (notifBtn) notifBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeNotifSheet() {
+    closeSheet(notifSheet);
+    if (notifBtn) notifBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  /* ------------------------------------------------------------- rendu quêtes */
+
+  function renderQuests() {
+    if (!questsView) return;
+    const info = levelInfo();
+    if (levelValue) levelValue.textContent = String(info.level);
+    if (levelXp) levelXp.textContent = `${fmt(info.into)} / ${fmt(info.needed)} XP`;
+    if (levelFill) {
+      levelFill.style.transform = `scaleX(${info.needed ? clamp(info.into / info.needed, 0, 1) : 0})`;
+    }
+    const doneCount = questState.completed.length;
+    if (questsCount) {
+      questsCount.textContent = !Quests.QUESTS.length
+        ? 'Quêtes indisponibles'
+        : doneCount >= Quests.QUESTS.length
+          ? `Toutes les quêtes sont terminées (${Quests.QUESTS.length} / ${Quests.QUESTS.length})`
+          : `Quête ${doneCount + 1} / ${Quests.QUESTS.length}`;
+    }
+    if (achCount) achCount.textContent = `${questState.achievements.length} / ${Quests.ACHIEVEMENTS.length}`;
+    renderQuestPanel();
+    renderAchPanel();
+  }
+
+  function renderQuestPanel() {
+    if (!questPanel) return;
+    const frag = document.createDocumentFragment();
+    const quest = activeQuest();
+    if (quest) {
+      const reward = quest.reward || { coins: 0, xp: 0 };
+      const progress = Quests.questProgress(quest, questCtx(), questState.baseline);
+      const card = el('article', 'quest-card' + (progress.done ? ' is-ready' : ''));
+      const kicker = el('p', 'quest-kicker');
+      kicker.append(
+        el('span', 'quest-icon', quest.icon || '🎯'),
+        document.createTextNode(`QUÊTE ${questState.completed.length + 1} / ${Quests.QUESTS.length}`)
+      );
+      card.append(kicker);
+      card.append(el('h3', 'quest-title', quest.title));
+      card.append(el('p', 'quest-desc', quest.desc));
+      const progressBlock = el('div', 'quest-progress');
+      const top = el('div', 'quest-progress-top');
+      top.append(
+        el('span', '', `Objectif : ${Quests.metricLabel(quest.metric)}`),
+        el('b', '', `${fmt(progress.value)} / ${fmt(progress.target)}`)
+      );
+      const bar = el('div', 'quest-bar');
+      const fill = el('i');
+      fill.style.transform = `scaleX(${progress.target ? clamp(progress.value / progress.target, 0, 1) : 0})`;
+      bar.append(fill);
+      progressBlock.append(top, bar);
+      card.append(progressBlock);
+      const meta = el('div', 'quest-meta');
+      const rewards = el('div', 'quest-rewards');
+      rewards.append(
+        el('span', 'quest-reward', `🪙 ${fmt(reward.coins)}`),
+        el('span', 'quest-reward quest-reward-xp', `⭐ ${fmt(reward.xp)} XP`)
+      );
+      const claim = el('button', 'quest-claim', progress.done ? 'RÉCLAMER LA RÉCOMPENSE' : 'EN COURS…');
+      claim.type = 'button';
+      claim.disabled = !progress.done;
+      claim.setAttribute('aria-label', progress.done
+        ? `Réclamer la récompense de la quête ${quest.title}`
+        : `Quête ${quest.title} en cours`);
+      on(claim, 'click', claimActiveQuest);
+      meta.append(rewards, claim);
+      card.append(meta);
+      frag.append(card);
+    } else if (Quests.QUESTS.length) {
+      frag.append(el('div', 'quest-all-done',
+        '🏆 Toutes les quêtes sont terminées ! Reviens bientôt : la suite arrive avec une nouvelle saison.'));
+    }
+    /* Quêtes déjà réclamées (de la plus récente à la plus ancienne). Les
+       quêtes suivantes restent volontairement invisibles : elles se
+       débloquent une par une. */
+    const done = questState.completed.slice().reverse();
+    if (done.length) {
+      frag.append(el('p', 'quest-done-title', `QUÊTES TERMINÉES · ${done.length}`));
+      const list = el('div', 'quest-done-list');
+      done.forEach((id) => {
+        const definition = Quests.QUESTS.find((q) => q.id === id);
+        if (!definition) return;
+        const row = el('div', 'quest-done-row');
+        row.append(
+          el('span', 'quest-icon', definition.icon || '🎯'),
+          el('span', '', definition.title),
+          el('span', 'quest-done-reward', `+${fmt((definition.reward || {}).coins || 0)} 🪙`),
+          el('span', 'quest-done-check', '✓')
+        );
+        list.append(row);
+      });
+      frag.append(list);
+    }
+    questPanel.replaceChildren(frag);
+  }
+
+  function renderAchPanel() {
+    if (!achPanel) return;
+    const ctx = questCtx();
+    const frag = document.createDocumentFragment();
+    frag.append(el('p', 'ach-summary',
+      `${questState.achievements.length} succès débloqué${questState.achievements.length > 1 ? 's' : ''} sur ${Quests.ACHIEVEMENTS.length} · chaque succès rapporte de l’XP.`));
+    const grid = el('div', 'ach-grid');
+    Quests.ACHIEVEMENTS.forEach((achievement) => {
+      const unlocked = questState.achievements.indexOf(achievement.id) >= 0;
+      const progress = Quests.achievementProgress(achievement, ctx);
+      const tile = el('article', 'ach-tile ' + (unlocked ? 'is-unlocked' : 'is-locked'));
+      tile.append(el('span', 'ach-state', unlocked ? '✓' : '🔒'));
+      tile.append(el('div', 'ach-icon', achievement.icon || '🏆'));
+      tile.append(el('h3', 'ach-title', achievement.title));
+      tile.append(el('p', 'ach-desc', achievement.desc));
+      const meta = el('p', 'ach-meta');
+      meta.append(el('span', 'ach-xp', `+${fmt(achievement.xp)} XP`));
+      if (!unlocked && progress.target > 1) {
+        meta.append(document.createTextNode(` · ${fmt(progress.value)}/${fmt(progress.target)}`));
+      }
+      tile.append(meta);
+      grid.append(tile);
+    });
+    frag.append(grid);
+    achPanel.replaceChildren(frag);
+  }
+
+  /* Chargement initial (appelé depuis applySave) : succès repris en compte,
+     quête active mesurée, badges à jour — sans toast. */
+  function initQuestProgress({ newDay = false } = {}) {
+    if (questsView) {
+      checkQuests({ silent: true });
+      checkAchievements({ silent: true });
+      renderQuests();
+      updateQuestBadges();
+    }
+    if (newDay) {
+      pushNotification('system', 'Packs gratuits disponibles',
+        'Un nouveau jour : tes 3 packs classiques gratuits t’attendent dans le Shop.');
+    }
+  }
+
+  /* Écouteurs du panneau de notifications et des onglets Quêtes / Succès. */
+  on(notifBtn, 'click', () => { SFX.unlock(); openNotifSheet(); });
+  on(notifReadAll, 'click', markAllNotificationsRead);
+  if (notifSheet) {
+    notifSheet.querySelectorAll('[data-close-notif]').forEach((button) => {
+      on(button, 'click', closeNotifSheet);
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && notifSheet && !notifSheet.hidden) closeNotifSheet();
+  });
+  document.querySelectorAll('[data-quest-tab]').forEach((tab) => {
+    on(tab, 'click', () => {
+      document.querySelectorAll('[data-quest-tab]').forEach((other) => {
+        const active = other === tab;
+        other.classList.toggle('is-active', active);
+        other.setAttribute('aria-selected', String(active));
+      });
+      if (questPanel) questPanel.hidden = tab.dataset.questTab !== 'quests';
+      if (achPanel) achPanel.hidden = tab.dataset.questTab !== 'achievements';
+      SFX.tick();
+    });
+  });
 
   function boot() {
     // Sans ces deux éléments, la page n'est pas celle attendue (ancien HTML en

@@ -10,7 +10,7 @@ service cloud.firestore {
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'freeDate', 'freeUsed', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'freeDate', 'freeUsed', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'updatedAt'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
@@ -21,6 +21,19 @@ service cloud.firestore {
         && request.resource.data.friends.size() <= 500
         && request.resource.data.packsOpened is int
         && request.resource.data.packsOpened >= 0
+        /* Quêtes / succès / niveau / notifications : compteurs cumulés,
+           XP, ids de quêtes et de succès, base de référence et historique. */
+        && (!('fusions' in request.resource.data) || (request.resource.data.fusions is int && request.resource.data.fusions >= 0))
+        && (!('packsBought' in request.resource.data) || (request.resource.data.packsBought is int && request.resource.data.packsBought >= 0))
+        && (!('freePacks' in request.resource.data) || (request.resource.data.freePacks is int && request.resource.data.freePacks >= 0))
+        && (!('marketSales' in request.resource.data) || (request.resource.data.marketSales is int && request.resource.data.marketSales >= 0))
+        && (!('marketEarned' in request.resource.data) || (request.resource.data.marketEarned is int && request.resource.data.marketEarned >= 0))
+        && (!('marketBuys' in request.resource.data) || (request.resource.data.marketBuys is int && request.resource.data.marketBuys >= 0))
+        && (!('xp' in request.resource.data) || (request.resource.data.xp is int && request.resource.data.xp >= 0))
+        && (!('quests' in request.resource.data) || (request.resource.data.quests is list && request.resource.data.quests.size() <= 100))
+        && (!('achievements' in request.resource.data) || (request.resource.data.achievements is list && request.resource.data.achievements.size() <= 200))
+        && (!('questBaseline' in request.resource.data) || request.resource.data.questBaseline is map)
+        && (!('notifications' in request.resource.data) || (request.resource.data.notifications is list && request.resource.data.notifications.size() <= 50))
         && (!('packStock' in request.resource.data)
             || (request.resource.data.packStock is map
                 && request.resource.data.packStock.keys().hasOnly(['classic', 'rare', 'legend', 'video'])

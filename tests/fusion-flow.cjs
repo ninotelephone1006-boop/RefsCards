@@ -50,6 +50,7 @@ async function boot({ url = 'https://refs-cards.test/', save = null, mutateScrip
   const context = dom.getInternalVMContext();
   vm.runInContext(fs.readFileSync('firebase-config.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
   let src = fs.readFileSync('app.js', 'utf8');
   if (mutateScript) src = mutateScript(src);
   vm.runInContext(src, context);

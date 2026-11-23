@@ -19,7 +19,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   /* 1. Les scripts locaux sont classiques, différés, versionnés et dans l'ordre. */
   const local = [...doc.querySelectorAll('script[src]')]
     .filter((script) => !/^https?:/i.test(script.getAttribute('src')));
-  assert.ok(local.length >= 4, 'firebase-config.js, cards.js, audio.js et app.js doivent être chargés');
+  assert.ok(local.length >= 5, 'firebase-config.js, cards.js, quests.js, audio.js et app.js doivent être chargés');
   for (const script of local) {
     const src = script.getAttribute('src');
     assert.notEqual(script.getAttribute('type'), 'module', `${src} ne doit pas être un module ES`);
@@ -30,7 +30,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     'app.js doit être le dernier script (il dépend de cards.js et audio.js)');
 
   /* 2. Aucun fichier local n'utilise la syntaxe réservée aux modules. */
-  for (const file of ['firebase-config.js', 'cards.js', 'audio.js', 'app.js']) {
+  for (const file of ['firebase-config.js', 'cards.js', 'quests.js', 'audio.js', 'app.js']) {
     assert.doesNotThrow(
       () => new vm.Script(fs.readFileSync(file, 'utf8'), { filename: file }),
       `${file} contient du syntaxe de module (import/export) : impossible dans un script classique`

@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
     w.Sound = new Proxy({}, { get: () => noop });
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+    vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
     const sources = vm.runInContext('cardsDatabase.flatMap(cardImageSources)', context);
     const cardCount = vm.runInContext('cardsDatabase.length', context);
     assert.ok(sources.length >= cardCount, 'au moins une source candidate par carte');
@@ -68,6 +69,7 @@ const assert = require('node:assert/strict');
     w.Sound = new Proxy({}, { get: () => noop });
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
+    vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
     vm.runInContext(
       fs.readFileSync('app.js', 'utf8').replace(
         /\}\)\(\);\s*$/,
