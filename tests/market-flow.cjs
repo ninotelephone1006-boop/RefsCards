@@ -219,8 +219,16 @@ function buttonByText(root, text) {
   const qtyHint = doc2.getElementById('market-qty-hint');
   const submitBtn = doc2.getElementById('market-submit');
 
-  cardSel.value = 'chasseur-royer';
-  cardSel.dispatchEvent(new w2.Event('change', { bubbles: true }));
+  const cardChoices = doc2.getElementById('market-card-choices');
+  const chasseurChoice = cardChoices.querySelector('[data-card-id="chasseur-royer"]');
+  const piedsChoice = cardChoices.querySelector('[data-card-id="pieds-de-rapace"]');
+  assert.equal(cardChoices.querySelectorAll('.market-card-choice').length, 2);
+  assert.equal(chasseurChoice.querySelector('img').getAttribute('src'), 'assets/Cartes/chasseur-royer.jpg');
+  assert.equal(chasseurChoice.querySelector('img').alt, 'Chasseur Royer');
+  chasseurChoice.click();
+  assert.equal(cardSel.value, 'chasseur-royer');
+  assert.equal(chasseurChoice.getAttribute('aria-pressed'), 'true');
+  assert.equal(piedsChoice.getAttribute('aria-pressed'), 'false');
   assert.equal(qtyInput.value, '1', 'quantité par défaut = 1 (pas toute la pile)');
   assert.equal(qtyMinus.disabled, true);
   assert.equal(qtyPlus.disabled, false);
@@ -236,8 +244,10 @@ function buttonByText(root, text) {
   assert.match(qtyHint.textContent, /2 sur 5.*restera 3/);
 
   // Changer de carte réinitialise la quantité à 1.
-  cardSel.value = 'pieds-de-rapace';
-  cardSel.dispatchEvent(new w2.Event('change', { bubbles: true }));
+  piedsChoice.click();
+  assert.equal(cardSel.value, 'pieds-de-rapace');
+  assert.equal(piedsChoice.getAttribute('aria-pressed'), 'true');
+  assert.equal(chasseurChoice.getAttribute('aria-pressed'), 'false');
   assert.equal(qtyInput.value, '1');
   assert.match(qtyHint.textContent, /1 sur 2.*restera 1/);
 
@@ -266,6 +276,9 @@ function buttonByText(root, text) {
 
   // Mes annonces sont regroupées : on peut retirer 1 seul exemplaire sans tout annuler.
   assert.match(doc2.getElementById('my-listings').textContent, /×2/);
+  const myCardRow = doc2.querySelector('#my-listings .trade-row');
+  assert.equal(myCardRow.querySelector('img').getAttribute('src'), 'assets/Cartes/chasseur-royer.jpg');
+  assert.doesNotMatch(myCardRow.querySelector('.trade-text').textContent, /Chasseur Royer/);
   buttonByText(doc2.getElementById('my-listings'), 'Retirer 1').click();
   await wait(120);
   assert.equal(store2.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 4);
@@ -292,6 +305,10 @@ function buttonByText(root, text) {
   await wait(50);
   const friendBox = doc2.getElementById('friend-listings');
   assert.match(friendBox.textContent, /×3 dispo/);
+  const friendCardRow = friendBox.querySelector('.trade-row');
+  assert.equal(friendCardRow.querySelector('img').getAttribute('src'), 'assets/Cartes/chasseur-royer.jpg');
+  assert.equal(friendCardRow.querySelector('img').alt, 'Chasseur Royer');
+  assert.doesNotMatch(friendCardRow.querySelector('.trade-text').textContent, /Chasseur Royer/);
   const buyQty = friendBox.querySelector('.market-row-qty');
   assert.equal(buyQty.value, '1');
   friendBox.querySelectorAll('.market-row-btn')[1].click(); // +

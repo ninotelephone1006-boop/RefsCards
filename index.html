@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-6">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-7">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -25,7 +25,7 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-2" defer></script>
   <script src="audio.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-5" defer></script>
+  <script src="app.js?v=2026.11.24-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -367,7 +367,9 @@
             <h3>🏪 Mon marché — créer une annonce</h3>
             <p class="online-empty">Mets en vente les cartes que tu veux : choisis la carte, le nombre d'exemplaires à vendre et le prix par carte, comme tu veux. Seule la quantité choisie est réservée jusqu’à la vente ou l’annulation. Tes amis verront ton marché sur ton profil.</p>
             <form id="market-list-form" class="market-form">
-              <label for="market-card">Carte à vendre</label><select id="market-card" required></select>
+              <span class="market-card-label" id="market-card-label">Carte à vendre</span>
+              <select id="market-card" hidden aria-hidden="true" tabindex="-1"></select>
+              <div id="market-card-choices" class="market-card-choices" role="group" aria-labelledby="market-card-label"></div>
               <label for="market-qty">Nombre à vendre (exemplaires)</label>
               <div class="market-qty-wrap">
                 <button class="qty-btn" id="market-qty-minus" type="button" aria-label="Vendre une carte de moins">−</button>

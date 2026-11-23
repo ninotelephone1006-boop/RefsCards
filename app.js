@@ -3795,6 +3795,7 @@
   let hadGiftSnapshot = false;
   const marketMessage = $('market-message');
   const marketCard = $('market-card');
+  const marketCardChoices = $('market-card-choices');
   const marketQty = $('market-qty');
   const marketQtyMinus = $('market-qty-minus');
   const marketQtyPlus = $('market-qty-plus');
@@ -3877,6 +3878,45 @@
   function listingName(listing) {
     if (isPackListing(listing)) return packName(listing.packType);
     return cardName(listing && listing.cardId);
+  }
+
+  // Affiche le visuel réel, avec un secours lisible si le fichier manque.
+  function marketCardImage(card) {
+    const visual = el('span', 'market-card-image');
+    const fallback = el('span', 'market-card-fallback', card.name);
+    visual.append(fallback);
+    const sources = typeof cardImageSources === 'function' ? cardImageSources(card) : card.image ? [card.image] : [];
+    if (sources.length) {
+      const img = el('img');
+      img.alt = card.name;
+      img.loading = 'lazy';
+      img.draggable = false;
+      let index = 0;
+      on(img, 'error', () => {
+        index++;
+        if (index < sources.length) img.src = sources[index];
+        else img.remove();
+      });
+      img.src = sources[0];
+      visual.append(img);
+    }
+    return visual;
+  }
+
+  function syncMarketCardChoice() {
+    if (!marketCardChoices || !marketCard) return;
+    marketCardChoices.querySelectorAll('button').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.cardId === marketCard.value));
+    });
+  }
+
+  function appendMarketListing(row, group, label) {
+    if (!group.packType) {
+      const card = cardsDatabase.find((c) => c.id === group.cardId);
+      if (card) row.append(marketCardImage(card));
+      else row.append(el('span', 'trade-text', cardName(group.cardId)));
+    }
+    row.append(el('span', 'trade-text', label));
   }
 
   function marketInfo(message) {
@@ -4021,6 +4061,23 @@
       marketCard.replaceChildren(...options);
       const kept = Boolean(old) && owned.has(old);
       if (kept) marketCard.value = old;
+      if (marketCardChoices) {
+        const cards = cardsDatabase.filter((card) => owned.has(card.id));
+        marketCardChoices.replaceChildren(...(cards.length ? cards.map((card) => {
+          const button = el('button', 'market-card-choice');
+          button.type = 'button';
+          button.dataset.cardId = card.id;
+          button.setAttribute('aria-label', `${card.name}, ${owned.get(card.id)} disponible(s)`);
+          button.append(marketCardImage(card), el('span', 'market-card-count', `×${owned.get(card.id)}`));
+          on(button, 'click', () => {
+            marketCard.value = card.id;
+            syncMarketCardChoice();
+            syncMarketQty({ reset: true });
+          });
+          return button;
+        }) : [el('p', 'online-empty', 'Aucune carte disponible') ]));
+        syncMarketCardChoice();
+      }
       syncMarketQty({ reset: !kept, clampValue: true });
     }
     if (myListings) {
@@ -4032,9 +4089,9 @@
         const name = isPack ? packName(group.packType) : cardName(group.cardId);
         const unit = isPack ? 'pack' : 'carte';
         const label = count > 1
-          ? `${name} (×${count}) · ${fmt(group.price)} 🪙 / ${unit}`
-          : `${name} · ${fmt(group.price)} 🪙`;
-        row.append(el('span', 'trade-text', label));
+          ? `${isPack ? name + ' ' : ''}(×${count}) · ${fmt(group.price)} 🪙 / ${unit}`
+          : `${isPack ? name + ' · ' : ''}${fmt(group.price)} 🪙`;
+        appendMarketListing(row, group, label);
         if (count > 1) {
           const cancelOne = el('button', 'mini-btn', 'Retirer 1');
           cancelOne.type = 'button';
@@ -4187,9 +4244,9 @@
         const name = isPack ? packName(group.packType) : cardName(group.cardId);
         const unit = isPack ? 'pack' : 'carte';
         const label = count > 1
-          ? `${name} (×${count} dispo) · ${fmt(group.price)} 🪙 / ${unit}`
-          : `${name} · ${fmt(group.price)} 🪙`;
-        row.append(el('span', 'trade-text', label));
+          ? `${isPack ? name + ' ' : ''}(×${count} dispo) · ${fmt(group.price)} 🪙 / ${unit}`
+          : `${isPack ? name + ' · ' : ''}${fmt(group.price)} 🪙`;
+        appendMarketListing(row, group, label);
         let qtyInput = null;
         if (count > 1) {
           const qtyWrap = el('div', 'market-row-qty-wrap');
@@ -4461,7 +4518,10 @@
     }
   }
 
-  on(marketCard, 'change', () => syncMarketQty({ reset: true }));
+  on(marketCard, 'change', () => {
+    syncMarketCardChoice();
+    syncMarketQty({ reset: true });
+  });
   on(marketQtyMinus, 'click', () => {
     if (!marketQty) return;
     const ownedCount = countMap().get(marketCard && marketCard.value) || 0;
