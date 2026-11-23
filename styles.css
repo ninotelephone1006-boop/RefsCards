@@ -742,15 +742,31 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   transform-style: preserve-3d;
 }
 
-/* -- dos de carte -- */
+/* -- dos de carte : derriere.png (le bleu) recolore selon la couleur de la
+   carte, memes motifs pour tous (assets/derriere-*.jpg, generes depuis
+   derriere.png). Rare = bleu d'origine, legendaire = dore, video = vert,
+   epique = violet, etc. Le choix se fait via data-back pose par app.js. -- */
 .card-back {
   padding: 6.5%;
-  background:
-    repeating-linear-gradient(135deg, #ffffff00 0 9px, #b388ff0a 9px 10px),
-    radial-gradient(120% 90% at 30% 10%, #2a1e38, #16111b 60%, #0d0812);
-  border: 1px solid #522e81;
-  box-shadow: inset 0 0 0 3px #0e0a13, inset 0 0 0 4px #362150, inset 0 0 44px #000000a8;
+  background: #0d0812 url('assets/derriere.png') center / cover no-repeat;
+  border: 1px solid var(--r-color, #522e81);
+  box-shadow: inset 0 0 0 3px #0e0a13, inset 0 0 0 4px #00000055, inset 0 0 44px #000000a8;
 }
+.card-back[data-back='common'] { background-image: url('assets/derriere-common.jpg'); }
+.card-back[data-back='uncommon'] { background-image: url('assets/derriere-uncommon.jpg'); }
+.card-back[data-back='rare'] { background-image: url('assets/derriere.png'); }
+.card-back[data-back='superrare'] { background-image: url('assets/derriere-superrare.jpg'); }
+.card-back[data-back='epic'] { background-image: url('assets/derriere-epic.jpg'); }
+.card-back[data-back='ultraepic'] { background-image: url('assets/derriere-ultraepic.jpg'); }
+.card-back[data-back='mythic'] { background-image: url('assets/derriere-mythic.jpg'); }
+.card-back[data-back='legendary'] { background-image: url('assets/derriere-legendary.jpg'); }
+.card-back[data-back='divine'] { background-image: url('assets/derriere-divine.jpg'); }
+.card-back[data-back='secret'] { background-image: url('assets/derriere-secret.jpg'); }
+.card-back[data-back='video'] { background-image: url('assets/derriere-video.jpg'); }
+/* Sur le motif plein cadre, on garde juste l'etoile centrale et les textes. */
+.card-back .back-emblem i { display: none; }
+.card-back .back-star { color: #ffffff; text-shadow: 0 0 22px #ffffff9c, 0 0 48px #0000008a; }
+.card-back .back-row, .card-back .back-row.bottom { color: #ffffff; text-shadow: 0 1px 6px #000000cc; }
 .card-back::after {
   content: '';
   position: absolute;
