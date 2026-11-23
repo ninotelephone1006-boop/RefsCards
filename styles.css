@@ -2195,7 +2195,7 @@ html,body{background:var(--bg)}
 @media(max-width:559px){.hud{padding-left:12px;padding-right:12px;gap:6px}.brand{gap:5px;font-size:14px}.account-control{gap:5px;max-width:none}.account-control span{display:none}.account-control button{padding:6px 6px;font-size:9px}.hud-right{gap:6px}.season{display:none}}
 
 /* ==========================================================================
-   COMPTE + EN LIGNE (amis, échanges, achats)
+   COMPTE + EN LIGNE (amis, marché, achats)
    ========================================================================== */
 .account-view,.online-view{justify-content:flex-start;align-items:stretch}
 .page-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
@@ -2499,6 +2499,7 @@ html,body{background:var(--bg)}
 .market-form label{flex-basis:100%;font-size:11px;color:#c4a1ff;font-weight:700}
 .market-form input,.market-form select{flex:1 1 150px;min-width:0;padding:10px;border:1px solid #725598;border-radius:9px;background:#0f0b14;color:#fff;font:inherit}
 .market-form select option{background:#160f20}.market-block #market-refresh{margin-top:12px}
+.market-sub{margin:14px 0 6px;font-size:14px;color:#e9d7ff;letter-spacing:.02em}
 .market-qty-wrap{flex-basis:100%;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .market-form .market-qty-input{flex:0 0 74px;width:74px;padding:7px 8px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 .market-qty-hint{font-size:12px;color:#b8acd0}

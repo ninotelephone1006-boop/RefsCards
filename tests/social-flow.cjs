@@ -1,7 +1,9 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/social-flow.cjs
 // Vérifie les pages Compte et En ligne : pseudo modifiable, code ami généré,
-// ajout d'ami par code, profil d'ami avec ses cartes, proposition d'échange
-// et d'achat (documents trades/ créés avec les bons champs).
+// ajout d'ami par code, profil d'ami avec ses cartes et son marché.
+// Les échanges à la demande (trades/) n'existent plus : ce test vérifie
+// aussi qu'on ne peut PLUS demander une carte à un ami, et que le marché
+// de l'ami s'achète depuis son profil.
 const { JSDOM } = require('jsdom');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -39,7 +41,8 @@ function makeStore() {
 }
 
 function makeFirestore(store) {
-  const docRef = (coll, id) => ({
+  let nextId = 0;
+  const docRef = (coll, id) => ({ coll, id,
     get: async () => ({
       exists: Object.prototype.hasOwnProperty.call(store[coll], id),
       data: () => store[coll][id]
@@ -67,9 +70,20 @@ function makeFirestore(store) {
   };
   return {
     collection: (coll) => ({
-      doc: (id) => docRef(coll, id),
+      doc: (id) => docRef(coll, id || `generated${++nextId}`),
       where: (field, op, value) => query(coll, field, value)
     }),
+    async runTransaction(fn) {
+      const writes = [];
+      const tx = {
+        get: async (ref) => ({ exists: !!store[ref.coll][ref.id], data: () => structuredClone(store[ref.coll][ref.id]) }),
+        set: (ref, data) => writes.push(() => { store[ref.coll][ref.id] = structuredClone(data); }),
+        update: (ref, data) => writes.push(() => { store[ref.coll][ref.id] = { ...store[ref.coll][ref.id], ...structuredClone(data) }; })
+      };
+      const result = await fn(tx);
+      writes.forEach((write) => write());
+      return result;
+    },
     // Pousse une mise à jour du store vers les abonnés onSnapshot.
     refresh(coll) {
       watchers.filter((w) => !coll || w.coll === coll).forEach((w) => w.cb());
@@ -168,36 +182,37 @@ function buttonByText(root, text) {
   await wait(400); // save() est différé de 250 ms
   assert.ok(store.playerSaves.me.friends.includes('friend1'), 'ami enregistré dans ma sauvegarde');
   console.log('PASS acceptation par l’autre joueur = amis des deux côtés');
-  /* 4. Profil d'ami : stats + ses cartes, boutons Échanger / Acheter. */
+  /* 4. Profil d'ami : stats + ses cartes, mais PLUS de bouton « Échanger ». */
   buttonByText(doc.querySelector('.friend-row'), 'Voir').click();
   await wait(60);
   assert.equal(doc.getElementById('friend-detail').hidden, false);
   assert.equal(doc.getElementById('friend-pseudo').textContent, 'AmiJoueur');
   assert.equal(doc.querySelectorAll('.friend-card').length, 1);
   assert.equal(buttonByText(doc.querySelector('.friend-card'), 'Acheter'), undefined, 'seules les annonces sont vendues');
-  console.log('PASS profil d’ami = stats et cartes à échanger');
+  assert.equal(buttonByText(doc.querySelector('.friend-card'), 'Échanger'), undefined, 'plus de demande de carte à la carte');
+  assert.equal(doc.getElementById('trade-sheet'), null, 'plus de fenêtre de choix d’échange');
+  console.log('PASS profil d’ami = stats et collection (sans bouton Échanger)');
 
-  /* 5. Échange : choix d'une de mes cartes, confirmation, document trades/. */
-  buttonByText(doc.querySelector('.friend-card'), 'Échanger').click();
-  await wait(30);
-  assert.equal(doc.getElementById('trade-sheet').hidden, false);
-  assert.equal(doc.querySelectorAll('.picker-tile').length, 2, 'mes deux cartes uniques');
-  doc.querySelector('#trade-picker .picker-tile').click();
-  await wait(30);
+  /* 5. Le marché de l'ami est visible sur son profil : on y achète
+     directement une annonce (plus aucun document trades/ créé). */
+  store.marketListings['friend-ad'] = { sellerUid: 'friend1', cardId: 'chasseur-royer', price: 120, buyerUid: '', status: 'open' };
+  doc.getElementById('market-refresh').click();
+  await wait(60);
+  const friendListings = doc.getElementById('friend-listings');
+  assert.match(friendListings.textContent, /Chasseur Royer/);
+  assert.match(friendListings.textContent, /120/);
+  buttonByText(friendListings, 'Acheter').click();
+  await wait(10);
   assert.equal(doc.getElementById('confirm-sheet').hidden, false);
   doc.getElementById('confirm-ok').click();
-  await wait(80);
-  const tradeIds = Object.keys(store.trades);
-  assert.equal(tradeIds.length, 1);
-  const trade = store.trades[tradeIds[0]];
-  assert.equal(trade.fromUid, 'me');
-  assert.equal(trade.toUid, 'friend1');
-  assert.equal(trade.receiveId, 'chasseur-royer');
-  assert.equal(trade.giveId, 'pieds-de-rapace');
-  assert.equal(trade.price, 0);
-  assert.equal(trade.status, 'pending');
-  console.log('PASS proposition d’échange = trades/ pending avec give/receive');
+  await wait(120);
+  assert.equal(store.marketListings['friend-ad'].status, 'sold');
+  assert.equal(store.marketListings['friend-ad'].buyerUid, 'me');
+  assert.equal(store.playerSaves.me.coins, 380, '120 pièces débitées sur les 500');
+  assert.equal(store.playerSaves.me.collection.filter((id) => id === 'chasseur-royer').length, 2);
+  assert.equal(Object.keys(store.trades).length, 0, 'aucun document trades/ créé');
+  console.log('PASS achat dans le marché de l’ami (profil) = carte achetée, aucun trades/');
 
   w.close();
-  console.log('PASS social-flow : compte, amis, échange et achat');
+  console.log('PASS social-flow : compte, amis, profil et marché');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -211,8 +211,9 @@ function buttonByText(root, text) {
   const frame = cards[0].querySelector('.friend-card-frame');
   assert.ok(frame, 'chaque carte doit être dans un cadre .friend-card-frame');
   assert.ok(frame.querySelector('.cf'), 'le visuel .cf est bien dans le cadre');
-  assert.ok(cards[0].querySelector('.friend-card-actions'), 'les boutons restent sous la carte');
-  console.log('PASS fiche ami = cartes montées dans un cadre 5:7 (plus de chevauchement)');
+  assert.ok(!cards[0].querySelector('.friend-card-actions'), 'plus de bouton sous la carte : on ne peut plus demander de carte');
+  assert.equal(cards[0].querySelector('button'), null, 'aucune action de demande sur les cartes de la fiche ami');
+  console.log('PASS fiche ami = cartes montées dans un cadre 5:7 (plus de bouton d’échange)');
 
   /* 5. Une demande acceptée pendant mon absence devient un ami au chargement. */
   const other = makeStore();

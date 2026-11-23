@@ -106,10 +106,26 @@ service cloud.firestore {
     // Le marché fonctionne par mise en réserve. Les règles lient chaque
     // changement d'état à une modification atomique de la sauvegarde de
     // l'acteur. Une annonce/cadeau ne peut être consommé qu'une fois.
+    // Une annonce peut porter une CARTE (cardId) ou un PACK (packType
+    // 'classic' | 'rare'). Les deux sont mises en réserve dans la sauvegarde
+    // du vendeur avant d'être listées, puis transférées dans la même
+    // transaction que le paiement (cartes ↔ collection, packs ↔ packStock).
     match /marketListings/{listingId} {
       function signedIn() { return request.auth != null; }
       function beforeSave() { return get(/databases/$(database)/documents/playerSaves/$(request.auth.uid)).data; }
       function afterSave() { return getAfter(/databases/$(database)/documents/playerSaves/$(request.auth.uid)).data; }
+      function hasStock() {
+        return beforeSave().packStock is map && afterSave().packStock is map;
+      }
+      function stockKeysOk() {
+        return afterSave().packStock.keys().hasOnly(['classic', 'rare'])
+          && afterSave().packStock.classic is int && afterSave().packStock.classic >= 0 && afterSave().packStock.classic <= 100000
+          && afterSave().packStock.rare is int && afterSave().packStock.rare >= 0 && afterSave().packStock.rare <= 100000;
+      }
+      function stockUnchanged() {
+        return (!('packStock' in beforeSave()) && !('packStock' in afterSave()))
+          || (afterSave().packStock == beforeSave().packStock);
+      }
       function cardRemoved(card) {
         return card in beforeSave().collection
           && afterSave().collection.size() == beforeSave().collection.size() - 1
@@ -122,29 +138,69 @@ service cloud.firestore {
           && afterSave().collection.hasAll(beforeSave().collection)
           && beforeSave().collection.hasAll(afterSave().collection.removeAll([card]));
       }
+      function packRemoved(packType) {
+        return hasStock() && stockKeysOk()
+          && afterSave().collection == beforeSave().collection
+          && (packType == 'classic'
+            ? afterSave().packStock.classic == beforeSave().packStock.classic - 1
+              && afterSave().packStock.rare == beforeSave().packStock.rare
+            : afterSave().packStock.rare == beforeSave().packStock.rare - 1
+              && afterSave().packStock.classic == beforeSave().packStock.classic);
+      }
+      function packAdded(packType) {
+        return hasStock() && stockKeysOk()
+          && afterSave().collection == beforeSave().collection
+          && (packType == 'classic'
+            ? afterSave().packStock.classic == beforeSave().packStock.classic + 1
+              && afterSave().packStock.rare == beforeSave().packStock.rare
+            : afterSave().packStock.rare == beforeSave().packStock.rare + 1
+              && afterSave().packStock.classic == beforeSave().packStock.classic);
+      }
+      function validPrice() {
+        return request.resource.data.price is int && request.resource.data.price >= 0 && request.resource.data.price <= 1000000000;
+      }
+      function validStatusOpen() {
+        return request.resource.data.status == 'open' && request.resource.data.buyerUid == '';
+      }
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['sellerUid', 'cardId', 'price', 'status', 'buyerUid', 'createdAt'])
-        && request.resource.data.sellerUid == request.auth.uid
-        && request.resource.data.cardId is string && request.resource.data.cardId.size() > 0 && request.resource.data.cardId.size() <= 100
-        && request.resource.data.price is int && request.resource.data.price >= 0 && request.resource.data.price <= 1000000000
-        && request.resource.data.status == 'open' && request.resource.data.buyerUid == ''
-        && request.resource.data.createdAt is timestamp
-        && cardRemoved(request.resource.data.cardId)
-        && afterSave().coins == beforeSave().coins;
+      allow create: if signedIn() && (
+        // Carte mise en vente : 1 exemplaire retiré de la collection.
+        (request.resource.data.keys().hasOnly(['sellerUid', 'cardId', 'price', 'status', 'buyerUid', 'createdAt'])
+          && request.resource.data.sellerUid == request.auth.uid
+          && request.resource.data.cardId is string && request.resource.data.cardId.size() > 0 && request.resource.data.cardId.size() <= 100
+          && validPrice() && validStatusOpen()
+          && request.resource.data.createdAt is timestamp
+          && cardRemoved(request.resource.data.cardId)
+          && afterSave().coins == beforeSave().coins
+          && stockUnchanged())
+        ||
+        // Pack mis en vente : 1 pack retiré de l'inventaire.
+        (request.resource.data.keys().hasOnly(['sellerUid', 'packType', 'price', 'status', 'buyerUid', 'createdAt'])
+          && request.resource.data.sellerUid == request.auth.uid
+          && (request.resource.data.packType == 'classic' || request.resource.data.packType == 'rare')
+          && validPrice() && validStatusOpen()
+          && request.resource.data.createdAt is timestamp
+          && packRemoved(request.resource.data.packType)
+          && afterSave().coins == beforeSave().coins)
+      );
       allow update: if signedIn() && (
-        // Le vendeur retire une annonce ouverte et récupère sa carte.
+        // Le vendeur retire une annonce ouverte et récupère la carte / le pack.
         (resource.data.sellerUid == request.auth.uid && resource.data.status == 'open'
           && request.resource.data.status == 'cancelled'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-          && cardAdded(resource.data.cardId) && afterSave().coins == beforeSave().coins)
+          && ('packType' in resource.data
+            ? packAdded(resource.data.packType)
+            : cardAdded(resource.data.cardId) && stockUnchanged())
+          && afterSave().coins == beforeSave().coins)
         ||
-        // L'acheteur paie et reçoit la carte dans la même transaction.
+        // L'acheteur paie et reçoit la carte / le pack dans la même transaction.
         (resource.data.sellerUid != request.auth.uid && resource.data.status == 'open'
           && resource.data.sellerUid in beforeSave().friends
           && request.resource.data.status == 'sold' && request.resource.data.buyerUid == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyerUid'])
-          && cardAdded(resource.data.cardId)
+          && ('packType' in resource.data
+            ? packAdded(resource.data.packType)
+            : cardAdded(resource.data.cardId) && stockUnchanged())
           && afterSave().coins == beforeSave().coins - resource.data.price)
         ||
         // Le vendeur encaisse une seule fois, y compris après reconnexion.
@@ -152,7 +208,8 @@ service cloud.firestore {
           && request.resource.data.status == 'completed'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && afterSave().coins == beforeSave().coins + resource.data.price
-          && afterSave().collection == beforeSave().collection)
+          && afterSave().collection == beforeSave().collection
+          && stockUnchanged())
       );
       allow delete: if false;
     }
@@ -161,6 +218,10 @@ service cloud.firestore {
       function signedIn() { return request.auth != null; }
       function beforeSave() { return get(/databases/$(database)/documents/playerSaves/$(request.auth.uid)).data; }
       function afterSave() { return getAfter(/databases/$(database)/documents/playerSaves/$(request.auth.uid)).data; }
+      function stockUnchanged() {
+        return (!('packStock' in beforeSave()) && !('packStock' in afterSave()))
+          || (afterSave().packStock == beforeSave().packStock);
+      }
       allow read: if signedIn() && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['fromUid', 'toUid', 'amount', 'status', 'createdAt'])
@@ -170,41 +231,30 @@ service cloud.firestore {
         && request.resource.data.amount is int && request.resource.data.amount > 0 && request.resource.data.amount <= 1000000000
         && request.resource.data.status == 'pending' && request.resource.data.createdAt is timestamp
         && afterSave().coins == beforeSave().coins - request.resource.data.amount
-        && afterSave().collection == beforeSave().collection;
+        && afterSave().collection == beforeSave().collection
+        && stockUnchanged();
       allow update: if signedIn() && (
         // Le destinataire encaisse le cadeau une seule fois.
         (resource.data.toUid == request.auth.uid
           && resource.data.status == 'pending' && request.resource.data.status == 'claimed'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && afterSave().coins == beforeSave().coins + resource.data.amount
-          && afterSave().collection == beforeSave().collection)
+          && afterSave().collection == beforeSave().collection
+          && stockUnchanged())
         ||
         // L'expéditeur annule un cadeau pas encore récupéré : il est remboursé.
         (resource.data.fromUid == request.auth.uid
           && resource.data.status == 'pending' && request.resource.data.status == 'cancelled'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && afterSave().coins == beforeSave().coins + resource.data.amount
-          && afterSave().collection == beforeSave().collection)
+          && afterSave().collection == beforeSave().collection
+          && stockUnchanged())
       );
       allow delete: if false;
     }
 
-    // Échanges / achats entre deux joueurs : seules les deux parties peuvent
-    // lire et modifier la proposition. Chaque joueur applique sa moitié dans
-    // sa propre sauvegarde (playerSaves reste « propriétaire uniquement »).
-    match /trades/{tradeId} {
-      function isParty() {
-        return request.auth != null
-          && (request.auth.uid == resource.data.fromUid
-              || request.auth.uid == resource.data.toUid);
-      }
-      allow read: if isParty();
-      allow create: if request.auth != null
-        && request.resource.data.fromUid == request.auth.uid
-        && request.resource.data.toUid != request.auth.uid
-        && request.resource.data.status == 'pending';
-      allow update: if isParty();
-      allow delete: if false;
-    }
+    // Les anciennes propositions d'échange (trades/) sont désactivées :
+    // le marché (cartes/packs en vente) est le seul moyen d'obtenir les
+    // cartes d'un ami. Aucune correspondance trades n'est exposée.
   }
 }
