@@ -2448,3 +2448,7 @@ html,body{background:var(--bg)}
   .qty-quick{margin-left:0}
   .free-info{flex-direction:column;text-align:center}
 }
+
+/* Choix du booster depuis l’inventaire de la boutique. */
+.inventory-open-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.shop-open-rare:not(:disabled){border-color:#a8781b;color:#f8d77b}

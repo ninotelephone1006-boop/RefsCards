@@ -117,22 +117,11 @@
         <div class="pack-head">
           <p class="kicker"><span>✦</span> SÉRIE 01 · BOOSTER MYSTÈRE <span>✦</span></p>
           <h1>Déchire. Révèle. <em>Collectionne.</em></h1>
-          <p class="pack-sub">Cinq cartes t'attendent sous le film. À toi de l'ouvrir.</p>
+          <p class="pack-sub">Choisis un booster dans ton inventaire pour l’ouvrir.</p>
         </div>
 
         <div class="pack-inventory" id="pack-inventory">
-          <div class="pack-type-switch" role="group" aria-label="Choisir le pack à ouvrir">
-            <button class="pack-type is-active" id="pack-type-classic" type="button" data-pack="classic" aria-pressed="true">
-              <span class="pack-type-name">Classique</span>
-              <span class="pack-type-count" id="pack-count-classic">×0</span>
-            </button>
-            <button class="pack-type pack-type-rare" id="pack-type-rare" type="button" data-pack="rare" aria-pressed="false">
-              <span class="pack-type-name">Rare <b>+20 %</b></span>
-              <span class="pack-type-count" id="pack-count-rare">×0</span>
-            </button>
-          </div>
-          <p class="pack-stock-label" id="pack-stock-label" aria-live="polite">Inventaire : 0 pack</p>
-          <button class="pack-go-shop" id="pack-go-shop" type="button" hidden>ALLER AU SHOP →</button>
+          <p class="pack-stock-label" id="pack-stock-label" aria-live="polite"></p>
         </div>
 
         <div class="pack-area" id="pack-area">
@@ -199,7 +188,7 @@
           <div class="shop-head">
             <p class="kicker"><span>✦</span> BOUTIQUE <span>✦</span></p>
             <h2>Achète tes packs,<br><em>ouvre-les quand tu veux.</em></h2>
-            <p class="shop-sub">Les packs achetés vont dans ton inventaire (onglet Pack). Tu peux en acheter plusieurs d'un coup — les prix sont réglés pour que l'argent reste un vrai défi.</p>
+            <p class="shop-sub">Les packs achetés vont dans ton inventaire ci-dessous. Tu peux en acheter plusieurs d'un coup — les prix sont réglés pour que l'argent reste un vrai défi.</p>
           </div>
 
           <div class="free-banner" id="free-banner">
@@ -266,7 +255,10 @@
 
           <div class="shop-inventory">
             <p class="shop-inventory-label" id="shop-inventory-label" aria-live="polite">Inventaire : 0 pack</p>
-            <button class="shop-open" id="shop-open-btn" type="button">OUVRIR UN PACK →</button>
+            <div class="inventory-open-actions">
+              <button class="shop-open" id="open-classic" type="button">OUVRIR CLASSIQUE · ×0 →</button>
+              <button class="shop-open shop-open-rare" id="open-rare" type="button">OUVRIR RARE · ×0 →</button>
+            </div>
             <p class="shop-msg" id="shop-msg" role="status"></p>
           </div>
         </div>

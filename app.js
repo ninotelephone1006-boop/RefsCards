@@ -150,12 +150,7 @@
   const shopView = $('shop-view');
   const packImgMain = $('pack-img-main');
   const packImgFlap = $('pack-img-flap');
-  const packTypeClassic = $('pack-type-classic');
-  const packTypeRare = $('pack-type-rare');
-  const packCountClassic = $('pack-count-classic');
-  const packCountRare = $('pack-count-rare');
   const packStockLabel = $('pack-stock-label');
-  const packGoShop = $('pack-go-shop');
   const freeClaim = $('free-claim');
   const freeLabel = $('free-label');
   const freeDots = $('free-dots');
@@ -167,7 +162,8 @@
   const buyClassic = $('buy-classic');
   const buyRare = $('buy-rare');
   const shopInventoryLabel = $('shop-inventory-label');
-  const shopOpenBtn = $('shop-open-btn');
+  const openClassic = $('open-classic');
+  const openRare = $('open-rare');
   const shopMsg = $('shop-msg');
   const tabBadgeShop = $('tab-badge-shop');
   const shopQty = { classic: 1, rare: 1 };
@@ -323,36 +319,29 @@
         ? `Inventaire : ${state.packStock.classic || 0} classique${(state.packStock.classic || 0) > 1 ? 's' : ''} · ${state.packStock.rare || 0} rare${(state.packStock.rare || 0) > 1 ? 's' : ''}`
         : 'Inventaire vide — achète ou récupère tes packs gratuits.';
     }
-    if (shopOpenBtn) shopOpenBtn.disabled = total <= 0;
+    [[openClassic, 'classic', 'CLASSIQUE'], [openRare, 'rare', 'RARE']].forEach(([button, type, label]) => {
+      if (!button) return;
+      const count = state.packStock[type] || 0;
+      button.textContent = `OUVRIR ${label} · ×${count} →`;
+      button.disabled = count <= 0 || (state.phase !== 'pack' && state.phase !== 'done');
+    });
   }
 
   function renderPackInventory() {
     const classic = state.packStock.classic || 0;
     const rare = state.packStock.rare || 0;
-    if (packCountClassic) packCountClassic.textContent = `×${classic}`;
-    if (packCountRare) packCountRare.textContent = `×${rare}`;
     const type = state.currentPackType === 'rare' ? 'rare' : 'classic';
     const selected = type === 'rare' ? rare : classic;
-    const total = classic + rare;
-    if (packTypeClassic) {
-      packTypeClassic.classList.toggle('is-active', type === 'classic');
-      packTypeClassic.setAttribute('aria-pressed', String(type === 'classic'));
+    const empty = selected <= 0 && !isDemoMode() && state.phase === 'pack';
+    const head = document.querySelector('.pack-head');
+    if (head) head.hidden = classic + rare === 0 && !isDemoMode() && state.phase === 'pack';
+    if (packStockLabel) packStockLabel.textContent = classic + rare === 0 && !isDemoMode() ? 'Aucun booster' : '';
+    if (packArea) packArea.hidden = empty;
+    if (packOdds) packOdds.hidden = empty;
+    if (pack) {
+      pack.classList.toggle('is-empty', empty);
+      pack.setAttribute('aria-label', `Booster ${type === 'rare' ? 'rare' : 'classique'}. Fais glisser vers la droite pour le déchirer.`);
     }
-    if (packTypeRare) {
-      packTypeRare.classList.toggle('is-active', type === 'rare');
-      packTypeRare.setAttribute('aria-pressed', String(type === 'rare'));
-    }
-    if (packStockLabel) {
-      packStockLabel.textContent = total > 0
-        ? `Inventaire : ${classic} classique${classic > 1 ? 's' : ''} · ${rare} rare${rare > 1 ? 's' : ''} — ${type === 'rare' ? 'pack rare sélectionné' : 'pack classique sélectionné'}`
-        : 'Inventaire vide — va au Shop pour en acheter ou récupérer les gratuits.';
-    }
-    const empty = selected <= 0 && !isDemoMode();
-    if (pack) pack.classList.toggle('is-empty', empty);
-    if (packGoShop) packGoShop.hidden = !empty;
-    if (pack) pack.setAttribute('aria-label', empty
-      ? 'Aucun pack en inventaire. Va au Shop pour en acheter.'
-      : `Booster ${type === 'rare' ? 'rare' : 'classique'}. Fais glisser vers la droite pour le déchirer.`);
     renderOdds(type === 'rare');
   }
 
@@ -401,12 +390,6 @@
     save();
     renderShop();
     renderPackInventory();
-  }
-
-  function goToShop() {
-    SFX.unlock();
-    SFX.tick();
-    setTab('shop');
   }
 
   /* --------------------------------------------------------------- tirage */
@@ -805,7 +788,6 @@
   function denyNoPack() {
     SFX.snap();
     showToast('Aucun pack en inventaire — va au Shop pour en acheter ou récupérer les gratuits.', 3600);
-    if (packGoShop) packGoShop.hidden = false;
   }
 
   function onDragStart(e) {
@@ -1604,10 +1586,13 @@
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     SFX.deal();
     scheduleSizing(10);
+    if (!state.packStock[state.currentPackType] && packTotal() > 0) {
+      selectPackType(state.packStock.classic > 0 ? 'classic' : 'rare');
+    }
     renderPackInventory();
     showToast(packTotal() > 0
       ? 'Nouveau booster ! Glisse vers la droite pour déchirer.'
-      : 'Inventaire vide — va au Shop pour un nouveau pack.', 2800);
+      : 'Aucun booster', 2800);
   }
 
   /* --------------------------------------------------------------- fusion */
@@ -2520,10 +2505,14 @@
   on(freeClaim, 'click', claimFreePack);
   on(buyClassic, 'click', () => buyPacks('classic'));
   on(buyRare, 'click', () => buyPacks('rare'));
-  on(shopOpenBtn, 'click', () => setTab('pack'));
-  on(packGoShop, 'click', goToShop);
-  on(packTypeClassic, 'click', () => selectPackType('classic'));
-  on(packTypeRare, 'click', () => selectPackType('rare'));
+  function openFromInventory(type) {
+    if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
+    if (state.phase === 'done') resetToPack();
+    selectPackType(type);
+    setTab('pack');
+  }
+  on(openClassic, 'click', () => openFromInventory('classic'));
+  on(openRare, 'click', () => openFromInventory('rare'));
   if (shopView) {
     on(shopView, 'click', (e) => {
       const qtyBtn = e.target.closest('.qty-btn');

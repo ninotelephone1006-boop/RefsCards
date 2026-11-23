@@ -117,7 +117,7 @@ function todayKey() {
     doc.getElementById('buy-classic').click();
     await wait(400); // save différée (250 ms)
     assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '500', '3000 - 2500 = 500');
-    assert.match(doc.getElementById('pack-count-classic').textContent, /×5/);
+    assert.match(doc.getElementById('open-classic').textContent, /×5/);
     assert.match(doc.getElementById('shop-stock-classic').textContent, /5/);
     assert.equal(store.playerSaves.me.packStock.classic, 5, 'inventaire persisté');
     assert.equal(store.playerSaves.me.coins, 500, 'solde persisté');
@@ -142,7 +142,7 @@ function todayKey() {
     claim.click(); await wait(30);
     assert.equal(claim.disabled, true, '4e gratuit bloqué le même jour');
     assert.match(claim.textContent, /ÉPUISÉS/);
-    assert.match(doc.getElementById('pack-count-classic').textContent, /×3/);
+    assert.match(doc.getElementById('open-classic').textContent, /×3/);
     await wait(400);
     assert.equal(store.playerSaves.me.packStock.classic, 3);
     assert.equal(store.playerSaves.me.freeUsed, 3);
@@ -167,7 +167,8 @@ function todayKey() {
       coins: 5000, firstPack: false, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 1, rare: 1 }, freeDate: todayKey(), freeUsed: 0
     });
-    doc.getElementById('pack-type-rare').click();
+    doc.getElementById('open-rare').click();
+    assert.equal(doc.getElementById('app').dataset.tab, 'pack');
     await wait(20);
     assert.match(doc.getElementById('pack-img-main').getAttribute('src'), /packetrare\.png/);
     assert.match(doc.getElementById('pack-odds').textContent, /\+20 %/);
@@ -175,7 +176,7 @@ function todayKey() {
     doc.getElementById('buy-rare').click();
     await wait(400);
     assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '4 000');
-    assert.match(doc.getElementById('pack-count-rare').textContent, /×2/);
+    assert.match(doc.getElementById('open-rare').textContent, /×2/);
     w.close();
     console.log('PASS pack rare : image dorée, chances +20 %, achat 1 000');
   }
@@ -186,10 +187,11 @@ function todayKey() {
       coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, freeDate: todayKey(), freeUsed: 3
     });
-    assert.equal(doc.getElementById('pack-go-shop').hidden, false);
-    doc.getElementById('pack-go-shop').click();
-    await wait(20);
-    assert.equal(doc.getElementById('app').dataset.tab, 'shop');
+    assert.equal(doc.getElementById('pack-stock-label').textContent, 'Aucun booster');
+    assert.equal(doc.getElementById('pack-area').hidden, true);
+    assert.equal(doc.getElementById('open-classic').disabled, true);
+    assert.equal(doc.getElementById('open-rare').disabled, true);
+    assert.equal(doc.getElementById('pack-type-rare'), null);
     w.close();
     console.log('PASS inventaire vide → bouton Aller au Shop');
   }
