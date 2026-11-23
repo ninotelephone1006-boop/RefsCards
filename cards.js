@@ -397,6 +397,15 @@ const cardsDatabase = [
     emoji: '✡️',
     image: 'assets/Cartes/kipa-demachy.jpeg',
     color: '#e6c8ff'
+  },
+  {
+    id: 'zoom-mathis',
+    name: 'Zoom Mathis',
+    description: 'zoooooom',
+    rarity: 'rare',
+    emoji: '🔍',
+    image: 'assets/Cartes/mathiszoom.jpg',
+    color: '#8fc8ef'
   }
 ];
 
