@@ -88,7 +88,7 @@ node tests/profile-save.cjs          # pseudo et photo persistés (bouton, auto-
 node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, gratuits quotidiens, pack rare boosté par rang
 node tests/video-pack.cjs            # Pack Vidéo : config fps/son/boucle, tirage, lecteur <video>
 node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
-node tests/quest-flow.cjs            # 5 quêtes en parallèle, succès, niveaux, notifications, sauvegarde
+node tests/quest-flow.cjs            # 70 quêtes (récompenses en packs), 5 en parallèle, succès, niveaux, notifications
 ```
 
 ## Page Shop (boutique + inventaire)
@@ -103,7 +103,8 @@ La barre de navigation compte sept onglets : **Pack**, **Shop**, **Inventaire**,
 
 ## Quêtes, succès et niveaux
 
-- L’onglet **Quêtes** propose **20 objectifs** à difficulté croissante. Les **5 premières quêtes non réclamées** sont visibles et progressent en parallèle. Choisis librement leur ordre : dès qu’une récompense est réclamée, la suivante prend sa place. Les quêtes terminées restent visibles dans l’historique.
+- L’onglet **Quêtes** propose **70 objectifs** à difficulté croissante (20 historiques + 50 de la saison 2). Les **5 premières quêtes non réclamées** sont visibles et progressent en parallèle. Choisis librement leur ordre : dès qu’une récompense est réclamée, la suivante prend sa place. Les quêtes terminées restent visibles dans l’historique.
+- **Récompenses variées** : en plus des pièces et de l’XP, de nombreuses quêtes offrent des **boosters** (`reward.packs`, ex. `{ rare: 1 }` ou `{ legend: 2, video: 1 }`) qui arrivent directement dans l’inventaire de l’onglet Pack. Certaines quêtes ne paient **que** des packs (ou des packs + de l’XP), sans aucune pièce : `reward.coins` vaut alors `0` et la pastille 🪙 n’est pas affichée sur la carte. Les lots en packs sont détaillés sur la carte (« 📦 1 Pack Rare + 2 Pack Vidéo ») et dans la notification de réclamation.
 - **Objectifs rétroactifs (à vie)** : les quêtes se mesurent sur les valeurs absolues du compte, jamais remises à zéro. Un joueur qui avait déjà 5 cartes différentes, 30 boosters ouverts ou 3 amis avant l’arrivée des quêtes voit ces objectifs déjà validés et peut réclamer sa récompense immédiatement, sans devoir refaire l’action une seconde fois. On enchaîne ensuite les réclamations une par une jusqu’à la première quête réellement non accomplie (l’en-tête affiche « · récompense prête » et la pastille de l’onglet reste allumée tant qu’une récompense attend).
 - Les actions du jeu mettent les objectifs à jour automatiquement : ouvertures et achats de packs, packs gratuits, fusions, collection, raretés, amis et ventes encaissées sur le marché. Chaque quête terminée donne les **pièces et l’XP** indiquées sur sa carte.
 - Les **30 succès** sont indépendants de l’ordre des quêtes : ils se débloquent dès que leur condition est remplie et rapportent de l’XP. Les succès déjà accomplis par un ancien compte sont repris silencieusement au premier chargement du système.
