@@ -532,6 +532,15 @@ const cardsDatabase = [
     color: '#fb7185'
   },
   {
+    id: 'singe-yanou',
+    name: 'Singe Yanou',
+    description: "Yanou, c'est un singe",
+    rarity: 'common',
+    emoji: '🐵',
+    image: 'assets/Cartes/singe-yanou.jpg',
+    color: '#a8d08d'
+  },
+  {
     id: 'maturebierry',
     name: 'Mature Bierry',
     description: 'le bierry mature',
