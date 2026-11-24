@@ -554,12 +554,12 @@ const CardMutations = (() => {
   function apply(base, mutation) {
     return { ...base, baseId: base.id, id: `${base.id}::${mutation.id}`, mutation: mutation.id };
   }
-  function roll(card, random = Math.random) {
+  function roll(card, random = Math.random, shinyMultiplier = 1) {
     if (!card || card.mutation) return card;
     const roll = random();
     let threshold = 0;
     for (const mutation of definitions) {
-      threshold += mutation.rates[card.rarity] || 0;
+      threshold += (mutation.rates[card.rarity] || 0) * (mutation.id === 'shiny' ? shinyMultiplier : 1);
       if (roll < threshold) return apply(card, mutation);
     }
     return { ...card };

@@ -1003,7 +1003,7 @@
     const drawn = [];
     const packCounts = new Map();
     const record = (card) => {
-      drawn.push(CardMutations.roll(card));
+      drawn.push(CardMutations.roll(card, Math.random, packType === 'rare' ? 2 : packType === 'ultra' ? 7 : 1));
       packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
     };
     const packType = isPackType(type) ? type : isPackType(state.currentPackType) ? state.currentPackType : 'classic';
@@ -3089,9 +3089,9 @@
       packOdds.append(row);
     });
     if (boosted === 'ultra') {
-      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : 30× PLUS DE CHANCE POUR LES GROSSES RARETÉS'));
+      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : 30× POUR LES GROSSES RARETÉS · SHINY ×7'));
     } else if (boosted) {
-      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES'));
+      packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES · SHINY ×2'));
     }
     if (packType === 'video') {
       packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 2 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
