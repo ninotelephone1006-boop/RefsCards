@@ -43,7 +43,10 @@ assert.equal(api.fusableEntries().length, 1);
 assert.equal(api.fusableEntries()[0].card.mutation, 'shiny');
 assert.equal(JSON.stringify(api.collectionIds()), JSON.stringify(['chasseur-royer', 'chasseur-royer::shiny', 'chasseur-royer::shiny']));
 api.renderCollection();
-assert.ok(w.document.querySelector('#coll-grid .mutation-shiny') || w.document.querySelector('.coll-tile .mutation-shiny'));
+// Une vignette possédée à la fois en normal et en shiny montre la carte
+// normale avec une pastille ✦ (le détail shiny reste visible à l'inspection).
+assert.ok(w.document.querySelector('#coll-grid .coll-shiny-dot'), 'pastille shiny attendue sur la vignette');
+assert.equal(w.document.querySelector('#coll-grid .coll-pill').textContent, 'x3', 'les 3 exemplaires sont comptés');
 const shiny = api.state.collection[1];
 assert.ok(api.cardFrame(shiny).querySelector('.cf-mutation').textContent.includes('Shiny'));
 const stats = api.statsFor(api.collectionIds(), 0);
