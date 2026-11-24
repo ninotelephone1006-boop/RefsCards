@@ -1664,6 +1664,24 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 }
 .inspect.is-open .inspect-backdrop { opacity: 1; }
 .inspect.is-open .inspect-dialog { opacity: 1; transform: none; }
+.inspect-sell {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 2;
+  transform: translateX(-50%);
+  padding: 11px 22px;
+  border-radius: 999px;
+  border: 1px solid #fbbf2480;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  box-shadow: 0 12px 28px -12px #f59e0b;
+  color: #241500;
+  font: 800 13px 'Space Grotesk', sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.inspect-sell:hover { filter: brightness(1.08); }
+.inspect-sell[hidden] { display: none; }
 
 .inspect-card {
   position: absolute;
@@ -2763,34 +2781,66 @@ html,body{background:var(--bg)}
    PAGE INVENTAIRE
    ========================================================================== */
 .inventory-view{position:relative;z-index:10;width:100%;max-width:980px;margin:0 auto;padding:24px 18px 92px;overflow-y:auto;max-height:100%}
-.inventory-head{text-align:center;margin-bottom:22px}
+.inventory-head{text-align:center;margin-bottom:24px}
 .inventory-head h2{margin:6px 0 8px;font-size:clamp(26px,4vw,34px);font-weight:900;letter-spacing:-.5px}
 .inventory-summary{margin:0;color:var(--muted);font-size:14px}
+.inventory-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:620px;margin:18px auto 12px}
+.inventory-stat{padding:14px 10px;border-radius:15px;border:1px solid #ffffff18;
+  background:linear-gradient(150deg,#a855f71f,#0f0a1db3);box-shadow:0 14px 28px -24px #000}
+.inventory-stat b{display:block;font:900 24px/1.1 'Space Grotesk',sans-serif;color:#fff;font-variant-numeric:tabular-nums}
+.inventory-stat span{display:block;margin-top:5px;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#bda9d8}
+.inventory-sell-link{padding:10px 18px;border-radius:999px;border:1px solid #fbbf2459;background:#f59e0b14;
+  color:#fcd77e;font:800 12px 'Space Grotesk',sans-serif;letter-spacing:.03em;cursor:pointer;
+  transition:transform .18s var(--ease-spring),background .18s}
+.inventory-sell-link:hover{transform:translateY(-2px);background:#f59e0b29}
+.inventory-sell-link[hidden]{display:none}
 .inventory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;align-items:stretch}
-.inventory-card{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
-  padding:20px 18px;border-radius:18px;background:linear-gradient(160deg,#1a122ecc,#0f0a1de6);
-  border:1px solid #a855f738;box-shadow:0 16px 36px -22px #000}
+.inventory-card{position:relative;display:flex;flex-direction:column;gap:12px;overflow:hidden;padding:18px;border-radius:20px;
+  background:linear-gradient(160deg,#1a122ecc,#0f0a1de6);border:1px solid #a855f738;
+  box-shadow:0 16px 36px -22px #000;animation:inv-rise .45s var(--ease-out) both;animation-delay:calc(var(--i,0) * 55ms);
+  transition:transform .2s var(--ease-spring),border-color .2s,box-shadow .2s}
+.inventory-card::before{content:"";position:absolute;inset:-60% 35% 55% -35%;pointer-events:none;
+  background:radial-gradient(circle,#a855f726,transparent 70%)}
+.inventory-card:hover{transform:translateY(-4px);border-color:#c084fc80;box-shadow:0 24px 44px -24px #a855f7aa}
 .inventory-card-rare{border-color:#f59e0b59;background:linear-gradient(160deg,#241910d9,#120d1ae6)}
-.inventory-qty-badge{position:absolute;top:14px;right:14px;padding:4px 10px;border-radius:999px;
+.inventory-card-visual{position:relative;display:grid;place-items:center;min-height:138px;border-radius:15px;
+  background:radial-gradient(ellipse at 50% 70%,#a855f72b,transparent 68%)}
+.inventory-card-rare .inventory-card-visual{background:radial-gradient(ellipse at 50% 70%,#f59e0b2b,transparent 68%)}
+.inventory-qty-badge{position:absolute;top:10px;right:10px;z-index:1;padding:5px 11px;border-radius:999px;
   font-size:12px;font-weight:800;letter-spacing:.3px;background:#a855f72e;border:1px solid #a855f766;color:#f3e8ff}
 .inventory-card-rare .inventory-qty-badge{background:#f59e0b2e;border-color:#f59e0b73;color:#fde68a}
-.inventory-card-img{width:128px;height:auto;filter:drop-shadow(0 14px 24px #00000099);transition:transform .25s var(--ease-spring)}
-.inventory-card:hover .inventory-card-img{transform:translateY(-4px) scale(1.03)}
+.inventory-card-img{width:118px;max-height:148px;object-fit:contain;filter:drop-shadow(0 14px 24px #00000099);
+  transition:transform .25s var(--ease-spring)}
+.inventory-card:hover .inventory-card-img{transform:translateY(-4px) scale(1.04)}
+.inventory-card-body{display:flex;flex-direction:column;gap:5px}
+.inventory-card-kicker{font-size:10px;font-weight:800;letter-spacing:.13em;color:#c9a8fb}
+.inventory-card-rare .inventory-card-kicker{color:#f6c665}
 .inventory-card-title{margin:0;font-size:18px;font-weight:800;color:#fff}
 .inventory-card-desc{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
-.inventory-open-btn{width:100%;margin-top:auto;padding:12px 16px;border-radius:12px;border:1px solid #a855f766;
+.inventory-card-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:auto}
+.inventory-card-actions:has(>:only-child){grid-template-columns:1fr}
+.inventory-open-btn{width:100%;padding:12px 16px;border-radius:12px;border:1px solid #a855f766;
   background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:13px;font-weight:800;letter-spacing:.4px;cursor:pointer;
   transition:transform .18s var(--ease-spring),filter .18s}
 .inventory-card-rare .inventory-open-btn{border-color:#fbbf2480;background:linear-gradient(135deg,#b45309,#f59e0b);color:#140c02}
 .inventory-open-btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
 .inventory-open-btn:disabled{opacity:.45;cursor:not-allowed}
+.inventory-sell-btn{padding:0 13px;border-radius:12px;border:1px solid #fbbf2459;background:#f59e0b16;
+  color:#fcd77e;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer;transition:background .18s,transform .18s}
+.inventory-sell-btn:hover{background:#f59e0b2e;transform:translateY(-1px)}
 .inventory-empty{max-width:440px;margin:28px auto 0;padding:28px 22px;text-align:center;border-radius:18px;
   background:linear-gradient(160deg,#161026cc,#0d0917e6);border:1px dashed #a855f744}
 .inventory-empty-title{margin:0 0 8px;font-size:18px;font-weight:800;color:#fff}
 .inventory-empty-sub{margin:0 0 18px;font-size:14px;color:var(--muted);line-height:1.5}
 .inventory-go-shop{padding:11px 20px;border-radius:12px;border:1px solid #a855f766;
   background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;font-size:13px;font-weight:800;cursor:pointer}
-
+@keyframes inv-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media(max-width:520px){
+  .inventory-stats{gap:7px}
+  .inventory-stat{padding:11px 6px}
+  .inventory-stat b{font-size:20px}
+  .inventory-stat span{font-size:9px;letter-spacing:.05em}
+}
 
 /* Marché entre amis */
 .market-block{margin-top:20px;padding:14px;border:1px solid #a855f733;border-radius:14px;background:#120c1cf5}
@@ -2798,6 +2848,8 @@ html,body{background:var(--bg)}
 .market-form label{flex-basis:100%;font-size:11px;color:#c4a1ff;font-weight:700}
 .market-form input,.market-form select{flex:1 1 150px;min-width:0;padding:10px;border:1px solid #725598;border-radius:9px;background:#0f0b14;color:#fff;font:inherit}
 .market-form select option{background:#160f20}.market-block #market-refresh{margin-top:12px}
+.market-price-wrap{display:flex;align-items:center;gap:8px;flex:1 1 220px;min-width:0}
+.market-price-suggest{flex:0 0 auto;white-space:nowrap;padding:9px 12px;font-size:11px;color:#fcd77e;border-color:#fbbf2459}
 .market-sub{margin:14px 0 6px;font-size:14px;color:#e9d7ff;letter-spacing:.02em}
 .market-qty-wrap{flex-basis:100%;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
 .market-form .market-qty-input{flex:0 0 74px;width:74px;padding:7px 8px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}

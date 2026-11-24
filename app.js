@@ -1063,10 +1063,18 @@
     if (tabBadgeInventory) tabBadgeInventory.hidden = total <= 0;
     if (inventorySummary) {
       inventorySummary.textContent = total > 0
-        ? `Tu as ${total} pack${total > 1 ? 's' : ''} prêt${total > 1 ? 's' : ''} à être ouvert${total > 1 ? 's' : ''}.`
+        ? `${fmt(total)} pack${total > 1 ? 's' : ''} prêt${total > 1 ? 's' : ''} à être ouvert${total > 1 ? 's' : ''}.`
         : 'Aucun pack en inventaire.';
     }
+    const cardsToOpen = PACK_TYPES.reduce((sum, type) => sum + (Number(state.packStock[type]) || 0) * cardCountFor(type), 0);
+    const typesInStock = PACK_TYPES.filter((type) => (Number(state.packStock[type]) || 0) > 0).length;
+    const setStat = (id, value) => { const node = $(id); if (node) node.textContent = fmt(value); };
+    setStat('inv-stat-packs', total);
+    setStat('inv-stat-cards', cardsToOpen);
+    setStat('inv-stat-types', typesInStock);
     if (inventoryEmpty) inventoryEmpty.hidden = total > 0;
+    const sellLink = $('inventory-sell-link');
+    if (sellLink) sellLink.hidden = !(Number(state.packStock.classic) > 0 || Number(state.packStock.rare) > 0);
     if (!inventoryGrid) return;
     inventoryGrid.hidden = total === 0;
     if (total === 0) {
@@ -1111,17 +1119,30 @@
       }))
       .filter((item) => item.count > 0);
     const canOpen = state.phase === 'pack' || state.phase === 'done';
-    inventoryGrid.innerHTML = items.map((item) => `
-      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}${item.ultra ? ' inventory-card-ultra' : ''}" data-pack-type="${item.type}">
-        <span class="inventory-qty-badge">×${item.count}</span>
-        <img class="inventory-card-img" src="${item.img}" alt="${item.title}">
-        <h3 class="inventory-card-title">${item.title}</h3>
-        <p class="inventory-card-desc">${item.desc}</p>
-        <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen ? '' : 'disabled'}>
-          OUVRIR UN PACK →
-        </button>
+    inventoryGrid.innerHTML = items.map((item, i) => {
+      /* Seuls les packs Classique et Rare peuvent être mis en vente :
+         les autres restent exclusivement ouvrables. */
+      const sellable = item.type === 'classic' || item.type === 'rare';
+      return `
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}${item.ultra ? ' inventory-card-ultra' : ''}" data-pack-type="${item.type}" style="--i:${i}">
+        <div class="inventory-card-visual">
+          <span class="inventory-qty-badge">×${item.count}</span>
+          <img class="inventory-card-img" src="${item.img}" alt="${item.title}" draggable="false">
+        </div>
+        <div class="inventory-card-body">
+          <span class="inventory-card-kicker">${packLabelUpper(item.type)} · ${cardCountFor(item.type)} CARTES</span>
+          <h3 class="inventory-card-title">${item.title}</h3>
+          <p class="inventory-card-desc">${item.desc}</p>
+        </div>
+        <div class="inventory-card-actions">
+          <button class="inventory-open-btn" type="button" data-open-pack="${item.type}" ${canOpen ? '' : 'disabled'}>
+            Ouvrir <span aria-hidden="true">→</span>
+          </button>
+          ${sellable ? `<button class="inventory-sell-btn" type="button" data-sell-pack="${item.type}" aria-label="Vendre un pack ${packLabelFr(item.type)}">🏷️ Vendre</button>` : ''}
+        </div>
       </article>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function selectPackType(type, { silent = false } = {}) {
@@ -2489,6 +2510,7 @@
   /* ------------------------------------------------------- inspection grand */
 
   let inspectReturnFocus = null;
+  let inspectCardId = null;
 
   function cardById(id) {
     return (
@@ -2509,6 +2531,9 @@
     inspectCard.dataset.rarity = card.rarity;
     inspectCard.dataset.fx = info.fx || 'calm';
     if (cardVideoInfo(card)) activateCardAudio(inspectCard);
+    inspectCardId = card.id;
+    const sellBtn = $('inspect-sell');
+    if (sellBtn) sellBtn.hidden = !(countMap().get(card.id) > 0);
     resetInspTilt();
     inspectReturnFocus = document.activeElement;
     inspect.hidden = false;
@@ -2526,6 +2551,7 @@
         on(cell, 'click', () => {
           inspectCard.replaceChildren(cardFrame(variant, { eager: true, alt: `${variant.name} — ${info.label}` }));
           box.querySelectorAll('.ic-cell').forEach((c) => c.classList.toggle('is-on', c === cell));
+          if (sellBtn) sellBtn.hidden = !(countMap().get(variant.id) > 0);
           SFX.tick();
         });
         return cell;
@@ -2541,6 +2567,9 @@
 
   function closeInspect() {
     if (inspect.hidden) return;
+    inspectCardId = null;
+    const sellBtn = $('inspect-sell');
+    if (sellBtn) sellBtn.hidden = true;
     inspect.classList.remove('is-open');
     window.setTimeout(() => {
       if (!inspect.classList.contains('is-open')) {
@@ -2554,6 +2583,7 @@
 
   on(inspectX, 'click', closeInspect);
   on(inspectBackdrop, 'click', closeInspect);
+  on($('inspect-sell'), 'click', () => { if (inspectCardId) quickSellCard(inspectCardId); });
 
   /* ----------------------------------------------------------- vers le butin */
 
@@ -4341,9 +4371,12 @@
   on(openVideo, 'click', () => openFromInventory('video'));
   on(openUltra, 'click', () => openFromInventory('ultra'));
   on(inventoryGoShop, 'click', () => setTab('shop'));
+  on($('inventory-sell-link'), 'click', () => openSellPanel());
   on(packGoShop, 'click', () => { SFX.tick(); setTab('shop'); });
   if (inventoryGrid) {
     on(inventoryGrid, 'click', (e) => {
+      const sellBtn = e.target.closest('[data-sell-pack]');
+      if (sellBtn) { quickSellPack(sellBtn.dataset.sellPack); return; }
       const btn = e.target.closest('[data-open-pack]');
       if (!btn || btn.disabled) return;
       openFromInventory(btn.dataset.openPack);
@@ -5360,6 +5393,12 @@
     }
   }
 
+  /* Raccourci « vendre » : on amène directement sur l'onglet Vendre. */
+  function openSellPanel() {
+    setTab('online');
+    setOnlineTab('sell', { scroll: true });
+  }
+
   function setTabCount(node, value) {
     if (!node) return;
     const n = Number(value) || 0;
@@ -5797,6 +5836,48 @@
   function marketInfo(message) {
     if (marketMessage) marketMessage.textContent = message;
     showToast(message);
+  }
+
+  /* Prix conseillé : valeur de rareté pour une carte, prix de revente
+     raisonnable pour un booster (la moitié de son prix d'achat). */
+  function suggestedCardPrice(cardId) {
+    const card = CardMutations.resolve(cardId);
+    const info = card && RARITIES[card.rarity];
+    return info ? info.reward : 50;
+  }
+
+  function suggestedPackPrice(type) {
+    return Math.max(1, Math.round((PACK_PRICES[type === 'rare' ? 'rare' : 'classic'] || 500) / 2));
+  }
+
+  /* Vente rapide : un seul clic depuis l'inspection d'une carte (ou depuis
+     l'inventaire pour un pack), prix déjà rempli, confirmation comprise. */
+  function quickSellCard(cardId) {
+    const id = cardId || (marketCard && marketCard.value);
+    if (!id || !CardMutations.resolve(id)) { marketInfo('Choisis une carte à vendre.'); return; }
+    const ownedCount = countMap().get(id) || 0;
+    if (ownedCount < 1) { marketInfo('Tu ne possèdes plus cette carte.'); return; }
+    const price = suggestedCardPrice(id);
+    closeInspect();
+    askConfirm({
+      title: 'Vendre cette carte ?',
+      message: `Mettre 1 exemplaire de « ${cardName(id)} » en vente pour ${fmt(price)} 🪙 ? Tu en gardes ${ownedCount - 1}.`,
+      confirmLabel: 'Vendre',
+      onConfirm: () => marketTransaction('list', null, { cardId: id, price, quantity: 1 })
+    });
+  }
+
+  function quickSellPack(type) {
+    const packType = type === 'rare' ? 'rare' : 'classic';
+    const ownedCount = Math.max(0, Number(state.packStock[packType]) || 0);
+    if (ownedCount < 1) { marketInfo(`Tu ne possèdes aucun ${packName(packType)}.`); return; }
+    const price = suggestedPackPrice(packType);
+    askConfirm({
+      title: 'Vendre ce pack ?',
+      message: `Mettre 1 « ${packName(packType)} » en vente pour ${fmt(price)} 🪙 ? Tu en gardes ${ownedCount - 1}.`,
+      confirmLabel: 'Vendre',
+      onConfirm: () => marketTransaction('list', null, { packType, price, quantity: 1 })
+    });
   }
 
   function groupListings(list) {
@@ -6791,7 +6872,21 @@
     }
   }
 
-  on(marketCard, 'change', () => syncMarketQty({ reset: true }));
+  on(marketCard, 'change', () => {
+    syncMarketQty({ reset: true });
+    if (marketPrice && marketCard.value) marketPrice.placeholder = `Conseillé : ${fmt(suggestedCardPrice(marketCard.value))} 🪙`;
+  });
+  on($('market-suggest-price'), 'click', () => {
+    const cardId = marketCard && marketCard.value;
+    if (!cardId) { marketInfo('Choisis d’abord une carte.'); return; }
+    if (marketPrice) marketPrice.value = String(suggestedCardPrice(cardId));
+    SFX.tick();
+  });
+  on($('pack-market-suggest-price'), 'click', () => {
+    const type = packMarketType && packMarketType.value === 'rare' ? 'rare' : 'classic';
+    if (packMarketPrice) packMarketPrice.value = String(suggestedPackPrice(type));
+    SFX.tick();
+  });
   on(marketQtyMinus, 'click', () => {
     if (!marketQty) return;
     const ownedCount = countMap().get(marketCard && marketCard.value) || 0;
