@@ -326,6 +326,10 @@
   const rays = $('rays');
   const tableGlow = $('table-glow');
   const flash = $('flash');
+  const openAll = $('open-all');
+  const nextPack = $('next-pack');
+  const packResults = $('pack-results');
+  const packResultsGrid = $('pack-results-grid');
   const recap = $('recap');
   const recapSlots = $('recap-slots');
   const recapCount = $('recap-count');
@@ -339,8 +343,6 @@
   const fusionBuy = $('fusion-buy');
   const fusionStage = $('fusion-stage');
   const fusionGo = $('fusion-go');
-  const buyLabel = qs(buyBtn, '.buy-label');
-  const buyPrice = qs(buyBtn, '.buy-price');
   const fusionLater = $('fusion-later');
   const fusionDesc = $('fusion-desc');
   const collFusion = $('coll-fusion');
@@ -1053,6 +1055,7 @@
     }
     renderOdds(type === 'ultra' ? 'ultra' : type === 'rare', packPool(type), type);
     renderInventory();
+    if (state.phase === 'done') updateNextPackAction();
   }
 
   function renderInventory() {
@@ -1874,7 +1877,7 @@
       stage.classList.add(theme.shake);
     }, reduceMotion.matches ? 40 : theme.burstDelay);
 
-    window.setTimeout(showReveal, reduceMotion.matches ? 320 : theme.revealDelay);
+    window.setTimeout(() => showReveal(type), reduceMotion.matches ? 320 : theme.revealDelay);
   }
 
   on(packArea, 'pointerdown', onDragStart);
@@ -2169,7 +2172,7 @@
     if (!opts.mini) {
       frame.append(el('span', 'cf-holo'), el('span', 'cf-shine'));
     }
-    const audioButton = videoConfig && !opts.mini ? buildCardAudioButton(videoConfig) : null;
+    const audioButton = showVideo && !opts.mini ? buildCardAudioButton(videoConfig) : null;
     if (audioButton) frame.append(audioButton);
 
     resolveCardImage(card).then((src) => {
@@ -2448,21 +2451,19 @@
       delete btn._skipCharge;
       btn.dataset.flipAt = String(performance.now());
       btn.classList.add('is-flipped');
+      openAll.disabled = false;
+      if (remaining.length > 1) openAll.hidden = false;
       burst();
       if (CardMutations.definition(card)) shinyCinematic(card, quiet);
     };
     const sus = quiet ? null : SUSPENSE[card.rarity];
-    if (sus) startCharge(btn, info, cx, cy, sus, doFlip);
-    else doFlip();
+    if (sus) {
+      openAll.disabled = true;
+      startCharge(btn, info, cx, cy, sus, doFlip);
+    } else doFlip();
 
-    /* On compte les exemplaires AVANT d'ajouter la carte : c'est ce nombre
-       qui fixe le gain du doublon (voir cardReward). Aucune pièce n'est
-       retirée au joueur, seul le gain est ajusté. */
-    const ownedBefore = state.collection.reduce((n, owned) => n + (owned.id === card.id ? 1 : 0), 0);
-    const isNew = ownedBefore === 0;
-    state.collection.push(card);
-    if (isNew) { fresh.add(card.id); tabBadge.hidden = false; }
-    addCoins(cardReward(card, ownedBefore));
+    const { isNew, reward } = collectPackCard(card);
+    addCoins(reward);
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${state.deck.length} · RÉVÉLÉE`;
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
@@ -2470,6 +2471,17 @@
       : 'Touche la carte ou le bouton pour continuer.';
     btn.dataset.isNew = isNew ? '1' : '0';
     if (!isNew) revealSub.textContent += ' Doublon : gain réduit.';
+  }
+
+  function collectPackCard(card) {
+    /* On compte les exemplaires AVANT d'ajouter la carte : c'est ce nombre
+       qui fixe le gain du doublon (voir cardReward). Aucune pièce n'est
+       retirée au joueur, seul le gain est ajusté. */
+    const ownedBefore = state.collection.reduce((n, owned) => n + (owned.id === card.id ? 1 : 0), 0);
+    const isNew = ownedBefore === 0;
+    state.collection.push(card);
+    if (isNew) { fresh.add(card.id); tabBadge.hidden = false; }
+    return { isNew, reward: cardReward(card, ownedBefore) };
   }
 
   /* ------------------------------------------------------- inspection grand */
@@ -2549,6 +2561,27 @@
     if (state.phase !== 'reveal' || !current || flying) return;
     if (!current.node.classList.contains('is-flipped')) return;
     sendToRecap(current.node, current.data);
+  });
+
+  on(openAll, 'click', () => {
+    if (state.phase !== 'reveal' || openAll.hidden || openAll.disabled || flying || !current) return;
+    SFX.unlock();
+    let reward = 0;
+    for (const { data, node } of remaining) {
+      // La carte affichée a déjà été ajoutée à la collection lors du flip.
+      if (!node.classList.contains('is-revealed')) reward += collectPackCard(data).reward;
+      state.loot.push(data);
+    }
+    addCoins(reward);
+    state.packIndex = state.deck.length;
+    stack.querySelectorAll('video').forEach((video) => {
+      cardVideoObserver?.unobserve(video);
+      if (!video.paused) video.pause();
+    });
+    stack.replaceChildren();
+    remaining = [];
+    current = null;
+    finishPack();
   });
 
   on(tableEl, 'click', (event) => {
@@ -2663,6 +2696,7 @@
     if (flying) return;
     flying = true;
     nextCard.hidden = true;
+    openAll.disabled = true;
     const restoreFocus = document.activeElement === nextCard || document.activeElement === btn;
     SFX.whoosh();
     btn.classList.remove('is-incoming');
@@ -2683,6 +2717,7 @@
 
     window.setTimeout(() => {
       flying = false; // libéré d'abord : une erreur plus bas ne peut plus bloquer le jeu
+      openAll.disabled = false;
       try {
       setRecapCollapsed(false);
       fillSlot(state.loot.length, card);
@@ -2746,7 +2781,7 @@
   let remaining = [];
   let current = null;
 
-  function showReveal() {
+  function showReveal(packType) {
     hidePackOpening();
     stage.classList.remove('ultra-shake');
     if (!cardsDatabase.some((c) => RARITIES[c.rarity])) {
@@ -2755,7 +2790,6 @@
       return;
     }
     nextCard.hidden = true;
-    const packType = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
     const boostMode = packType === 'ultra' ? 'ultra' : packType === 'rare';
     state.deck = drawPack(
       boostMode,
@@ -2766,7 +2800,7 @@
       /* Pool vide (ex. Pack Vidéo sans aucune carte configurée) : on reste
          sur l'écran du booster au lieu d'ouvrir une pile vide. */
       state.phase = 'pack';
-      showToast(state.currentPackType === 'video'
+      showToast(packType === 'video'
         ? 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).'
         : 'Aucune carte à tirer.');
       return;
@@ -2857,39 +2891,71 @@
     pileLabel.textContent = `CARTE ${total - remaining.length + 1} / ${total}`;
   }
 
+  function updateNextPackAction() {
+    const type = revealView.dataset.packType;
+    const count = state.packStock[type] || 0;
+    nextPack.hidden = count <= 0;
+    buyBtn.hidden = count > 0;
+    recapMsg.textContent = count > 0
+      ? `En inventaire : ${count} × pack ${packLabelFr(type)}`
+      : `Plus de pack ${packLabelFr(type)} en inventaire.`;
+  }
+
   function finishPack() {
     state.phase = 'done';
     clearEffects();
+    openAll.hidden = true;
+    nextCard.hidden = true;
     revealTitle.innerHTML = 'Butin complet<em>.</em>';
-    revealSub.textContent = 'Toutes les cartes sont à toi. Ouvre un autre booster ou tente une fusion.';
+    revealSub.textContent = state.loot.length === 1
+      ? '1 carte obtenue'
+      : `${state.loot.length} cartes · De la plus rare à la plus commune`;
     revealKicker.innerHTML = '<span>✦</span> BOOSTER TERMINÉ <span>✦</span>';
-    pileLabel.textContent = `${state.deck.length} / ${state.deck.length} CARTES`;
-    footRight.textContent = '✳ COLLECTION ENREGISTRÉE';
     recapCount.textContent = `${state.loot.length} / ${state.deck.length}`;
 
-    window.setTimeout(() => {
-      SFX.coin();
-      /* Plus d'achat direct ici : le bouton renvoie au Shop (les packs
-         achetés vont dans l'inventaire, onglet Pack). */
-      buyBtn.hidden = false;
-      buyBtn.disabled = false;
-      buyBtn.classList.remove('is-denied', 'is-free');
-      if (buyLabel) buyLabel.textContent = 'ALLER AU SHOP';
-      if (buyPrice) buyPrice.hidden = true;
-      const total = packTotal();
-      recapMsg.textContent = total > 0
-        ? `Tu as ${total} pack${total > 1 ? 's' : ''} en inventaire — ouvre-les dans l'onglet Pack !`
-        : 'Plus de packs ? Le Shop t\'attend (cadeau de connexion quotidien).';
-      updateFusionChip();
-      if (!fusionChip.hidden) {
-        fusionChip.animate?.(
-          [{ transform: 'translateY(10px)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-          { duration: 500, easing: 'cubic-bezier(.22,1,.36,1)', delay: 120, fill: 'backwards' }
-        );
-      }
-      if (fusionCount() > 0) window.setTimeout(() => openFusion(true), reduceMotion.matches ? 260 : 1250);
-    }, reduceMotion.matches ? 120 : 480);
+    const sorted = [...state.loot].sort((a, b) => RARITIES[b.rarity].rank - RARITIES[a.rarity].rank);
+    packResultsGrid.replaceChildren(...sorted.map((card, index) => {
+      const info = RARITIES[card.rarity];
+      const item = el('li', 'pack-result');
+      item.style.setProperty('--result-order', index);
+      item.style.setProperty('--result-color', info.color);
+      if (index === 0) item.append(el('span', 'pack-result-badge', '✦ LA PLUS RARE ✦'));
+      const preview = el('button', 'pack-result-card');
+      preview.type = 'button';
+      preview.setAttribute('aria-label', `Voir ${card.name} (${info.label}) en grand`);
+      preview.append(cardFrame(card, { disableVideo: true, eager: index === 0 }));
+      on(preview, 'click', () => openInspect(card));
+      item.append(preview);
+      return item;
+    }));
+    revealView.classList.add('is-results');
+    recap.classList.add('is-results');
+    packResults.hidden = false;
+    packResults.scrollTop = 0;
+    updateNextPackAction();
+    renderInventory();
+    updateFusionChip();
+    setRecapCollapsed(false);
+    SFX.coin();
+    if (app.dataset.tab === 'pack') revealTitle.focus({ preventScroll: true });
+
+    // Seule la démo de fusion ouvre encore cette fenêtre automatiquement.
+    if (new URLSearchParams(window.location.search).get('demo') === 'fusion' && fusionCount() > 0) {
+      const finishedDeck = state.deck;
+      window.setTimeout(() => {
+        if (state.phase === 'done' && state.deck === finishedDeck && app.dataset.tab === 'pack' && inspect.hidden) openFusion();
+      }, reduceMotion.matches ? 260 : 1250);
+    }
   }
+
+  on(nextPack, 'click', () => {
+    const type = revealView.dataset.packType;
+    if (state.phase !== 'done' || !isPackType(type)) return;
+    if (!(state.packStock[type] > 0)) { updateNextPackAction(); return; }
+    resetToPack({ quiet: true });
+    selectPackType(type, { silent: true });
+    autoTear();
+  });
 
   /* --------------------------------------------------------------- achat
      L'ancien achat direct (100 🪙 depuis le récap) est remplacé par le Shop :
@@ -2903,18 +2969,23 @@
     setTab('shop');
   }
 
-  function resetToPack() {
+  function resetToPack({ quiet = false } = {}) {
     state.phase = 'pack';
+    recap.classList.remove('is-results');
+    revealView.classList.remove('is-results');
+    packResults.hidden = true;
+    packResultsGrid.replaceChildren();
+    openAll.hidden = true;
+    openAll.disabled = false;
+    nextPack.hidden = true;
     recap.classList.add('is-idle');
     setRecapCollapsed(false);
     buyBtn.hidden = true;
     fusionChip.hidden = true;
     recapMsg.textContent = '';
-    recap.classList.add('is-idle');
     revealView.hidden = true;
     packView.hidden = false;
     packView.classList.remove('view-out');
-    packView.hidden = false;
     packView.classList.remove('view-in');
     void packView.offsetWidth;
     packView.classList.add('view-in');
@@ -2934,24 +3005,15 @@
     remaining = [];
     current = null;
 
-    window.setTimeout(() => {
-      [...recapSlots.children].forEach((s) => {
-        s.className = 'slot';
-        s.style.removeProperty('--slot-color');
-        s.replaceChildren();
-      });
-      recapCount.textContent = `0 / ${cardCountFor(state.currentPackType)}`;
-    }, 420);
-
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
-    SFX.deal();
+    if (!quiet) SFX.deal();
     scheduleSizing(10);
-    if (!state.packStock[state.currentPackType] && packTotal() > 0) {
+    if (!quiet && !state.packStock[state.currentPackType] && packTotal() > 0) {
       selectPackType(firstAvailablePackType());
     }
     renderPackInventory();
-    showToast(packTotal() > 0
+    if (!quiet) showToast(packTotal() > 0
       ? 'Nouveau booster ! Glisse vers la droite pour déchirer.'
       : 'Aucun booster', 2800);
   }
@@ -3004,16 +3066,8 @@
     }
   }
 
-  function openFusion(auto = false) {
-    if (state.fusionOpen) return;
-    /* Auto (fin de pack) : uniquement depuis l'onglet Pack, une fois les cinq
-       cartes rangées. Manuel (récap ou Collection) : dès qu'un doublon existe,
-       même hors de la phase de révélation. */
-    if (auto) {
-      if (state.phase !== 'done' || app.dataset.tab !== 'pack') return;
-    } else if (state.phase !== 'done' && !fusionCount()) {
-      return;
-    }
+  function openFusion() {
+    if (state.fusionOpen || (state.phase !== 'done' && !fusionCount())) return;
     SFX.unlock();
     state.fusionOpen = true;
     state.fusionSelection = null;
@@ -3212,8 +3266,8 @@
     window.setTimeout(buyPack, 180);
   });
   on($('fusion-backdrop'), 'click', closeFusion);
-  on(fusionChip, 'click', () => openFusion(false));
-  if (collFusion) on(collFusion, 'click', () => openFusion(false));
+  on(fusionChip, 'click', openFusion);
+  if (collFusion) on(collFusion, 'click', openFusion);
 
   document.addEventListener('keydown', (e) => {
     if (!currentUser) return;
@@ -3232,7 +3286,7 @@
     }
     if (app.dataset.tab !== 'pack' || state.phase !== 'reveal' || state.fusionOpen || !current) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle) return;
+    if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle || document.activeElement === openAll) return;
     e.preventDefault();
     SFX.unlock();
     if (!current.node.classList.contains('is-revealed')) revealCard(current.node, current.data);
@@ -3599,6 +3653,7 @@
        (une fois par session) pour ne pas le laisser passer. */
     const newDay = Boolean(previousStreakDate) && previousStreakDate !== savedToday;
     state.currentPackType = firstAvailablePackType();
+    if (revealView.classList.contains('is-results')) resetToPack({ quiet: true });
     state.phase = 'pack';
     state.deck = [];
     state.loot = [];
@@ -3953,9 +4008,6 @@
 
   function setTab(tab) {
     if (app.dataset.tab === tab) return;
-    if (tab === 'pack' && state.phase === 'done' && packTotal() > 0) {
-      resetToPack();
-    }
     app.dataset.tab = tab;
     tabs.forEach((t) => {
       const on = t.dataset.tab === tab;

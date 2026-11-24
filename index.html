@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-12">
+  <meta name="app-version" content="2026.11.24-13">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-9">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-10">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-13" defer></script>
+  <script src="app.js?v=2026.11.24-14" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -199,7 +199,7 @@
       <section class="view reveal-view" id="reveal-view" hidden aria-label="Révélation des cartes">
         <div class="reveal-head">
           <p class="kicker" id="reveal-kicker"><span>✦</span> BOOSTER OUVERT <span>✦</span></p>
-          <h2 id="reveal-title">La pile est prête<em>.</em></h2>
+          <h2 id="reveal-title" tabindex="-1">La pile est prête<em>.</em></h2>
           <p id="reveal-sub">Clique sur la carte du dessus pour la retourner.</p>
         </div>
 
@@ -209,7 +209,14 @@
           <div class="stack" id="stack"></div>
         </div>
 
-        <button class="next-card" id="next-card" type="button" hidden>CARTE SUIVANTE →</button>
+        <div class="reveal-actions">
+          <button class="next-card" id="next-card" type="button" hidden>CARTE SUIVANTE →</button>
+          <button class="open-all" id="open-all" type="button" hidden><span aria-hidden="true">✦</span> Ouvrir tout le pack</button>
+        </div>
+
+        <div class="pack-results" id="pack-results" hidden>
+          <ol class="pack-results-grid" id="pack-results-grid" aria-label="Cartes obtenues, de la plus rare à la plus commune"></ol>
+        </div>
 
         <div class="reveal-foot">
           <span class="foot-left"><i></i><span id="pile-label">CARTE 1 / 5</span></span>
@@ -675,6 +682,9 @@
           <span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span><span class="slot"></span>
         </div>
         <div class="recap-actions">
+          <button class="buy-btn next-pack" id="next-pack" type="button" aria-describedby="recap-msg" hidden>
+            <span aria-hidden="true">✦</span> Passer au pack suivant <span aria-hidden="true">→</span>
+          </button>
           <button class="fusion-chip" id="fusion-chip" type="button" hidden>
             <span class="chip-icon" aria-hidden="true">⚗</span>
             <span class="chip-label">FUSIONNER DES DOUBLONS</span>
