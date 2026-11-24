@@ -575,6 +575,15 @@ const cardsDatabase = [
     emoji: '🤫',
     image: 'assets/Cartes/porte-lelio-en-secret.jpeg',
     color: '#c79bff'
+  },
+  {
+    id: 'soyer-rex',
+    name: 'Soyer Rex',
+    description: "J'ai de très bon tarifs",
+    rarity: 'ultrasecret',
+    emoji: '🦖',
+    image: 'assets/Cartes/soyer-rex.png',
+    color: '#c084fc'
   }
 ];
 
