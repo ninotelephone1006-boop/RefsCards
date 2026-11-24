@@ -645,10 +645,13 @@ const CardMutations = (() => {
     }
     return { ...card };
   }
+  // Le catalogue est statique : indexer une fois évite une recherche linéaire
+  // pour chaque carte chargée depuis une sauvegarde.
+  const cardsById = new Map(cardsDatabase.map((card) => [card.id, card]));
   function resolve(id) {
     if (typeof id !== 'string') return null;
     const [baseId, mutationId, extra] = id.split('::');
-    const base = cardsDatabase.find((c) => c.id === baseId);
+    const base = cardsById.get(baseId);
     if (!base || extra !== undefined) return null;
     if (mutationId === undefined) return base;
     const mutation = definitions.find((m) => m.id === mutationId);
