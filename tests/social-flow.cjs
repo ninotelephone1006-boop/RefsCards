@@ -60,7 +60,13 @@ function makeFirestore(store) {
         .map(([id, d]) => ({ id, data: () => d }))
     });
     return {
-      get: async () => snap(),
+      get: async () => {
+        // Firestore vérifie la requête entière, pas uniquement les résultats.
+        if (coll === 'marketListings' && field === 'sellerUid' && value !== 'me') {
+          throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+        }
+        return snap();
+      },
       onSnapshot: (cb) => {
         watchers.push({ coll, cb: () => cb(snap()) });
         Promise.resolve().then(() => cb(snap()));
@@ -197,11 +203,14 @@ function buttonByText(root, text) {
   /* 5. Le marché de l'ami est visible sur son profil : on y achète
      directement une annonce (plus aucun document trades/ créé). */
   store.marketListings['friend-ad'] = { sellerUid: 'friend1', cardId: 'chasseur-royer', price: 120, buyerUid: '', status: 'open' };
+  store.marketListings['other-ad'] = { sellerUid: 'other', cardId: 'pieds-de-rapace', price: 777, status: 'open' };
+  store.marketListings['sold-ad'] = { sellerUid: 'friend1', cardId: 'pieds-de-rapace', price: 888, status: 'sold' };
   doc.getElementById('market-refresh').click();
   await wait(60);
   const friendListings = doc.getElementById('friend-listings');
   assert.match(friendListings.textContent, /Chasseur Royer/);
   assert.match(friendListings.textContent, /120/);
+  assert.doesNotMatch(friendListings.textContent, /777|888/, 'ni ventes d’autrui ni annonces vendues');
   buttonByText(friendListings, 'Acheter').click();
   await wait(10);
   assert.equal(doc.getElementById('confirm-sheet').hidden, false);
