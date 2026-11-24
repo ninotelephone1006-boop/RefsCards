@@ -488,6 +488,47 @@ const cardsDatabase = [
       sound: true,
       loop: true
     }
+  },
+  {
+    id: 'bierrypiano',
+    name: 'Bierry Piano',
+    description: 'il joue du piano (apparemment)',
+    rarity: 'hypersecret',
+    emoji: '🎹',
+    color: '#fb7185',
+    video: {
+      src: 'assets/Cartes/videos/bierrypiano.MP4',
+      fps: 30,
+      sound: true,
+      loop: true
+    }
+  },
+  {
+    id: 'fagarscreamer',
+    name: 'Fagar Screamer',
+    description: 'il crie (très fort)',
+    rarity: 'ultrasecret',
+    emoji: '😱',
+    image: 'assets/Cartes/fagarscreamer.JPEG',
+    color: '#c084fc'
+  },
+  {
+    id: 'yanou-zoom',
+    name: 'Yanou Zoom',
+    description: 'zoooooom (édition yanou)',
+    rarity: 'hypersecret',
+    emoji: '🔍',
+    image: 'assets/Cartes/yanou zoom.JPEG',
+    color: '#fb7185'
+  },
+  {
+    id: 'maturebierry',
+    name: 'Mature Bierry',
+    description: 'le bierry mature',
+    rarity: 'unique',
+    emoji: '🧔',
+    image: 'assets/Cartes/maturebierry.PNG',
+    color: '#fef08a'
   }
 ];
 
@@ -544,7 +585,8 @@ const CardMutations = (() => {
       rates: Object.freeze({
         common: 0.01, uncommon: 0.008, rare: 0.006, superrare: 0.0045,
         epic: 0.003, ultraepic: 0.002, mythic: 0.0012,
-        legendary: 0.0008, divine: 0.0005, secret: 0.0002
+        legendary: 0.0008, divine: 0.0005, secret: 0.0002,
+        ultrasecret: 0.0001, hypersecret: 0.00005, unique: 0.00002
       })
     })
   ]);

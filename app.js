@@ -190,12 +190,13 @@
   }
   const TEAR_THRESHOLD = 0.75;
 
-  /* Dix raretés, du plus courant au plus rare. `weight` est la probabilité de
+  /* Treize raretés, du plus courant au plus rare. `weight` est la probabilité de
      tirage (en %), `fx` le niveau de mise en scène (calm | rare | epic | gold)
      et `next` la rareté obtenue par fusion. Les couleurs servent au cadre, au
-     badge, au titre et aux lueurs de la carte. */
+     badge, au titre et aux lueurs de la carte. Au-dessus de Secrète (0,5 %) :
+     Ultra Secrète (0,3 %), Hyper Secrète (0,2 %) et Unique (0,1 % = 1/1000). */
   const RARITIES = {
-    common:     { label: 'Commune',      rank: 0, weight: 30,  color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
+    common:     { label: 'Commune',      rank: 0, weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
     uncommon:   { label: 'Inhabituelle', rank: 1, weight: 22,  color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 35,  fx: 'calm', next: 'rare' },
     rare:       { label: 'Rare',         rank: 2, weight: 16,  color: '#5fb8ff', ink: '#06243a', glow: '#4aa8ff', reward: 55,  fx: 'rare', next: 'superrare' },
     superrare:  { label: 'Super Rare',   rank: 3, weight: 11,  color: '#67e0d0', ink: '#032a26', glow: '#3fd8c8', reward: 80,  fx: 'rare', next: 'epic' },
@@ -204,7 +205,10 @@
     mythic:     { label: 'Mythique',     rank: 6, weight: 3.5, color: '#ffa469', ink: '#331204', glow: '#ff8a3d', reward: 240, fx: 'gold', next: 'legendary' },
     legendary:  { label: 'Légendaire',   rank: 7, weight: 2.5, color: '#ffd45e', ink: '#3a2600', glow: '#ffb347', reward: 340, fx: 'gold', next: 'divine' },
     divine:     { label: 'Divine',       rank: 8, weight: 1.5, color: '#a7f3ff', ink: '#032830', glow: '#7ce8ff', reward: 520, fx: 'gold', next: 'secret' },
-    secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: null }
+    secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: 'ultrasecret' },
+    ultrasecret:{ label: 'Ultra Secrète',rank: 10, weight: 0.3, color: '#c084fc', ink: '#2a0a3d', glow: '#a855f7', reward: 1400, fx: 'gold', next: 'hypersecret' },
+    hypersecret:{ label: 'Hyper Secrète',rank: 11, weight: 0.2, color: '#fb7185', ink: '#3d0714', glow: '#f43f5e', reward: 2200, fx: 'gold', next: 'unique' },
+    unique:     { label: 'Unique',       rank: 12, weight: 0.1, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 5000, fx: 'gold', next: null }
   };
 
   /* Une fusion ne peut jamais produire mieux qu'Ultra épique. */
@@ -232,11 +236,11 @@
      Pour changer les probas, il suffit de modifier PACK_TABLES / PACK_SLOTS :
      l'affichage des chances (renderOdds) et le tirage suivent automatiquement. */
   const PACK_TABLES = {
-    classic: { common: 30, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5 },
-    rare: { common: 10, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2 },
-    legend: { common: 30, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5 },
-    video: { common: 30, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5 },
-    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 22, divine: 14, secret: 10 }
+    classic: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
+    rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
+    legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
+    video: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
+    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 21.4, divine: 14, secret: 10, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 }
   };
   /* Slots par pack : 'std' = table complète ; { minRank } = garantie
      (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
@@ -2322,7 +2326,10 @@
     mythic:    { ms: 1700, tier: 3 },
     legendary: { ms: 2100, tier: 3 },
     divine:    { ms: 2600, tier: 4 },
-    secret:    { ms: 3200, tier: 4 }
+    secret:    { ms: 3200, tier: 4 },
+    ultrasecret:{ ms: 3800, tier: 4 },
+    hypersecret:{ ms: 4400, tier: 4 },
+    unique:    { ms: 5200, tier: 4 }
   };
 
   function startCharge(btn, info, cx, cy, sus, done) {
@@ -7003,6 +7010,18 @@
     updateQuestBadges();
   }
 
+  /* « Récupérer tout » : réclame d'un coup toutes les quêtes actives prêtes,
+     en réutilisant claimActiveQuest (une récompense complète par quête). */
+  function claimAllActiveQuests() {
+    const ctx = questCtx();
+    const ready = activeQuests().filter((quest) => Quests.questProgress(quest, ctx).done);
+    if (!ready.length) {
+      showToast('Aucune quête prête à être réclamée pour l’instant.');
+      return;
+    }
+    ready.forEach((quest) => claimActiveQuest(quest.id));
+  }
+
   /* ----------------------------------------------------------- notifications
      Historique persisté (50 max, plus récent en tête). Le badge de la cloche
      compte les non lues ; le badge de l'onglet Quêtes signale une récompense
@@ -7149,6 +7168,26 @@
       questCategory = (withReady || cats[0]).id;
     }
     const frag = document.createDocumentFragment();
+
+    /* Barre d’action : réclame d’un coup toutes les quêtes prêtes. */
+    const readyList = active.filter(isReady);
+    const toolbar = el('div', 'quest-toolbar');
+    const readyNote = el('span', 'quest-toolbar-note', readyList.length
+      ? `${readyList.length} récompense${readyList.length > 1 ? 's' : ''} prête${readyList.length > 1 ? 's' : ''}`
+      : 'Aucune récompense prête pour l’instant');
+    const claimAll = el('button', 'quest-claim-all', `Récupérer tout${readyList.length ? ` (${readyList.length})` : ''}`);
+    claimAll.type = 'button';
+    claimAll.disabled = !readyList.length;
+    claimAll.setAttribute('aria-label', readyList.length
+      ? `Récupérer toutes les récompenses prêtes (${readyList.length})`
+      : 'Aucune récompense prête à récupérer');
+    on(claimAll, 'click', () => {
+      claimAll.disabled = true;
+      SFX.tick();
+      claimAllActiveQuests();
+    });
+    toolbar.append(readyNote, claimAll);
+    frag.append(toolbar);
 
     const tabs = el('div', 'quest-cats');
     tabs.setAttribute('role', 'tablist');

@@ -132,7 +132,7 @@ La barre de navigation compte sept onglets : **Pack**, **Shop**, **Inventaire**,
 
 ## Quêtes, succès et niveaux
 
-- L’onglet **Quêtes** propose **70 objectifs** à difficulté croissante (20 historiques + 50 de la saison 2). Les **5 premières quêtes non réclamées** sont visibles et progressent en parallèle. Choisis librement leur ordre : dès qu’une récompense est réclamée, la suivante prend sa place. Les quêtes terminées restent visibles dans l’historique.
+- L’onglet **Quêtes** propose **271 objectifs** à difficulté croissante (70 historiques + 200 de la saison 3 + la quête légendaire « Mille boosters », 1000 boosters ouverts, peu importe lesquels → 200 XP + 1 Pack Ultra). Les **5 premières quêtes non réclamées** sont visibles et progressent en parallèle. Choisis librement leur ordre : dès qu’une récompense est réclamée, la suivante prend sa place. Le bouton **« Récupérer tout »** en haut du panneau réclame d’un coup toutes les récompenses prêtes (toutes catégories confondues). Les quêtes terminées restent visibles dans l’historique.
 - **Récompenses variées** : en plus des pièces et de l’XP, de nombreuses quêtes offrent des **boosters** (`reward.packs`, ex. `{ rare: 1 }` ou `{ legend: 2, video: 1 }`) qui arrivent directement dans l’inventaire de l’onglet Pack. Certaines quêtes ne paient **que** des packs (ou des packs + de l’XP), sans aucune pièce : `reward.coins` vaut alors `0` et la pastille 🪙 n’est pas affichée sur la carte. Les lots en packs sont détaillés sur la carte (« 📦 1 Pack Rare + 2 Pack Vidéo ») et dans la notification de réclamation.
 - **Objectifs rétroactifs (à vie)** : les quêtes se mesurent sur les valeurs absolues du compte, jamais remises à zéro. Un joueur qui avait déjà 5 cartes différentes, 30 boosters ouverts ou 3 amis avant l’arrivée des quêtes voit ces objectifs déjà validés et peut réclamer sa récompense immédiatement, sans devoir refaire l’action une seconde fois. On enchaîne ensuite les réclamations une par une jusqu’à la première quête réellement non accomplie (l’en-tête affiche « · récompense prête » et la pastille de l’onglet reste allumée tant qu’une récompense attend).
 - Les actions du jeu mettent les objectifs à jour automatiquement : ouvertures et achats de packs, cadeaux du calendrier de connexion, fusions, collection, raretés, amis et ventes encaissées sur le marché. Chaque quête terminée donne les **pièces et l’XP** indiquées sur sa carte.
@@ -171,7 +171,7 @@ Les annonces (`marketListings`, une annonce porte soit `cardId`, soit `packType`
 
 1. **Découpe manuelle** : le booster flotte au centre (parallaxe souris, `touch-action: none`). Une ligne de découpe lumineuse, guidée par une flèche, attend à 15 % du haut. Glisser vers la droite (doigt ou souris) fait progresser la coupe de 0 à 100 % : trait incandescent, gerbe d'étincelles, rabat soulevé en `clip-path`, bruit de papier/plastique dont le timbre suit la vitesse du geste.
 2. **Seuil** : relâché avant 75 %, le paquet revient en place avec un rebond élastique (et un léger craquement). À partir de 75 %, la déchirure s'achève : le haut s'envole en tournoyant dans un flash, éjecte la pile de cinq cartes et déclenche le *pop* d'ouverture.
-3. **Pile de cartes** : les cinq cartes sont triées de la moins rare à la plus rare, la plus rare au fond. Un clic retourne la carte du dessus (`rotateY`), avec parallaxe/tilt et reflet holographique qui suit le curseur. Les dix raretés ont leur mise en scène, regroupée en trois paliers d'effets : halo coloré (Commune, Inhabituelle), anneau + étincelles (Rare, Super Rare), ralenti + tremblement d'écran (Épique, Ultra épique), rayons rotatifs + pluie + hologramme (Mythique, Légendaire, Divine, Secrète).
+3. **Pile de cartes** : les cinq cartes sont triées de la moins rare à la plus rare, la plus rare au fond. Un clic retourne la carte du dessus (`rotateY`), avec parallaxe/tilt et reflet holographique qui suit le curseur. Les treize raretés ont leur mise en scène, regroupée en trois paliers d'effets : halo coloré (Commune, Inhabituelle), anneau + étincelles (Rare, Super Rare), ralenti + tremblement d'écran (Épique, Ultra épique), rayons rotatifs + pluie + hologramme (Mythique, Légendaire, Divine, Secrète).
 4. **Rangement** : après l'avoir révélée, touche la carte pour la manipuler (tilt/parallaxe), puis appuie sur **Carte suivante** (ou clique à côté dans la table) pour la faire glisser vers le récapitulatif (whoosh) et dévoiler la suivante. Au clavier, Entrée/Espace range la carte révélée. Une fois les cinq cartes rangées, le bouton **Aller au Shop** apparaît (les packs s'achètent dans la boutique et vont dans l'inventaire).
 5. **Demande de fusion** : à la fin du booster (ou dès qu'un doublon existe), une **demande de fusion** s'ouvre : chaque paire de cartes identiques peut être échangée contre une carte de la rareté supérieure (la fusion est sans risque, les légendaires étant au sommet). Elle est aussi accessible à tout moment depuis l'onglet **Collection**, via le bouton `DEMANDE DE FUSION · N DOUBLON(S)` affiché au-dessus de la grille.
 
@@ -198,7 +198,7 @@ Chaque carte possède un identifiant, un nom, une description, une rareté, un e
   id: 'ma-carte',              // identifiant unique, affiché en tout petit sur la carte
   name: 'Ma carte',            // titre affiché en haut
   description: 'Ma description', // affichée en bas
-  rarity: 'rare',              // voir les dix raretés ci-dessous
+  rarity: 'rare',              // voir les treize raretés ci-dessous
   emoji: '😎',                 // secours si le visuel manque
   image: 'ma-carte',           // nom de fichier dans assets/Cartes/ (sans extension)
   color: '#a2d8ef'             // fond de secours
@@ -250,11 +250,11 @@ Le lecteur est utilisé partout : révélation, récap miniature, collection, in
 
 > **Règles Firestore** : `packStock` accepte maintenant la clé `video`. Republie `firestore.rules` (`firebase deploy --only firestore:rules`) avant de sauvegarder un Pack Vidéo, sinon le cloud refusera l'écriture.
 
-### Les dix raretés
+### Les treize raretés
 
 | Clé | Libellé | Tirage | Récompense | Palier d'effets |
 | --- | --- | --- | --- | --- |
-| `common` | Commune | 30 % | 20 🪙 | calm |
+| `common` | Commune | 29,4 % | 20 🪙 | calm |
 | `uncommon` | Inhabituelle | 22 % | 35 🪙 | calm |
 | `rare` | Rare | 16 % | 55 🪙 | rare |
 | `superrare` | Super Rare | 11 % | 80 🪙 | rare |
@@ -264,8 +264,11 @@ Le lecteur est utilisé partout : révélation, récap miniature, collection, in
 | `legendary` | Légendaire | 2,5 % | 340 🪙 | gold |
 | `divine` | Divine | 1,5 % | 520 🪙 | gold |
 | `secret` | Secrète | 0,5 % | 900 🪙 | gold |
+| `ultrasecret` | Ultra Secrète | 0,3 % | 1400 🪙 | gold |
+| `hypersecret` | Hyper Secrète | 0,2 % | 2200 🪙 | gold |
+| `unique` | Unique | 0,1 % (1/1000) | 5000 🪙 | gold |
 
-Le tirage est pondéré par `weight` dans `RARITIES` (`app.js`) : si une rareté ne contient aucune carte, son poids est simplement ignoré et les autres se partagent le tirage. La fusion remonte la chaîne `next` (une Commune fusionne vers une Inhabituelle, etc.), la Secrète étant au sommet. Les couleurs de cadre, de badge et de lueur viennent aussi de `RARITIES`.
+Le tirage est pondéré par `weight` dans `RARITIES` (`app.js`) : si une rareté ne contient aucune carte, son poids est simplement ignoré et les autres se partagent le tirage. La fusion remonte la chaîne `next` (une Commune fusionne vers une Inhabituelle, etc.), la Unique étant au sommet. Les couleurs de cadre, de badge et de lueur viennent aussi de `RARITIES`.
 
 L'image `assets/packet.png` fournie ici est un visuel temporaire créé pour le prototype : remplacez-la par votre propre image en conservant le même chemin. Le Pack Vidéo utilise `assets/packetvideo.png` : remplacez ce fichier par votre visuel en gardant le même chemin.
 

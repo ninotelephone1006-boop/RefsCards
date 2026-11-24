@@ -762,6 +762,9 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .card-back[data-back='legendary'] { background-image: url('assets/derriere-legendary.jpg'); }
 .card-back[data-back='divine'] { background-image: url('assets/derriere-divine.jpg'); }
 .card-back[data-back='secret'] { background-image: url('assets/derriere-secret.jpg'); }
+.card-back[data-back='ultrasecret'] { background-image: url('assets/derriere-secret.jpg'); }
+.card-back[data-back='hypersecret'] { background-image: url('assets/derriere-secret.jpg'); }
+.card-back[data-back='unique'] { background-image: url('assets/derriere-secret.jpg'); }
 .card-back[data-back='video'] { background-image: url('assets/derriere-video.jpg'); }
 /* Sur le motif plein cadre, on garde juste l'etoile centrale et les textes. */
 .card-back .back-emblem i { display: none; }
@@ -2842,6 +2845,9 @@ html,body{background:var(--bg)}
 .global-market-card-rarity[data-rarity="legendary"]{color:#ffe18a;border-color:#ffb347aa;box-shadow:0 0 15px #ffb34766}
 .global-market-card-rarity[data-rarity="divine"]{color:#baf7ff;border-color:#7ce8ffbb;box-shadow:0 0 16px #7ce8ff77}
 .global-market-card-rarity[data-rarity="secret"]{color:#efd9ff;border-color:#c79bffcc;box-shadow:0 0 18px #c79bff88}
+.global-market-card-rarity[data-rarity="ultrasecret"]{color:#e2c4ff;border-color:#a855f7dd;box-shadow:0 0 20px #a855f799}
+.global-market-card-rarity[data-rarity="hypersecret"]{color:#ffb3c2;border-color:#f43f5ecc;box-shadow:0 0 22px #f43f5e88}
+.global-market-card-rarity[data-rarity="unique"]{color:#fef9c3;border-color:#facc15dd;box-shadow:0 0 24px #facc15aa}
 .global-market-card-title{display:block;max-width:100%;font:800 15px/1.12 'Space Grotesk',sans-serif;letter-spacing:-.025em;color:#f1f0eb;overflow-wrap:anywhere}
 .global-market-card-title[data-rarity="uncommon"]{color:var(--market-rarity-color,#6fe0a8);text-shadow:0 0 8px var(--market-rarity-glow,#57d39a66)}
 .global-market-card-title[data-rarity="rare"]{color:var(--market-rarity-color,#5fb8ff);text-shadow:0 0 10px var(--market-rarity-glow,#4aa8ff88)}
@@ -2852,6 +2858,9 @@ html,body{background:var(--bg)}
 .global-market-card-title[data-rarity="legendary"]{background:linear-gradient(100deg,#fffbe6 0%,#ffd45e 28%,#fff4b0 52%,#ffb347 78%,#fffbe6 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 9px #ffb347dd);letter-spacing:.015em;animation:market-rarity-glisten 3.2s linear infinite}
 .global-market-card-title[data-rarity="divine"]{background:linear-gradient(100deg,#fff 0%,#a7f3ff 24%,#f2fcff 48%,#7ce8ff 72%,#e5d3ff 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 10px #7ce8ff);letter-spacing:.02em;animation:market-rarity-glisten 2.8s linear infinite}
 .global-market-card-title[data-rarity="secret"]{background:linear-gradient(100deg,#fff 0%,#e9d4ff 22%,#ffdef4 42%,#c79bff 63%,#fff 82%,#d8faff 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 11px #c79bff) drop-shadow(0 0 18px #ff9ad566);letter-spacing:.025em;animation:market-rarity-glisten 2.3s linear infinite}
+.global-market-card-title[data-rarity="ultrasecret"]{background:linear-gradient(100deg,#fff 0%,#e9d5ff 18%,#c084fc 45%,#7e22ce 68%,#fff 88%,#f0abfc 100%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 12px #a855f7) drop-shadow(0 0 24px #7e22ce88);letter-spacing:.03em;animation:market-rarity-glisten 2.1s linear infinite}
+.global-market-card-title[data-rarity="hypersecret"]{background:linear-gradient(100deg,#fff 0%,#fecdd3 16%,#fb7185 40%,#e11d48 66%,#fff 86%,#fda4af 100%);background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 13px #f43f5e) drop-shadow(0 0 26px #e11d4888);letter-spacing:.035em;animation:market-rarity-glisten 1.9s linear infinite}
+.global-market-card-title[data-rarity="unique"]{background:linear-gradient(100deg,#fff 0%,#fef08a 14%,#facc15 38%,#ca8a04 62%,#fffde7 82%,#fde68a 100%);background-size:280% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 14px #facc15) drop-shadow(0 0 30px #eab308aa);letter-spacing:.04em;animation:market-rarity-glisten 1.6s linear infinite}
 @keyframes market-rarity-glisten{to{background-position:200% 0}}
 .global-market-pack-label{color:#ffd45e;border-color:#eab30866}
 .global-market-item-stats{display:flex;flex-direction:column;gap:2px;margin-top:2px}
@@ -2879,7 +2888,7 @@ html,body{background:var(--bg)}
 .global-market-qty-wrap{margin-left:auto}
 .global-market-buy{flex:0 0 auto}
 .qty-btn:disabled{opacity:.38;cursor:not-allowed;transform:none}
-@media(prefers-reduced-motion:reduce){.global-market-card-title[data-rarity="legendary"],.global-market-card-title[data-rarity="divine"],.global-market-card-title[data-rarity="secret"]{animation:none;background-position:0 0}}
+@media(prefers-reduced-motion:reduce){.global-market-card-title[data-rarity="legendary"],.global-market-card-title[data-rarity="divine"],.global-market-card-title[data-rarity="secret"],.global-market-card-title[data-rarity="ultrasecret"],.global-market-card-title[data-rarity="hypersecret"],.global-market-card-title[data-rarity="unique"]{animation:none;background-position:0 0}}
 .market-busy{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#090510bd;color:#fff;font-weight:700}
 
 /* Mutation Shiny : couche visuelle indépendante des dix cadres de rareté. */
@@ -3286,6 +3295,15 @@ body:has(.inspect.is-open) .update-banner{display:none}
 :root{--glow:#b388ff;--glow-2:#f0abfc;--surface:#17121f;--surface-2:#1e1729}
 
 /* ---- Quêtes : onglets de catégories ---- */
+.quest-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:760px;margin:0 auto 12px;padding:10px 14px;border:1px solid #ffffff14;border-radius:14px;background:linear-gradient(145deg,#1a1330d9,#120d1ee6)}
+.quest-toolbar-note{color:#a79fbd;font:700 12px 'Space Grotesk',sans-serif;letter-spacing:.02em}
+.quest-claim-all{flex:0 0 auto;padding:10px 18px;border:0;border-radius:12px;cursor:pointer;
+  background:linear-gradient(100deg,#f59e0b,#f97316);color:#2a1300;font:800 12.5px 'Space Grotesk',sans-serif;letter-spacing:.6px;
+  box-shadow:0 10px 24px -10px #f59e0b;transition:transform .15s,filter .2s,box-shadow .2s}
+.quest-claim-all:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
+.quest-claim-all:active:not(:disabled){transform:scale(.98)}
+.quest-claim-all:disabled{background:#241d33;color:#6f6785;box-shadow:none;cursor:not-allowed}
+@media(max-width:559px){.quest-toolbar{flex-direction:column;align-items:stretch;text-align:center}.quest-claim-all{width:100%}}
 .quest-cats{display:flex;gap:8px;max-width:760px;margin:0 auto 16px;padding:4px 2px 8px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity}
 .quest-cats::-webkit-scrollbar{display:none}
 .quest-cat{position:relative;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:1px solid #ffffff14;border-radius:99px;background:var(--surface);color:#a79fbd;font:700 12.5px 'Space Grotesk',sans-serif;cursor:pointer;scroll-snap-align:center;transition:transform .25s var(--ease-spring),background .25s,color .25s,border-color .25s,box-shadow .25s}

@@ -4,7 +4,8 @@
    Chargement : script classique avant app.js (index.html). Expose l'objet
    global `RefsQuests` lu par app.js ; les tests jsdom le chargent aussi.
 
-   - `QUESTS` : 70 quêtes jouées 5 PAR 5. Chaque quête pose un objectif
+   - `QUESTS` : quêtes jouées 5 PAR 5 (q01 → q270 générées, plus la quête
+     légendaire q271 « Mille boosters »). Chaque quête pose un objectif
      (`metric` + `target`) et une récompense : `coins`, `xp` et/ou `packs`
      (ex. `packs: { rare: 1 }`). Certaines quêtes ne donnent donc PAS de
      pièces : elles offrent de l'XP et des boosters à ouvrir. app.js affiche
@@ -507,6 +508,14 @@ const RefsQuests = (() => {
       });
     }
   })();
+
+  /* ---- Quête légendaire : la plus longue du jeu. 1000 boosters, peu
+     importe lesquels, récompense en XP + un Pack Ultra. ---- */
+  QUESTS.push({
+    id: 'q271', icon: '🌌', title: 'Mille boosters',
+    desc: 'Ouvre 1 000 boosters, peu importe lesquels.',
+    metric: 'packsOpened', target: 1000, reward: { coins: 0, xp: 200, packs: { ultra: 1 } }
+  });
 
   /* ------------------------------------------------------------ les 30 succès
      Non séquentiels : chacun se débloquera dès que sa condition sera vraie,
