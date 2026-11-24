@@ -21,7 +21,7 @@
 const CARTE_DIR = 'assets/Cartes/';
 
 /* Extensions testées, dans l'ordre, quand `image` est donné sans extension. */
-const CARTE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'avif'];
+const CARTE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'PNG', 'JPG', 'JPEG', 'WEBP', 'AVIF'];
 
 /* ==========================================================================
    CARTES VIDÉO (Pack Vidéo)
@@ -59,7 +59,7 @@ const CARTE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'avif'];
    ========================================================================== */
 
 const CARTE_VIDEO_DIR = 'assets/Cartes/videos/';
-const CARTE_VIDEO_EXTENSIONS = ['mp4', 'webm'];
+const CARTE_VIDEO_EXTENSIONS = ['mp4', 'webm', 'MP4', 'WEBM'];
 /* Fréquences proposées dans l'interface ; une autre valeur reste acceptée. */
 const VIDEO_FPS_PRESETS = [24, 30, 60];
 
@@ -367,6 +367,7 @@ const cardsDatabase = [
     description: 'skibidi sapin',
     rarity: 'epic',
     emoji: '🎄',
+    image: 'assets/Cartes/sapin-george.jpg',
     color: '#8fc8ef',
     video: {
       src: 'assets/Cartes/videos/GeorgeSapin.mp4',
@@ -566,9 +567,11 @@ function videoDemoIds() {
    ou nom de fichier sans extension décliné sur les extensions courantes.
    L'application essaie chaque candidat jusqu'à trouver le visuel. */
 function cardImageSources(card) {
-  if (!card || !card.image) return [];
-  if (card.image.includes('/') || /\.[a-z0-9]{2,4}$/i.test(card.image)) return [card.image];
-  const base = CARTE_DIR + card.image;
+  const vc = card && cardVideoConfig(card);
+  const rawImage = (card && card.image) || (vc && vc.poster) || '';
+  if (!rawImage) return [];
+  if (rawImage.includes('/') || /\.[a-z0-9]{2,4}$/i.test(rawImage)) return [rawImage];
+  const base = CARTE_DIR + rawImage;
   return CARTE_EXTENSIONS.map((ext) => `${base}.${ext}`);
 }
 
