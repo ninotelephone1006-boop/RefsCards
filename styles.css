@@ -2495,28 +2495,18 @@ html,body{background:var(--bg)}
 /* ==========================================================================
    SHOP + INVENTAIRE DE PACKS
    ========================================================================== */
-/* --- Onglet Pack : inventaire + choix du pack à ouvrir --- */
-.pack-inventory{position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:7px;
-  width:100%;max-width:420px;margin:8px auto 0;padding:10px 12px;border:1px solid #ffffff14;border-radius:14px;
-  background:#0f0b14d9;backdrop-filter:blur(6px)}
-.pack-type-switch{display:flex;gap:8px;width:100%}
-.pack-type{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px 10px;
-  border:1px solid #3a2d55;border-radius:11px;background:#ffffff06;color:#a79fbd;cursor:pointer;
-  font-size:12px;font-weight:700;transition:background .2s,color .2s,border-color .2s,transform .15s}
-.pack-type:hover{border-color:#8b5cf6;color:#fff}
-.pack-type:active{transform:scale(.97)}
-.pack-type.is-active{background:linear-gradient(100deg,#8b5cf6,#c026d3);border-color:transparent;color:#fff;
-  box-shadow:0 6px 20px -8px #a855f7cc}
-.pack-type-rare.is-active{background:linear-gradient(100deg,#d97706,#eab308);box-shadow:0 6px 20px -8px #eab308cc}
-.pack-type-name b{font-size:10px;color:#fde68a}
-.pack-type.is-active .pack-type-name b{color:#fff}
-.pack-type-count{padding:2px 8px;border-radius:99px;background:#00000033;font-family:'Space Grotesk',sans-serif;
-  font-size:11px;font-variant-numeric:tabular-nums}
-.pack-stock-label{margin:0;font-size:11px;color:#8d84a8;text-align:center}
-.pack-go-shop{padding:9px 16px;border:0;border-radius:10px;background:linear-gradient(100deg,#8b5cf6,#c026d3);
-  color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;cursor:pointer;
-  box-shadow:0 8px 22px -8px #a855f7cc;animation:buy-in .5s var(--ease-spring)}
+/* --- Onglet Pack : état « aucun booster » (plus de bandeau vide) --- */
+.pack-empty{position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:9px;
+  width:100%;max-width:360px;margin:14px auto 0;padding:18px 16px;text-align:center;
+  border:1px dashed #a855f74d;border-radius:16px;
+  background:linear-gradient(160deg,#161026cc,#0d0917e6);animation:rise-in .5s var(--ease-out) backwards}
+.pack-stock-label{margin:0;font:800 15px 'Space Grotesk',sans-serif;letter-spacing:.2px;color:#fff}
+.pack-empty-sub{margin:0;font-size:12.5px;line-height:1.5;color:#a79fbd}
+.pack-go-shop{padding:11px 20px;border:0;border-radius:11px;background:linear-gradient(100deg,#8b5cf6,#c026d3);
+  color:#fff;font-size:11.5px;font-weight:800;letter-spacing:.8px;cursor:pointer;
+  box-shadow:0 8px 22px -8px #a855f7cc;transition:transform .15s var(--ease-spring),filter .2s}
 .pack-go-shop:hover{filter:brightness(1.12)}
+.pack-go-shop:active{transform:scale(.97)}
 .pack.is-empty{filter:grayscale(.7) brightness(.6);cursor:not-allowed}
 .pack.is-empty::after{opacity:.25}
 .pack-odds-rare-note{display:block;width:100%;text-align:center;font-size:8px;font-weight:700;letter-spacing:.8px;
