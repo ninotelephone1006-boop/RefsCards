@@ -1159,6 +1159,12 @@
         desc: '5 cartes · 1 Rare+ et 1 Épique+ garanties · Shiny ×2.',
         rare: true,
       },
+      doubleRare: {
+        title: 'Booster Double Rare',
+        desc: '10 cartes · mêmes chances que le Pack Rare · 2 Rare+ et 2 Épique+ garanties · Shiny ×2.',
+        rare: false,
+        double: true,
+      },
       legend: {
         title: 'Booster Légende',
         desc: '10 cartes · chances standard de rareté.',
@@ -1191,7 +1197,7 @@
          les autres restent exclusivement ouvrables. */
       const sellable = item.type === 'classic' || item.type === 'rare';
       return `
-      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}${item.ultra ? ' inventory-card-ultra' : ''}" data-pack-type="${item.type}" style="--i:${i}">
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.double ? ' inventory-card-double' : ''}${item.video ? ' inventory-card-video' : ''}${item.ultra ? ' inventory-card-ultra' : ''}" data-pack-type="${item.type}" style="--i:${i}">
         <div class="inventory-card-visual">
           <span class="inventory-qty-badge">×${item.count}</span>
           <img class="inventory-card-img" src="${item.img}" alt="${item.title}" draggable="false">
