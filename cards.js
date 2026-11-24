@@ -422,7 +422,7 @@ const cardsDatabase = [
     description: 'ZOOOMING (with bierry)',
     rarity: 'common',
     emoji: '🔍',
-    image: 'assets/Cartes/Ilanus.JPEG',
+    image: 'assets/Cartes/bierryzoom.JPEG',
     color: '#f5d979'
   },
    {
