@@ -2246,7 +2246,7 @@
     img.alt = opts.alt || '';
     img.draggable = false;
     img.decoding = 'async';
-    img.loading = 'eager';
+    img.loading = opts.lazy ? 'lazy' : 'eager';
 
     const fallback = el('span', 'cf-fallback');
     fallback.style.setProperty('--art', card.color || '#cfd7c5');
@@ -4543,6 +4543,7 @@
     recent: { label: 'Ajout récente', dir: -1 }
   };
   const COLL_SORT_DEFAULT = { key: 'num', dir: 1 };
+  const collNameCollator = new Intl.Collator('fr', { numeric: true, sensitivity: 'base' });
 
   function collSortRank(st) {
     const info = RARITIES[st.card.rarity] || RARITIES.common;
@@ -4570,7 +4571,7 @@
     const vb = collSortValue(b, key);
     let diff = 0;
     if (typeof va === 'string' || typeof vb === 'string') {
-      diff = String(va).localeCompare(String(vb), 'fr', { numeric: true, sensitivity: 'base' });
+      diff = collNameCollator.compare(String(va), String(vb));
     } else {
       diff = Math.sign(va - vb);
     }
@@ -4692,7 +4693,7 @@
       t.style.setProperty('--r-color', info.color);
       t.style.setProperty('--r-glow', info.glow);
       t.setAttribute('aria-label', `${card.name}, ${info.label}${n > 1 ? `, ${n} exemplaires` : ''}${st.shiny ? `, dont ${st.shiny} shiny` : ''}. Clic : voir en grand avec le détail normal / shiny.`);
-      t.append(cardFrame(shown_card, { mini: true, alt: `${card.name} — ${info.label}` }));
+      t.append(cardFrame(shown_card, { mini: true, lazy: true, alt: `${card.name} — ${info.label}` }));
       if (n > 1) t.append(el('span', 'coll-pill', `x${n}`));
       if (st.shiny) t.append(el('span', 'coll-shiny-dot', '✦'));
       if (fresh.has(card.id) || (st.shinyCard && fresh.has(st.shinyCard.id))) t.classList.add('is-fresh');
@@ -4953,10 +4954,11 @@
     const owned = new Map();
     for (const id of ids) owned.set(id, (owned.get(id) || 0) + 1);
     const total = ids.length;
-    const unique = new Set(CardMutations.owned(ids).map((c) => c.baseId || c.id)).size;
+    const uniqueCards = CardMutations.owned(ids);
+    const unique = new Set(uniqueCards.map((c) => c.baseId || c.id)).size;
     let value = 0;
     let best = null;
-    for (const card of CardMutations.owned(ids)) {
+    for (const card of uniqueCards) {
       const n = owned.get(card.id) || 0;
       if (!n) continue;
       value += CardMutations.multiply(card, RARITIES[card.rarity] ? RARITIES[card.rarity].reward : 0) * n;
