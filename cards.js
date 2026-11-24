@@ -587,7 +587,7 @@ const cardsDatabase = [
   },
   {
     id: 'le-meilleur-investissement',
-    name: 'Le Meilleur Investissement',
+    name: 'saint bridou',
     description: '38 % de protéines, 0 % de regrets 🥩',
     rarity: 'mythic',
     emoji: '🥩',
@@ -596,7 +596,7 @@ const cardsDatabase = [
   },
   {
     id: 'le-son',
-    name: 'Le Son',
+    name: 'royer Son',
     description: 'Ne monte pas le son, il est maudit 🔊',
     rarity: 'ultrasecret',
     emoji: '🔊',
@@ -614,7 +614,7 @@ const cardsDatabase = [
   },
   {
     id: 'prophete-de-la-teuf',
-    name: 'Le Prophète de la Teuf',
+    name: 'yanouchibre',
     description: 'Il a vu la lumière (verte) de la soirée 🎈',
     rarity: 'ultraepic',
     emoji: '🎈',
@@ -623,7 +623,7 @@ const cardsDatabase = [
   },
   {
     id: 'jeune-sapeur',
-    name: 'Jeune Sapeur',
+    name: 'Jeune sapeur',
     description: "Il éteint les incendies, pas les rumeurs 🚒",
     rarity: 'uncommon',
     emoji: '🚒',
@@ -631,8 +631,8 @@ const cardsDatabase = [
     color: '#9dbfc4'
   },
   {
-    id: 'cami-du-dimanche',
-    name: 'Le Cami du Dimanche',
+    id: 'sexy lelio',
+    name: 'sexy lelio',
     description: 'Tenue officielle du dimanche après-midi 👕',
     rarity: 'common',
     emoji: '👕',
@@ -641,7 +641,7 @@ const cardsDatabase = [
   },
   {
     id: 'le-regard',
-    name: 'Le Regard',
+    name: 'creepy brazil',
     description: 'Il te fixe. Il te connaît. Il sait. 👁️',
     rarity: 'unique',
     emoji: '👁️',
