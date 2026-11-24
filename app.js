@@ -73,6 +73,45 @@
           : type === 'ultra' ? 'ULTRA RARE'
             : 'CLASSIQUE';
   }
+  /* Cinématique d'ouverture : chaque pack a sa propre identité (titre,
+     sous-titre, palette, rythme). `burstDelay` = temps avant l'explosion,
+     `revealDelay` = temps avant la pile de cartes. L'ultra reste la plus
+     longue et la plus spectaculaire ; le classique reste punchy. */
+  const PACK_OPENING = {
+    classic: {
+      title: 'CLASSIQUE', sub: '5 cartes · 1 Rare+ garantie',
+      colors: ['#ffffff', '#c084fc', '#a855f7', '#f0abfc', '#e9d5ff'],
+      burstDelay: 240, revealDelay: 820, sparks: 26, dots: 34, confetti: 26, rain: 0,
+      shake: 'shake', sound: 'classic'
+    },
+    rare: {
+      title: 'RARE DORÉ', sub: '5 cartes · 1 Rare+ et 1 Épique+ garanties',
+      colors: ['#ffffff', '#fbbf24', '#f59e0b', '#fde68a', '#fef3c7'],
+      burstDelay: 300, revealDelay: 1050, sparks: 34, dots: 44, confetti: 40, rain: 36,
+      shake: 'shake', sound: 'rare'
+    },
+    legend: {
+      title: 'LÉGENDE', sub: '10 cartes · chances standards',
+      colors: ['#ffffff', '#fbbf24', '#f97316', '#ef4444', '#fde68a'],
+      burstDelay: 420, revealDelay: 1350, sparks: 44, dots: 52, confetti: 48, rain: 48,
+      shake: 'ultra-shake', sound: 'legend'
+    },
+    video: {
+      title: 'VIDÉO', sub: '2 cartes animées exclusives',
+      colors: ['#ffffff', '#22d3ee', '#ec4899', '#f0abfc', '#67e8f9'],
+      burstDelay: 320, revealDelay: 1100, sparks: 36, dots: 46, confetti: 36, rain: 40,
+      shake: 'shake', sound: 'video'
+    },
+    ultra: {
+      title: 'ULTRA RARE', sub: '5 cartes · raretés extrêmes garanties',
+      colors: ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#c4a1ff'],
+      burstDelay: 360, revealDelay: 1380, sparks: 36, dots: 55, confetti: 54, rain: 64,
+      shake: 'ultra-shake', sound: 'ultra'
+    }
+  };
+  function packOpeningFor(type) {
+    return PACK_OPENING[type] || PACK_OPENING.classic;
+  }
   /* Accès tolérant à la configuration vidéo (cards.js en cache ancien). */
   function cardVideoInfo(card) {
     return typeof cardVideoConfig === 'function' ? cardVideoConfig(card) : null;
@@ -315,7 +354,14 @@
   const qtyUltra = $('qty-ultra');
   const buyUltra = $('buy-ultra');
   const openUltra = $('open-ultra');
-  const ultraOpening = $('ultra-opening');
+  /* Cinématique d'ouverture générique (tous les packs). `ultraOpening`
+     reste un alias pour compatibilité avec l'ancien HTML en cache. */
+  const packOpening = $('pack-opening') || $('ultra-opening');
+
+  const packOpeningImg = $('pack-opening-img');
+  const packOpeningTitle = $('pack-opening-title');
+  const packOpeningSub = $('pack-opening-sub');
+  const packOpeningKicker = $('pack-opening-kicker');
   const shopMsg = $('shop-msg');
   const tabBadgeShop = $('tab-badge-shop');
   const inventoryView = $('inventory-view');
@@ -1529,8 +1575,34 @@
     requestAnimationFrame(step);
   }
 
+  /* Affiche la cinématique d'ouverture du pack (overlay plein écran).
+     Le thème (titre, image, palette) vient de PACK_OPENING ; le CSS
+     module les animations via [data-pack-type] + les variables --po-*. */
+  function showPackOpening(type) {
+    if (!packOpening) return;
+    const theme = packOpeningFor(type);
+    packOpening.dataset.packType = type;
+    packOpening.hidden = false;
+    packOpening.setAttribute('aria-hidden', 'false');
+    if (packOpeningImg) packOpeningImg.src = PACK_IMAGES[type] || PACK_IMAGES.classic;
+    if (packOpeningTitle) packOpeningTitle.textContent = theme.title;
+    if (packOpeningSub) packOpeningSub.textContent = theme.sub;
+    if (packOpeningKicker) packOpeningKicker.textContent = `✦ PACK ${theme.title} ✦`;
+    packOpening.classList.remove('is-active', 'is-burst');
+    void packOpening.offsetWidth;
+    packOpening.classList.add('is-active');
+  }
+
+  function hidePackOpening() {
+    if (!packOpening) return;
+    packOpening.classList.remove('is-active', 'is-burst');
+    packOpening.hidden = true;
+    packOpening.setAttribute('aria-hidden', 'true');
+  }
+
   function openPack() {
     const type = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
+    const theme = packOpeningFor(type);
     /* Consomme 1 pack de l'inventaire (sauf en démo, où l'ouverture est
        gratuite pour les tests/apercus). */
     if (!isDemoMode()) {
@@ -1546,100 +1618,65 @@
     }
     SFX.tearStop();
     SFX.rip();
-    pack.classList.add('is-ripped');
+    pack.classList.add('is-ripped', 'is-pack-ripped');
+    pack.dataset.packType = type;
+    if (type === 'ultra') pack.classList.add('is-ultra-ripped');
     packFlap.classList.add('is-gone');
     packFlap.style.transform = '';
+
+    /* Jingle signature du pack (audio.js packOpen, repli tolérant). */
+    if (SFX && typeof SFX.packOpen === 'function') SFX.packOpen(type);
+    else if (type === 'ultra' && SFX && typeof SFX.ultraOpen === 'function') SFX.ultraOpen();
 
     const r = cut.getBoundingClientRect();
     const s = stage.getBoundingClientRect();
     const lineY = r.top - s.top;
     const x0 = r.left - s.left;
+    const packRect = pack.getBoundingClientRect();
+    const cx = packRect.width > 0 ? packRect.left - s.left + packRect.width / 2 : x0 + r.width * 0.5;
+    const cy = packRect.height > 0 ? packRect.top - s.top + packRect.height * 0.48 : lineY;
+    const colors = theme.colors;
 
-    if (type === 'ultra') {
-      pack.classList.add('is-ultra-ripped');
-      SFX.ultraOpen();
-      const packRect = pack.getBoundingClientRect();
-      const cx = packRect.width > 0 ? packRect.left - s.left + packRect.width / 2 : x0 + r.width * 0.5;
-      const cy = packRect.height > 0 ? packRect.top - s.top + packRect.height * 0.48 : lineY;
-      if (ultraOpening) {
-        ultraOpening.hidden = false;
-        ultraOpening.classList.remove('is-active', 'is-burst');
-        void ultraOpening.offsetWidth;
-        ultraOpening.classList.add('is-active');
-      }
-      if (!reduceMotion.matches) {
-        const prism = ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#c4a1ff'];
-        for (let i = 0; i < 36; i++) {
-          FX.spark(x0 + (r.width * i) / 36, lineY + (Math.random() - 0.5) * 8, prism[i % prism.length], {
-            speedMin: 160,
-            speedMax: 620,
-            g: 380,
-            size: 3
-          });
-        }
-        for (let i = 0; i < 24; i++) {
-          FX.dot(cx, cy, prism[i % prism.length], { speedMin: 30, speedMax: 220, g: -40, size: 4, life: 0.9 });
-        }
-      }
-
-      window.setTimeout(() => {
-        if (ultraOpening) ultraOpening.classList.add('is-burst');
-        flash.classList.remove('run');
-        void flash.offsetWidth;
-        flash.classList.add('run');
-        if (!reduceMotion.matches) {
-          const prism = ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#e2e8f0'];
-          FX.ring(cx, cy, '#ffffff', 420);
-          FX.ring(cx, cy, '#67e8f9', 320);
-          FX.ring(cx, cy, '#f0abfc', 230);
-          for (let i = 0; i < 70; i++) {
-            FX.spark(cx, cy, prism[i % prism.length], { speedMin: 180, speedMax: 780, g: 240, size: 3.4, life: 1.15 });
-          }
-          for (let i = 0; i < 55; i++) {
-            FX.dot(cx, cy, prism[i % prism.length], { speedMin: 70, speedMax: 520, g: -50, size: 5.5, life: 1.5 });
-          }
-          FX.confetti(cx, cy, prism, 54);
-          FX.rain(prism, 64);
-        }
-        stage.classList.remove('shake', 'ultra-shake');
-        void stage.offsetWidth;
-        stage.classList.add('ultra-shake');
-      }, reduceMotion.matches ? 40 : 360);
-
-      window.setTimeout(showReveal, reduceMotion.matches ? 320 : 1380);
-      return;
-    }
+    showPackOpening(type);
 
     if (!reduceMotion.matches) {
-      for (let i = 0; i < 26; i++) {
-        FX.spark(x0 + (r.width * i) / 26, lineY + (Math.random() - 0.5) * 6, i % 3 ? '#ffffff' : '#b388ff', {
-          speedMin: 120,
-          speedMax: 520,
-          g: 520,
-          size: 2.6
+      for (let i = 0; i < theme.sparks; i++) {
+        FX.spark(x0 + (r.width * i) / Math.max(1, theme.sparks), lineY + (Math.random() - 0.5) * 8, colors[i % colors.length], {
+          speedMin: 140,
+          speedMax: 620,
+          g: 380,
+          size: 3
         });
+      }
+      for (let i = 0; i < 24; i++) {
+        FX.dot(cx, cy, colors[i % colors.length], { speedMin: 30, speedMax: 220, g: -40, size: 4, life: 0.9 });
       }
     }
 
     window.setTimeout(() => {
-      SFX.pop();
+      if (packOpening) packOpening.classList.add('is-burst');
       flash.classList.remove('run');
       void flash.offsetWidth;
       flash.classList.add('run');
       if (!reduceMotion.matches) {
-        FX.ring(x0 + r.width * 0.5, lineY, '#e6d9ff', 320);
-        for (let i = 0; i < 40; i++) {
-          FX.dot(x0 + r.width * 0.5, lineY, i % 2 ? '#ffffff' : '#b388ff', { speedMax: 420, g: -60, size: 4, life: 1.2 });
+        FX.ring(cx, cy, '#ffffff', 420);
+        FX.ring(cx, cy, colors[1] || '#ffffff', 320);
+        FX.ring(cx, cy, colors[2] || '#ffffff', 230);
+        for (let i = 0; i < theme.sparks * 2; i++) {
+          FX.spark(cx, cy, colors[i % colors.length], { speedMin: 180, speedMax: 780, g: 240, size: 3.4, life: 1.15 });
         }
-        const glow = pack.getBoundingClientRect();
-        FX.confetti(glow.left - s.left + glow.width / 2, glow.top - s.top + glow.height * 0.4, ['#b388ff', '#ffffff', '#f0abfc'], 26);
+        for (let i = 0; i < theme.dots; i++) {
+          FX.dot(cx, cy, colors[i % colors.length], { speedMin: 70, speedMax: 520, g: -50, size: 5.5, life: 1.5 });
+        }
+        FX.confetti(cx, cy, colors, theme.confetti);
+        if (theme.rain > 0) FX.rain(colors, theme.rain);
       }
-      stage.classList.remove('shake');
+      stage.classList.remove('shake', 'ultra-shake');
       void stage.offsetWidth;
-      stage.classList.add('shake');
-    }, 260);
+      stage.classList.add(theme.shake);
+    }, reduceMotion.matches ? 40 : theme.burstDelay);
 
-    window.setTimeout(showReveal, reduceMotion.matches ? 320 : 720);
+    window.setTimeout(showReveal, reduceMotion.matches ? 320 : theme.revealDelay);
   }
 
   on(packArea, 'pointerdown', onDragStart);
@@ -2509,10 +2546,7 @@
   let current = null;
 
   function showReveal() {
-    if (ultraOpening) {
-      ultraOpening.classList.remove('is-active', 'is-burst');
-      ultraOpening.hidden = true;
-    }
+    hidePackOpening();
     stage.classList.remove('ultra-shake');
     if (!cardsDatabase.some((c) => RARITIES[c.rarity])) {
       state.phase = 'pack';
@@ -2565,9 +2599,9 @@
       s.removeAttribute('tabindex');
       s.replaceChildren();
     });
-    revealKicker.innerHTML = packType === 'ultra'
-      ? '<span>✦</span> PACK ULTRA RARE OUVERT <span>✦</span>'
-      : '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
+    revealKicker.innerHTML = packType === 'classic'
+      ? '<span>✦</span> BOOSTER OUVERT <span>✦</span>'
+      : `<span>✦</span> PACK ${packOpeningFor(packType).title} OUVERT <span>✦</span>`;
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
@@ -2684,14 +2718,12 @@
     void packView.offsetWidth;
     packView.classList.add('view-in');
 
-    pack.classList.remove('is-ripped', 'is-ultra-ripped', 'is-dragging');
+    pack.classList.remove('is-ripped', 'is-ultra-ripped', 'is-pack-ripped', 'is-dragging');
+    delete pack.dataset.packType;
     pack.style.transform = '';
     packFlap.classList.remove('is-gone');
     packFlap.style.transform = '';
-    if (ultraOpening) {
-      ultraOpening.classList.remove('is-active', 'is-burst');
-      ultraOpening.hidden = true;
-    }
+    hidePackOpening();
     stage.classList.remove('ultra-shake');
     delete revealView.dataset.packType;
     resetTear();

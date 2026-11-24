@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-8">
+  <meta name="app-version" content="2026.11.24-10">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-5">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-7">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -29,13 +29,13 @@
   <script src="firebase-config.js?v=2026.11.24-1" defer></script>
   <script src="cards.js?v=2026.11.24-8" defer></script>
   <script src="quests.js?v=2026.11.24-1" defer></script>
-  <script src="audio.js?v=2026.11.24-1" defer></script>
+  <script src="audio.js?v=2026.11.24-2" defer></script>
   <!-- Détection de mise à jour : compare la version chargée à celle
        du index.html en ligne et propose de recharger (aucun
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-9" defer></script>
+  <script src="app.js?v=2026.11.24-10" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -636,12 +636,21 @@
         </div>
       </section>
 
-      <div class="ultra-opening" id="ultra-opening" hidden aria-hidden="true">
-        <div class="ultra-aurora"></div>
-        <div class="ultra-beams"></div>
-        <div class="ultra-rings"><i></i><i></i><i></i></div>
-        <div class="ultra-core"></div>
-        <div class="ultra-flash"></div>
+      <!-- Cinématique d'ouverture : un seul overlay, thémé par pack
+           (data-pack-type = classic | rare | legend | video | ultra).
+           app.js remplit l'image et les textes, le CSS anime. -->
+      <div class="pack-opening" id="pack-opening" hidden aria-hidden="true" data-pack-type="classic">
+        <div class="pack-aurora"></div>
+        <div class="pack-beams"></div>
+        <div class="pack-rings"><i></i><i></i><i></i></div>
+        <div class="pack-core"></div>
+        <div class="pack-hero"><img id="pack-opening-img" alt="" draggable="false"></div>
+        <div class="pack-flash"></div>
+        <div class="pack-title-wrap">
+          <p class="pack-kicker" id="pack-opening-kicker"></p>
+          <h2 class="pack-title" id="pack-opening-title"></h2>
+          <p class="pack-sub" id="pack-opening-sub"></p>
+        </div>
       </div>
 
       <div class="flash" id="flash" aria-hidden="true"></div>

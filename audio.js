@@ -554,6 +554,98 @@ const Sound = (() => {
     noiseHit({ t: boom + 0.06, attack: 0.18, decay: 1.5, gain: 0.06, type: 'highpass', freq: 7200, send: 1 });
   }
 
+  /* Jingle d'ouverture propre à chaque booster (appelé par app.js).
+     Le pack ultra garde sa supernova dédiée ; les autres montent en
+     tension puis éclatent avec leur propre palette sonore :
+     or (rare), cuivres (légende), néon (vidéo), violet punchy (classique). */
+  function packOpen(type) {
+    if (type === 'ultra') { ultraOpen(); return; }
+    if (!ready()) return;
+    const t = now();
+
+    if (type === 'legend') {
+      // Montée dramatique + timbales + fanfare cuivrée.
+      tone({ t, type: 'sawtooth', freq: 74, freqEnd: 300, decay: 0.42, gain: 0.07, filterType: 'lowpass', filterFreq: 260, filterEnd: 3200, q: 3, send: 0.4 });
+      tone({ t, type: 'sine', freq: 52, freqEnd: 120, decay: 0.42, gain: 0.22, send: 0.2 });
+      noiseHit({ t, attack: 0.05, decay: 0.36, gain: 0.12, type: 'bandpass', freq: 480, freqEnd: 3600, q: 1.4, send: 0.5 });
+      const boom = t + 0.42;
+      tone({ t: boom, type: 'sine', freq: 150, freqEnd: 36, decay: 0.85, gain: 0.4, send: 0.3 });
+      noiseHit({ t: boom, attack: 0.002, decay: 0.5, gain: 0.26, type: 'lowpass', freq: 5200, freqEnd: 260, send: 0.4 });
+      const fanfare = [392, 523.25, 659.25, 783.99, 1046.5];
+      fanfare.forEach((f, i) => {
+        const at = boom + i * 0.085;
+        [-7, 7].forEach((detune) => {
+          tone({
+            t: at, type: 'sawtooth', freq: f, detune, attack: 0.012, decay: 0.5, hold: 0.2,
+            gain: 0.05, filterType: 'lowpass', filterFreq: 3800, filterEnd: 1600, q: 0.9,
+            pan: (i / fanfare.length - 0.5) * 0.7, send: 0.5
+          });
+        });
+        bell(f * 2, at, { gain: 0.045, decay: 1.3, ratio: 2.01, index: 380, send: 0.75 });
+      });
+      [0, 0.18, 0.36].forEach((offset, i) => {
+        tone({ t: boom + offset, type: 'sine', freq: 104 - i * 6, freqEnd: 48, decay: 0.6, gain: 0.24, send: 0.25 });
+      });
+      return;
+    }
+
+    if (type === 'rare') {
+      // Montée dorée + carillon de pièces.
+      tone({ t, type: 'triangle', freq: 180, freqEnd: 720, decay: 0.3, gain: 0.09, filterType: 'lowpass', filterFreq: 900, filterEnd: 5200, q: 2, send: 0.4 });
+      tone({ t, type: 'sine', freq: 60, freqEnd: 120, decay: 0.3, gain: 0.2, send: 0.2 });
+      const boom = t + 0.3;
+      tone({ t: boom, type: 'sine', freq: 140, freqEnd: 40, decay: 0.6, gain: 0.32, send: 0.3 });
+      noiseHit({ t: boom, attack: 0.002, decay: 0.38, gain: 0.2, type: 'lowpass', freq: 5400, freqEnd: 400, send: 0.35 });
+      [783.99, 987.77, 1174.66, 1567.98].forEach((f, i) => {
+        const at = boom + i * 0.07;
+        bell(f, at, { gain: 0.07, decay: 1.35, ratio: 2.4, index: 460, pan: (i / 4 - 0.5) * 0.8, send: 0.8 });
+        tone({ t: at, type: 'triangle', freq: f * 0.5, decay: 0.7, gain: 0.035, send: 0.55 });
+      });
+      for (let i = 0; i < 8; i++) {
+        const f = 1568 * Math.pow(2, (Math.floor(Math.random() * 5) * 2) / 12);
+        bell(f, boom + 0.12 + i * 0.075, {
+          gain: 0.028, decay: 0.7, ratio: 3.01, index: 700,
+          pan: (Math.random() - 0.5) * 1.5, send: 0.85
+        });
+      }
+      return;
+    }
+
+    if (type === 'video') {
+      // Bips néon + arpège magenta / cyan.
+      tone({ t, type: 'square', freq: 220, freqEnd: 880, decay: 0.26, gain: 0.055, filterType: 'lowpass', filterFreq: 1200, filterEnd: 6400, q: 4, send: 0.45 });
+      for (let i = 0; i < 4; i++) {
+        tone({ t: t + i * 0.06, type: 'square', freq: 1320 + i * 220, decay: 0.1, gain: 0.03, pan: i % 2 ? 0.45 : -0.45, send: 0.5 });
+      }
+      const boom = t + 0.32;
+      tone({ t: boom, type: 'sine', freq: 160, freqEnd: 44, decay: 0.55, gain: 0.3, send: 0.3 });
+      noiseHit({ t: boom, attack: 0.002, decay: 0.42, gain: 0.18, type: 'highpass', freq: 2200, send: 0.5 });
+      const arp = [523.25, 783.99, 1046.5, 1318.51, 1567.98, 2093];
+      arp.forEach((f, i) => {
+        const at = boom + i * 0.055;
+        tone({
+          t: at, type: 'square', freq: f, attack: 0.005, decay: 0.2, hold: 0.06,
+          gain: 0.035, filterType: 'lowpass', filterFreq: 5200, filterEnd: 2400,
+          pan: i % 2 ? 0.5 : -0.5, send: 0.6
+        });
+        bell(f * 2, at, { gain: 0.03, decay: 0.8, ratio: 2.01, index: 300, send: 0.7 });
+      });
+      return;
+    }
+
+    // Classique : pop violet punchy + petit arpège cristallin.
+    tone({ t, type: 'triangle', freq: 200, freqEnd: 640, decay: 0.22, gain: 0.08, filterType: 'lowpass', filterFreq: 700, filterEnd: 4200, q: 2, send: 0.35 });
+    const boom = t + 0.24;
+    tone({ t: boom, type: 'sine', freq: 130, freqEnd: 46, decay: 0.45, gain: 0.28, send: 0.25 });
+    noiseHit({ t: boom, attack: 0.002, decay: 0.3, gain: 0.16, type: 'lowpass', freq: 4200, freqEnd: 500, send: 0.3 });
+    [659.25, 880, 1046.5, 1318.51].forEach((f, i) => {
+      bell(f, boom + i * 0.05, {
+        gain: 0.05, decay: 0.9, ratio: 2.2, index: 380,
+        pan: (i / 4 - 0.5) * 0.7, send: 0.7
+      });
+    });
+  }
+
   function rarity(kind) {
     if (!ready()) return;
     if (kind === 'rare') stingerRare();
@@ -584,6 +676,7 @@ const Sound = (() => {
     coin,
     chaChing,
     ultraOpen,
+    packOpen,
     rarity
   };
 })();
