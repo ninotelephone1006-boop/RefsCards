@@ -557,6 +557,15 @@ const cardsDatabase = [
     emoji: '🧘',
     image: 'assets/Cartes/yoga-lelio.jpg',
     color: '#c6a0eb'
+  },
+  {
+    id: 'girly-lelio',
+    name: 'Girly Lelio',
+    description: 'Lelio sort le grand jeu avec son look rose 🌸',
+    rarity: 'rare',
+    emoji: '🌸',
+    image: 'assets/Cartes/girly-lelio.jpeg',
+    color: '#ff8fd1'
   }
 ];
 
