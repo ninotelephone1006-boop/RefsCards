@@ -12,7 +12,7 @@
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer le cadeau du calendrier de connexion. */
-  const PACK_PRICES = { classic: 500, rare: 1000, legend: 800, video: 1000 };
+  const PACK_PRICES = { classic: 500, rare: 1000, legend: 800, video: 1000, ultra: 20000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
   /* Calendrier de connexion : un cadeau gratuit chaque jour, de mieux en mieux.
      Le cycle fait 7 jours (le 7e est le jackpot) puis recommence ; le cran
@@ -34,6 +34,19 @@
   // réduites. Le total reste normalisé pour que les pourcentages affichés restent cohérents.
   const RARE_RANK_FACTOR_BASE = 0.45;
   const RARE_RANK_FACTOR_STEP = 0.32;
+  // Pack Ultra Rare : 30x plus de chance pour les cartes de grosse rareté.
+  const ULTRA_RARITY_MULTIPLIER = {
+    common: 0.02,
+    uncommon: 0.04,
+    rare: 0.08,
+    superrare: 0.25,
+    epic: 1.0,
+    ultraepic: 3.5,
+    mythic: 14,
+    legendary: 18,
+    divine: 52,
+    secret: 60
+  };
   /* Économie : une carte déjà possédée rapporte moins à chaque révélation.
      On ne retire jamais de pièces à personne — on limite seulement la création
      d'argent des doublons (sinon ouvrir toujours la même commune restait une
@@ -46,21 +59,30 @@
     classic: 'assets/packet.png',
     rare: 'assets/packetrare.png',
     legend: 'assets/packetlegende.png',
-    video: 'assets/packetvideo.png'
+    video: 'assets/packetvideo.png',
+    ultra: 'assets/packetultra.png'
   };
   const CARD_COUNT = 5;
-  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10, video: 2 };
+  const PACK_CARD_COUNT = { classic: 5, rare: 5, legend: 10, video: 2, ultra: 5 };
   /* Ordre d'affichage + validation. Ajouter un type ici (et dans les objets
      ci-dessus) suffit pour qu'il apparaisse dans le Shop, l'inventaire, les
      sauvegardes et les écrans d'ouverture. */
-  const PACK_TYPES = ['classic', 'rare', 'legend', 'video'];
+  const PACK_TYPES = ['classic', 'rare', 'legend', 'video', 'ultra'];
   function isPackType(type) { return PACK_TYPES.indexOf(type) >= 0; }
   function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
   function packLabelFr(type) {
-    return type === 'rare' ? 'rare' : type === 'legend' ? 'légende' : type === 'video' ? 'vidéo' : 'classique';
+    return type === 'rare' ? 'rare'
+      : type === 'legend' ? 'légende'
+        : type === 'video' ? 'vidéo'
+          : type === 'ultra' ? 'ultra rare'
+            : 'classique';
   }
   function packLabelUpper(type) {
-    return type === 'rare' ? 'RARE' : type === 'legend' ? 'LÉGENDE' : type === 'video' ? 'VIDÉO' : 'CLASSIQUE';
+    return type === 'rare' ? 'RARE'
+      : type === 'legend' ? 'LÉGENDE'
+        : type === 'video' ? 'VIDÉO'
+          : type === 'ultra' ? 'ULTRA RARE'
+            : 'CLASSIQUE';
   }
   /* Accès tolérant à la configuration vidéo (cards.js en cache ancien). */
   function cardVideoInfo(card) {
@@ -68,8 +90,8 @@
   }
   /* Le Pack Vidéo ne tire que des cartes dotées d'une configuration `video`,
      et ces cartes restent exclusives à ce pack : elles ne sortent jamais des
-     autres boosters (classique, rare, légende). On peut les voir verrouillées
-     dans la collection, mais on ne les obtient que par le Pack Vidéo. */
+     autres boosters (classique, rare, légende, ultra rare). On peut les voir
+     verrouillées dans la collection, mais on ne les obtient que par le Pack Vidéo. */
   function packPool(type) {
     if (type === 'video') {
       /* Seules les cartes configurées avec un bloc `video` sortent du Pack
@@ -79,7 +101,7 @@
     }
     return cardsDatabase.filter((card) => !cardVideoInfo(card));
   }
-  function emptyPackStock() { return { classic: 0, rare: 0, legend: 0, video: 0 }; }
+  function emptyPackStock() { return { classic: 0, rare: 0, legend: 0, video: 0, ultra: 0 }; }
   function packStockFrom(raw) {
     const source = raw && typeof raw === 'object' ? raw : {};
     const stock = emptyPackStock();
@@ -254,6 +276,11 @@
   const qtyVideo = $('qty-video');
   const buyVideo = $('buy-video');
   const openVideo = $('open-video');
+  const shopStockUltra = $('shop-stock-ultra');
+  const qtyUltra = $('qty-ultra');
+  const buyUltra = $('buy-ultra');
+  const openUltra = $('open-ultra');
+  const ultraOpening = $('ultra-opening');
   const shopMsg = $('shop-msg');
   const tabBadgeShop = $('tab-badge-shop');
   const inventoryView = $('inventory-view');
@@ -262,7 +289,7 @@
   const inventoryEmpty = $('inventory-empty');
   const inventoryGoShop = $('inventory-go-shop');
   const tabBadgeInventory = $('tab-badge-inventory');
-  const shopQty = { classic: 1, rare: 1, legend: 1, video: 1 };
+  const shopQty = { classic: 1, rare: 1, legend: 1, video: 1, ultra: 1 };
   /* Quêtes, succès, niveau, notifications (blocs tolérants : un HTML en
      cache obsolète peut ne pas les avoir). */
   const questsView = $('quests-view');
@@ -680,6 +707,9 @@
     if (shopStockVideo) {
       shopStockVideo.textContent = stockText(state.packStock.video || 0);
     }
+    if (shopStockUltra) {
+      shopStockUltra.textContent = stockText(state.packStock.ultra || 0);
+    }
 
     const updateBuy = (type, qtyEl, btn) => {
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
@@ -699,6 +729,7 @@
     updateBuy('rare', qtyRare, buyRare);
     updateBuy('legend', qtyLegend, buyLegend);
     updateBuy('video', qtyVideo, buyVideo);
+    updateBuy('ultra', qtyUltra, buyUltra);
 
     const total = packTotal();
     if (shopInventoryLabel) {
@@ -712,7 +743,7 @@
     }
     [
       [openClassic, 'classic'], [openRare, 'rare'],
-      [openLegend, 'legend'], [openVideo, 'video']
+      [openLegend, 'legend'], [openVideo, 'video'], [openUltra, 'ultra']
     ].forEach(([button, type]) => {
       if (!button) return;
       const count = state.packStock[type] || 0;
@@ -735,11 +766,13 @@
     if (packEmpty) packEmpty.hidden = !empty;
     if (packArea) packArea.hidden = empty;
     if (packOdds) packOdds.hidden = empty;
+    if (packView) packView.dataset.packType = type;
     if (pack) {
+      pack.dataset.packType = type;
       pack.classList.toggle('is-empty', empty);
       pack.setAttribute('aria-label', `Booster ${packLabelFr(type)}. Fais glisser vers la droite pour le déchirer.`);
     }
-    renderOdds(type === 'rare', packPool(type), type);
+    renderOdds(type === 'ultra' ? 'ultra' : type === 'rare', packPool(type), type);
     renderInventory();
   }
 
@@ -780,6 +813,12 @@
         rare: false,
         video: true,
       },
+      ultra: {
+        title: 'Booster Ultra Rare',
+        desc: '5 cartes · 30× plus de chance pour les cartes de grosse rareté.',
+        rare: false,
+        ultra: true,
+      },
     };
     const items = PACK_TYPES
       .map((type) => ({
@@ -791,7 +830,7 @@
       .filter((item) => item.count > 0);
     const canOpen = state.phase === 'pack' || state.phase === 'done';
     inventoryGrid.innerHTML = items.map((item) => `
-      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}" data-pack-type="${item.type}">
+      <article class="inventory-card${item.rare ? ' inventory-card-rare' : ''}${item.video ? ' inventory-card-video' : ''}${item.ultra ? ' inventory-card-ultra' : ''}" data-pack-type="${item.type}">
         <span class="inventory-qty-badge">×${item.count}</span>
         <img class="inventory-card-img" src="${item.img}" alt="${item.title}">
         <h3 class="inventory-card-title">${item.title}</h3>
@@ -809,6 +848,8 @@
     const src = PACK_IMAGES[type];
     if (packImgMain) packImgMain.src = src;
     if (packImgFlap) packImgFlap.src = src;
+    if (packView) packView.dataset.packType = type;
+    if (pack) pack.dataset.packType = type;
     if (!silent) SFX.tick();
     renderPackInventory();
     const gapCards = document.querySelector('.gap-cards');
@@ -896,6 +937,16 @@
     return RARE_RANK_FACTOR_BASE + rank * RARE_RANK_FACTOR_STEP;
   }
 
+  function ultraRankMultiplier(rarity) {
+    return ULTRA_RARITY_MULTIPLIER[rarity] || 1;
+  }
+
+  function packRankMultiplier(card, boosted) {
+    if (boosted === 'ultra') return ultraRankMultiplier(card.rarity);
+    const info = RARITIES[card.rarity];
+    return info ? rareRankMultiplier(info.rank) : 1;
+  }
+
   function cardBaseWeight(card, boosted, pool) {
     const info = card && RARITIES[card.rarity];
     if (!info) return 0;
@@ -907,10 +958,10 @@
       const r = RARITIES[c.rarity];
       if (!r) continue;
       baseTotal += r.weight;
-      boostedTotal += r.weight * rareRankMultiplier(r.rank);
+      boostedTotal += r.weight * packRankMultiplier(c, boosted);
     }
     if (baseTotal <= 0 || boostedTotal <= 0) return info.weight;
-    return info.weight * rareRankMultiplier(info.rank) * (baseTotal / boostedTotal);
+    return info.weight * packRankMultiplier(card, boosted) * (baseTotal / boostedTotal);
   }
 
   function rarityWeight(key, boosted, pool) {
@@ -1443,11 +1494,10 @@
   }
 
   function openPack() {
+    const type = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
     /* Consomme 1 pack de l'inventaire (sauf en démo, où l'ouverture est
-       gratuite pour les tests/apercus). Le tirage utilise ensuite le type
-       choisi (rare = chances +20 %). */
+       gratuite pour les tests/apercus). */
     if (!isDemoMode()) {
-      const type = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
       if ((state.packStock[type] || 0) > 0) {
         state.packStock[type] -= 1;
         state.packsOpened = (state.packsOpened || 0) + 1;
@@ -1468,6 +1518,62 @@
     const s = stage.getBoundingClientRect();
     const lineY = r.top - s.top;
     const x0 = r.left - s.left;
+
+    if (type === 'ultra') {
+      pack.classList.add('is-ultra-ripped');
+      SFX.ultraOpen();
+      const packRect = pack.getBoundingClientRect();
+      const cx = packRect.width > 0 ? packRect.left - s.left + packRect.width / 2 : x0 + r.width * 0.5;
+      const cy = packRect.height > 0 ? packRect.top - s.top + packRect.height * 0.48 : lineY;
+      if (ultraOpening) {
+        ultraOpening.hidden = false;
+        ultraOpening.classList.remove('is-active', 'is-burst');
+        void ultraOpening.offsetWidth;
+        ultraOpening.classList.add('is-active');
+      }
+      if (!reduceMotion.matches) {
+        const prism = ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#c4a1ff'];
+        for (let i = 0; i < 36; i++) {
+          FX.spark(x0 + (r.width * i) / 36, lineY + (Math.random() - 0.5) * 8, prism[i % prism.length], {
+            speedMin: 160,
+            speedMax: 620,
+            g: 380,
+            size: 3
+          });
+        }
+        for (let i = 0; i < 24; i++) {
+          FX.dot(cx, cy, prism[i % prism.length], { speedMin: 30, speedMax: 220, g: -40, size: 4, life: 0.9 });
+        }
+      }
+
+      window.setTimeout(() => {
+        if (ultraOpening) ultraOpening.classList.add('is-burst');
+        flash.classList.remove('run');
+        void flash.offsetWidth;
+        flash.classList.add('run');
+        if (!reduceMotion.matches) {
+          const prism = ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#e2e8f0'];
+          FX.ring(cx, cy, '#ffffff', 420);
+          FX.ring(cx, cy, '#67e8f9', 320);
+          FX.ring(cx, cy, '#f0abfc', 230);
+          for (let i = 0; i < 70; i++) {
+            FX.spark(cx, cy, prism[i % prism.length], { speedMin: 180, speedMax: 780, g: 240, size: 3.4, life: 1.15 });
+          }
+          for (let i = 0; i < 55; i++) {
+            FX.dot(cx, cy, prism[i % prism.length], { speedMin: 70, speedMax: 520, g: -50, size: 5.5, life: 1.5 });
+          }
+          FX.confetti(cx, cy, prism, 54);
+          FX.rain(prism, 64);
+        }
+        stage.classList.remove('shake', 'ultra-shake');
+        void stage.offsetWidth;
+        stage.classList.add('ultra-shake');
+      }, reduceMotion.matches ? 40 : 360);
+
+      window.setTimeout(showReveal, reduceMotion.matches ? 320 : 1380);
+      return;
+    }
+
     if (!reduceMotion.matches) {
       for (let i = 0; i < 26; i++) {
         FX.spark(x0 + (r.width * i) / 26, lineY + (Math.random() - 0.5) * 6, i % 3 ? '#ffffff' : '#b388ff', {
@@ -2367,16 +2473,23 @@
   let current = null;
 
   function showReveal() {
+    if (ultraOpening) {
+      ultraOpening.classList.remove('is-active', 'is-burst');
+      ultraOpening.hidden = true;
+    }
+    stage.classList.remove('ultra-shake');
     if (!cardsDatabase.some((c) => RARITIES[c.rarity])) {
       state.phase = 'pack';
       showToast('Ajoute au moins une carte valide dans cards.js.');
       return;
     }
     nextCard.hidden = true;
+    const packType = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
+    const boostMode = packType === 'ultra' ? 'ultra' : packType === 'rare';
     state.deck = drawPack(
-      state.currentPackType === 'rare',
-      packPool(state.currentPackType),
-      state.currentPackType
+      boostMode,
+      packPool(packType),
+      packType
     );
     if (!state.deck.length) {
       /* Pool vide (ex. Pack Vidéo sans aucune carte configurée) : on reste
@@ -2389,6 +2502,7 @@
     }
     packView.hidden = true;
     revealView.hidden = false;
+    revealView.dataset.packType = packType;
     revealView.classList.remove('view-in');
     void revealView.offsetWidth;
     revealView.classList.add('view-in');
@@ -2415,7 +2529,9 @@
       s.removeAttribute('tabindex');
       s.replaceChildren();
     });
-    revealKicker.innerHTML = '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
+    revealKicker.innerHTML = packType === 'ultra'
+      ? '<span>✦</span> PACK ULTRA RARE OUVERT <span>✦</span>'
+      : '<span>✦</span> BOOSTER OUVERT <span>✦</span>';
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
@@ -2426,14 +2542,16 @@
     clearEffects();
     rays.classList.remove('on');
 
+    const dealStep = packType === 'ultra' ? 110 : 80;
     stack.replaceChildren();
     state.deck.forEach((card, i) => {
       const node = buildCard(card, i);
       node.classList.add('is-ejecting');
-      node.style.setProperty('--eject-delay', `${reduceMotion.matches ? 0 : i * 80}ms`);
+      if (packType === 'ultra') node.classList.add('is-ultra-ejecting');
+      node.style.setProperty('--eject-delay', `${reduceMotion.matches ? 0 : i * dealStep}ms`);
       stack.append(node);
       if (!reduceMotion.matches) {
-        window.setTimeout(() => SFX.deal(), 260 + i * 80);
+        window.setTimeout(() => SFX.deal(), 260 + i * dealStep);
       }
     });
 
@@ -2530,10 +2648,16 @@
     void packView.offsetWidth;
     packView.classList.add('view-in');
 
-    pack.classList.remove('is-ripped', 'is-dragging');
+    pack.classList.remove('is-ripped', 'is-ultra-ripped', 'is-dragging');
     pack.style.transform = '';
     packFlap.classList.remove('is-gone');
     packFlap.style.transform = '';
+    if (ultraOpening) {
+      ultraOpening.classList.remove('is-active', 'is-burst');
+      ultraOpening.hidden = true;
+    }
+    stage.classList.remove('ultra-shake');
+    delete revealView.dataset.packType;
     resetTear();
     clearEffects();
     flash.classList.remove('run');
@@ -2964,7 +3088,9 @@
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
-    if (boosted) {
+    if (boosted === 'ultra') {
+      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : 30× PLUS DE CHANCE POUR LES GROSSES RARETÉS'));
+    } else if (boosted) {
       packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES'));
     }
     if (packType === 'video') {
@@ -3813,6 +3939,7 @@
   on(buyRare, 'click', () => buyPacks('rare'));
   on(buyLegend, 'click', () => buyPacks('legend'));
   on(buyVideo, 'click', () => buyPacks('video'));
+  on(buyUltra, 'click', () => buyPacks('ultra'));
   function openFromInventory(type) {
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
@@ -3823,6 +3950,7 @@
   on(openRare, 'click', () => openFromInventory('rare'));
   on(openLegend, 'click', () => openFromInventory('legend'));
   on(openVideo, 'click', () => openFromInventory('video'));
+  on(openUltra, 'click', () => openFromInventory('ultra'));
   on(inventoryGoShop, 'click', () => setTab('shop'));
   on(packGoShop, 'click', () => { SFX.tick(); setTab('shop'); });
   if (inventoryGrid) {
@@ -5267,7 +5395,8 @@
     return packType === 'rare' ? 'Pack Rare doré'
       : packType === 'legend' ? 'Pack Légende'
         : packType === 'video' ? 'Pack Vidéo'
-          : 'Pack Classique';
+          : packType === 'ultra' ? 'Pack Ultra Rare'
+            : 'Pack Classique';
   }
 
   function listingName(listing) {

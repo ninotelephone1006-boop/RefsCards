@@ -519,6 +519,41 @@ const Sound = (() => {
     noiseHit({ t: t + 0.1, attack: 0.3, decay: 1.6, gain: 0.05, type: 'highpass', freq: 6800, send: 1 });
   }
 
+  function ultraOpen() {
+    if (!ready()) return;
+    const t = now();
+    // Phase 1 (0 -> 0.36s) : montée prismatique + tension sub-basse.
+    tone({ t, type: 'sawtooth', freq: 95, freqEnd: 520, decay: 0.36, gain: 0.08, filterType: 'lowpass', filterFreq: 320, filterEnd: 4600, q: 3.5, send: 0.4 });
+    tone({ t, type: 'sine', freq: 58, freqEnd: 170, decay: 0.36, gain: 0.24, send: 0.2 });
+    noiseHit({ t, attack: 0.04, decay: 0.32, gain: 0.14, type: 'bandpass', freq: 600, freqEnd: 5200, q: 1.5, send: 0.5 });
+
+    // Phase 2 (0.36s) : supernova prismatique !
+    const boom = t + 0.36;
+    tone({ t: boom, type: 'sine', freq: 165, freqEnd: 34, decay: 0.9, gain: 0.45, send: 0.35 });
+    tone({ t: boom, type: 'triangle', freq: 980, freqEnd: 120, decay: 0.28, gain: 0.2 });
+    noiseHit({ t: boom, attack: 0.002, decay: 0.55, gain: 0.32, type: 'lowpass', freq: 6400, freqEnd: 280, send: 0.45 });
+
+    // Accord cristallin stellaire + arpège chromatique ascendant.
+    const notes = [523.25, 659.25, 783.99, 987.77, 1318.51, 1567.98, 2093, 2637.02];
+    notes.forEach((f, i) => {
+      const at = boom + i * 0.065;
+      bell(f, at, { gain: 0.068, decay: 1.8, ratio: 2.01, index: 520, pan: (i / notes.length - 0.5) * 1.1, send: 0.85 });
+      tone({ t: at, type: 'triangle', freq: f * 0.5, decay: 0.9, gain: 0.038, send: 0.6 });
+    });
+    for (let i = 0; i < 10; i++) {
+      tone({
+        t: boom + 0.18 + i * 0.075,
+        type: 'sine',
+        freq: 2093 * Math.pow(2, (Math.floor(Math.random() * 6) * 2) / 12),
+        decay: 0.85,
+        gain: 0.024,
+        pan: (Math.random() - 0.5) * 1.6,
+        send: 0.95
+      });
+    }
+    noiseHit({ t: boom + 0.06, attack: 0.18, decay: 1.5, gain: 0.06, type: 'highpass', freq: 7200, send: 1 });
+  }
+
   function rarity(kind) {
     if (!ready()) return;
     if (kind === 'rare') stingerRare();
@@ -548,6 +583,7 @@ const Sound = (() => {
     snap,
     coin,
     chaChing,
+    ultraOpen,
     rarity
   };
 })();

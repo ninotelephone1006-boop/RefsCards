@@ -334,6 +334,30 @@
                 <button class="shop-buy shop-buy-video" id="buy-video" type="button">ACHETER · 1 000 🪙</button>
               </div>
             </article>
+
+            <article class="shop-card shop-card-ultra" data-pack="ultra">
+              <span class="shop-badge shop-badge-ultra" aria-hidden="true">CHANCES ×30</span>
+              <div class="shop-img-wrap">
+                <img class="shop-img" src="assets/packetultra.png" alt="Pack Ultra Rare Refs Cards" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Pack Ultra Rare <span class="shop-ultra-tag">×30</span></h3>
+                <p class="shop-desc">5 cartes · 30× plus de chance d’obtenir les cartes de grosse rareté</p>
+                <p class="shop-odds">Raretés Mythique à Secrète massivement boostées</p>
+                <p class="shop-stock" id="shop-stock-ultra">Tu en as 0</p>
+                <div class="qty-row" role="group" aria-label="Quantité de packs ultra rares">
+                  <button class="qty-btn" type="button" data-pack="ultra" data-delta="-1" aria-label="Moins">−</button>
+                  <span class="qty-val" id="qty-ultra" aria-live="polite">1</span>
+                  <button class="qty-btn" type="button" data-pack="ultra" data-delta="1" aria-label="Plus">+</button>
+                  <span class="qty-quick">
+                    <button class="qty-chip" type="button" data-pack="ultra" data-qty="1">×1</button>
+                    <button class="qty-chip" type="button" data-pack="ultra" data-qty="5">×5</button>
+                    <button class="qty-chip" type="button" data-pack="ultra" data-qty="10">×10</button>
+                  </span>
+                </div>
+                <button class="shop-buy shop-buy-ultra" id="buy-ultra" type="button">ACHETER · 20 000 🪙</button>
+              </div>
+            </article>
           </div>
 
           <div class="shop-inventory">
@@ -343,6 +367,7 @@
               <button class="shop-open shop-open-rare" id="open-rare" type="button">OUVRIR RARE · ×0 →</button>
               <button class="shop-open" id="open-legend" type="button">OUVRIR LÉGENDE · ×0 →</button>
               <button class="shop-open shop-open-video" id="open-video" type="button">OUVRIR VIDÉO · ×0 →</button>
+              <button class="shop-open shop-open-ultra" id="open-ultra" type="button">OUVRIR ULTRA RARE · ×0 →</button>
             </div>
             <p class="shop-msg" id="shop-msg" role="status"></p>
           </div>
@@ -610,6 +635,14 @@
           </section>
         </div>
       </section>
+
+      <div class="ultra-opening" id="ultra-opening" hidden aria-hidden="true">
+        <div class="ultra-aurora"></div>
+        <div class="ultra-beams"></div>
+        <div class="ultra-rings"><i></i><i></i><i></i></div>
+        <div class="ultra-core"></div>
+        <div class="ultra-flash"></div>
+      </div>
 
       <div class="flash" id="flash" aria-hidden="true"></div>
 
