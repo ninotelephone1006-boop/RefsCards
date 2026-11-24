@@ -29,6 +29,26 @@ Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'a
 - **Aucun `addEventListener` sur un élément nul** : `app.js` passe par les helpers `on()` / `qs()`, qui se contentent d'un avertissement si un élément manque, et l'écran de compte comme le bouton Google restent fonctionnels.
 - **Filet de sécurité** : un petit script inline de `index.html` affiche un message dans l'écran de compte si `app.js` n'a pas démarré (cache obsolète, script bloqué). `app.js` signale son démarrage via `window.REFS_CARDS_READY`.
 
+## Logo et icône de l'application (écran d'accueil iPhone / Android)
+
+Le logo « RF » doré dessiné en pixel art sur fond bleu est le visuel officiel du jeu. Le fichier source `assets/icons/logo-refs-cards.png` sert partout, et les déclinaisons sont déjà générées dans `assets/icons/` :
+
+| Fichier | Usage |
+| --- | --- |
+| `logo-refs-cards.png` | logo affiché dans le jeu (écran de chargement, accueil de l'onglet Booster) |
+| `icon-192.png` / `icon-512.png` | icônes d'application (Android, fenêtre installée, en-tête du jeu) |
+| `icon-maskable-512.png` | icône « maskable » Android : logo réduit, fond bleu plein, rien n'est rogné par la forme de l'icône |
+| `apple-touch-icon.png` | icône de l'écran d'accueil iPhone/iPad (180×180, **sans transparence**) |
+| `favicon-32.png` / `favicon-16.png` | icône de l'onglet du navigateur |
+
+- **Dans le jeu** : le logo remplace l'ancien ✳ de l'en-tête (HUD et page de connexion), s'affiche en grand sur l'écran de chargement et à l'accueil de l'onglet Booster (`.brand-logo`, `.loading-logo`, `.game-logo` dans `styles.css`). Sur les écrans de moins de 640 px de haut, le logo d'accueil est masqué pour laisser la place au booster.
+- **iPhone / iPad** : `index.html` déclare `<link rel="apple-touch-icon">`, `<meta name="apple-mobile-web-app-capable">`, `apple-mobile-web-app-title` (« Refs Cards ») et `apple-mobile-web-app-status-bar-style`. Ajouter le site à l'écran d'accueil (Safari → Partager → « Sur l'écran d'accueil ») installe donc le logo et ouvre le jeu en plein écran, sans barre d'adresse. En mode autonome, `styles.css` réserve la zone sûre du haut (`display-mode: standalone`) pour que la marque et les pièces ne passent pas sous l'heure ni l'encoche.
+- **Manifeste** : `manifest.webmanifest` (nom, nom court, `display: standalone`, `orientation: portrait`, couleurs, icônes). Il est lié depuis `index.html` : Chrome/Edge/Android proposent l'installation, et Safari 16.4+ lit aussi le manifeste. `scope` et `start_url` sont relatifs (`./`), le jeu fonctionne donc aussi bien à la racine que dans un sous-dossier.
+- **Remplacer le logo** : dépose le nouveau carré dans `assets/icons/logo-refs-cards.png`, puis régénère les tailles (ImageMagick) :
+  `convert logo-refs-cards.png -filter Lanczos -resize 180x180 -depth 8 -colors 256 -strip assets/icons/apple-touch-icon.png` (idem 192, 512, 32, 16 ; pour `icon-maskable-512.png`, place le logo redimensionné à ~80 % au centre d'un carré `#0016fd`).
+- **Vérification** : `node tests/app-icon.cjs` (lancé par `npm test`) contrôle les balises, le manifeste, la taille et l'opacité réelles des PNG, et la présence du logo dans le jeu.
+- **Hébergement** : le manifeste et les icônes sont des fichiers statiques servis comme le reste du site (`server.js` renvoie `manifest.webmanifest` en `application/manifest+json`). Sur Firebase Hosting, aucun réglage supplémentaire n'est nécessaire.
+
 ## Écran de chargement à l'ouverture
 
 À l'ouverture, un écran de chargement (`#loading-screen`, dans `index.html`) s'affiche immédiatement, le temps de savoir si une session Google est déjà active :

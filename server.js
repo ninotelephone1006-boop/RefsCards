@@ -8,7 +8,7 @@ const path = require('node:path');
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT) || 8000;
 const HOST = '0.0.0.0';
-const MIME = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.svg':'image/svg+xml', '.json':'application/json; charset=utf-8', '.webp':'image/webp', '.avif':'image/avif', '.mp4':'video/mp4', '.webm':'video/webm', '.ogg':'video/ogg', '.mp3':'audio/mpeg', '.wav':'audio/wav' };
+const MIME = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.svg':'image/svg+xml', '.json':'application/json; charset=utf-8', '.webp':'image/webp', '.avif':'image/avif', '.webmanifest':'application/manifest+json; charset=utf-8', '.mp4':'video/mp4', '.webm':'video/webm', '.ogg':'video/ogg', '.mp3':'audio/mpeg', '.wav':'audio/wav' };
 
 const server = http.createServer(async (req, res) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
