@@ -492,7 +492,7 @@ const cardsDatabase = [
   {
     id: 'bierrypiano',
     name: 'Bierry Piano',
-    description: 'il joue du piano (apparemment)',
+    description: 'il joue du piano ( c fo )',
     rarity: 'hypersecret',
     emoji: '🎹',
     color: '#fb7185',
@@ -506,7 +506,7 @@ const cardsDatabase = [
   {
     id: 'fagarscreamer',
     name: 'Fagar Screamer',
-    description: 'il crie (très fort)',
+    description: 'jai peur',
     rarity: 'ultrasecret',
     emoji: '😱',
     image: 'assets/Cartes/fagarscreamer.JPEG',
