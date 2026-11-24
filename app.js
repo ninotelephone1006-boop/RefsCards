@@ -6413,94 +6413,132 @@
         ? 'Quêtes indisponibles'
         : doneCount >= Quests.QUESTS.length
           ? `Toutes les quêtes sont terminées (${Quests.QUESTS.length} / ${Quests.QUESTS.length})`
-          : `${doneCount} / ${Quests.QUESTS.length} terminées · ${activeQuests().length} quêtes actives${ready ? ' · récompense prête' : ''}`;
+          : `${doneCount} / ${Quests.QUESTS.length} terminées · ${activeQuests().length} en cours${ready ? ' · récompense prête' : ''}`;
     }
     if (achCount) achCount.textContent = `${questState.achievements.length} / ${Quests.ACHIEVEMENTS.length}`;
     renderQuestPanel();
     renderAchPanel();
   }
 
+  let questCategory = null;
+
+  /* Petites étincelles au moment de la réclamation. */
+  function questBurst(card) {
+    if (reduceMotion.matches) return;
+    for (let i = 0; i < 14; i++) {
+      const p = el('i', 'quest-spark');
+      const angle = (i / 14) * Math.PI * 2;
+      p.style.setProperty('--dx', `${Math.cos(angle) * (60 + Math.random() * 50)}px`);
+      p.style.setProperty('--dy', `${Math.sin(angle) * (40 + Math.random() * 40)}px`);
+      card.append(p);
+    }
+  }
+
   function renderQuestPanel() {
     if (!questPanel) return;
-    const frag = document.createDocumentFragment();
-    const active = activeQuests();
     const ctx = questCtx();
-    for (const quest of active) {
+    const active = activeQuests();
+    const cats = Quests.CATEGORIES || [];
+    const isReady = (q) => Quests.questProgress(q, ctx).done;
+    if (!cats.length) { questPanel.replaceChildren(); return; }
+    if (!questCategory || !cats.some((c) => c.id === questCategory)) {
+      const withReady = cats.find((c) => active.some((q) => Quests.categoryOf(q) === c.id && isReady(q)));
+      questCategory = (withReady || cats[0]).id;
+    }
+    const frag = document.createDocumentFragment();
+
+    const tabs = el('div', 'quest-cats');
+    tabs.setAttribute('role', 'tablist');
+    cats.forEach((cat) => {
+      const list = active.filter((q) => Quests.categoryOf(q) === cat.id);
+      const ready = list.filter(isReady).length;
+      const b = el('button', 'quest-cat' + (cat.id === questCategory ? ' is-active' : ''));
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', String(cat.id === questCategory));
+      b.append(el('span', 'quest-cat-icon', cat.icon), el('span', 'quest-cat-label', cat.label));
+      if (ready) b.append(el('i', 'quest-cat-dot', String(ready)));
+      on(b, 'click', () => { questCategory = cat.id; SFX.tick(); renderQuestPanel(); });
+      tabs.append(b);
+    });
+    frag.append(tabs);
+
+    const current = active.filter((q) => Quests.categoryOf(q) === questCategory);
+    const grid = el('div', 'quest-grid');
+    current.sort((x, y) => Number(isReady(y)) - Number(isReady(x)));
+    current.forEach((quest, index) => {
       const reward = Quests.questReward(quest);
       const packText = Quests.packRewardLabel(reward.packs);
       const progress = Quests.questProgress(quest, ctx);
+      const chain = Quests.chainInfo(quest);
+      const next = Quests.nextInChain(quest, questState.completed);
       const card = el('article', 'quest-card' + (progress.done ? ' is-ready' : ''));
       card.dataset.questId = quest.id;
-      if (questSeenInitialized && !questSeenIds.has(quest.id)) card.classList.add('is-new');
-      questSeenIds.add(quest.id);
-      const kicker = el('p', 'quest-kicker');
-      kicker.append(
-        el('span', 'quest-icon', quest.icon || '🎯'),
-        document.createTextNode(`QUÊTE ${Quests.QUESTS.indexOf(quest) + 1} / ${Quests.QUESTS.length}`)
-      );
-      card.append(kicker);
-      card.append(el('h3', 'quest-title', quest.title));
-      card.append(el('p', 'quest-desc', quest.desc));
-      const progressBlock = el('div', 'quest-progress');
-      const top = el('div', 'quest-progress-top');
-      top.append(
-        el('span', '', `Objectif : ${Quests.metricLabel(quest.metric)}`),
-        el('b', '', `${fmt(progress.value)} / ${fmt(progress.target)}`)
-      );
+      card.style.setProperty('--i', String(index));
+      const head = el('div', 'quest-head');
+      head.append(el('span', 'quest-icon', quest.icon || '🎯'));
+      const hText = el('div', 'quest-head-text');
+      hText.append(el('h3', 'quest-title', quest.title), el('p', 'quest-step', `Étape ${chain.step} sur ${chain.total}`));
+      head.append(hText);
+      card.append(head, el('p', 'quest-desc', quest.desc));
+      const pips = el('div', 'quest-pips');
+      for (let i = 1; i <= chain.total; i++) pips.append(el('i', i < chain.step ? 'is-done' : i === chain.step ? 'is-now' : ''));
+      card.append(pips);
       const bar = el('div', 'quest-bar');
       const fill = el('i');
       fill.style.transform = `scaleX(${progress.target ? clamp(progress.value / progress.target, 0, 1) : 0})`;
       bar.append(fill);
-      progressBlock.append(top, bar);
-      card.append(progressBlock);
+      const top = el('div', 'quest-progress-top');
+      top.append(el('span', '', Quests.metricLabel(quest.metric)), el('b', '', `${fmt(progress.value)} / ${fmt(progress.target)}`));
+      card.append(el('div', 'quest-progress'));
+      card.lastChild.append(top, bar);
       const meta = el('div', 'quest-meta');
       const rewards = el('div', 'quest-rewards');
       if (reward.coins) rewards.append(el('span', 'quest-reward', `🪙 ${fmt(reward.coins)}`));
       if (reward.xp) rewards.append(el('span', 'quest-reward quest-reward-xp', `⭐ ${fmt(reward.xp)} XP`));
-      /* Quêtes qui offrent des boosters (et parfois rien d'autre) : on détaille
-         le contenu exact du lot dans une pastille dédiée. */
       if (packText) rewards.append(el('span', 'quest-reward quest-reward-pack', `📦 ${packText}`));
-      const claim = el('button', 'quest-claim', progress.done ? 'RÉCLAMER LA RÉCOMPENSE' : 'EN COURS…');
+      const claim = el('button', 'quest-claim', progress.done ? 'Réclamer' : 'En cours');
       claim.type = 'button';
       claim.disabled = !progress.done;
-      claim.setAttribute('aria-label', progress.done
-        ? `Réclamer la récompense de la quête ${quest.title}`
-        : `Quête ${quest.title} en cours`);
-      on(claim, 'click', () => claimActiveQuest(quest.id));
+      claim.setAttribute('aria-label', progress.done ? `Réclamer la récompense de ${quest.title}` : `${quest.title} en cours`);
+      on(claim, 'click', () => {
+        claim.disabled = true;
+        card.classList.add('is-claiming');
+        questBurst(card);
+        window.setTimeout(() => claimActiveQuest(quest.id), reduceMotion.matches ? 0 : 520);
+      });
       meta.append(rewards, claim);
       card.append(meta);
-      frag.append(card);
+      if (next) card.append(el('p', 'quest-next', `Ensuite : ${next.title}`));
+      grid.append(card);
+    });
+    if (!current.length) {
+      grid.append(el('div', 'quest-all-done', '✓ Catégorie terminée. Bravo, tu as tout réclamé ici !'));
     }
-    questSeenInitialized = true;
-    if (!active.length && Quests.QUESTS.length) {
-      frag.append(el('div', 'quest-all-done',
-        '🏆 Toutes les quêtes sont terminées ! Reviens bientôt : la suite arrive avec une nouvelle saison.'));
-    }
-    /* Quêtes déjà réclamées (de la plus récente à la plus ancienne). Les
-       quêtes au-delà des cinq actives restent invisibles. */
+    frag.append(grid);
+
     const done = questState.completed.slice().reverse();
     if (done.length) {
-      frag.append(el('p', 'quest-done-title', `QUÊTES TERMINÉES · ${done.length}`));
+      const details = document.createElement('details');
+      details.className = 'quest-done';
+      details.append(el('summary', 'quest-done-title', `Quêtes terminées · ${done.length}`));
       const list = el('div', 'quest-done-list');
       done.forEach((id) => {
         const definition = Quests.QUESTS.find((q) => q.id === id);
         if (!definition) return;
         const row = el('div', 'quest-done-row');
-        const doneReward = Quests.questReward(definition);
-        const doneParts = [];
-        if (doneReward.coins) doneParts.push(`+${fmt(doneReward.coins)} 🪙`);
-        if (doneReward.xp) doneParts.push(`+${fmt(doneReward.xp)} XP`);
-        const donePacks = Quests.packRewardLabel(doneReward.packs);
-        if (donePacks) doneParts.push(`+${donePacks}`);
-        row.append(
-          el('span', 'quest-icon', definition.icon || '🎯'),
-          el('span', '', definition.title),
-          el('span', 'quest-done-reward', doneParts.join(' · ')),
-          el('span', 'quest-done-check', '✓')
-        );
+        const r = Quests.questReward(definition);
+        const parts = [];
+        if (r.coins) parts.push(`+${fmt(r.coins)} 🪙`);
+        if (r.xp) parts.push(`+${fmt(r.xp)} XP`);
+        const p = Quests.packRewardLabel(r.packs);
+        if (p) parts.push(`+${p}`);
+        row.append(el('span', 'quest-icon', definition.icon || '🎯'), el('span', '', definition.title),
+          el('span', 'quest-done-reward', parts.join(' · ')), el('span', 'quest-done-check', '✓'));
         list.append(row);
       });
-      frag.append(list);
+      details.append(list);
+      frag.append(details);
     }
     questPanel.replaceChildren(frag);
   }
