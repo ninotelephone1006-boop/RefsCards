@@ -416,6 +416,15 @@ const cardsDatabase = [
     image: 'assets/Cartes/Ilanus.JPEG',
     color: '#f5d979'
   },
+    {
+    id: 'Bierry-Zoom',
+    name: 'Bierry zoom',
+    description: 'ZOOOMING (with bierry)',
+    rarity: 'common',
+    emoji: '🔍',
+    image: 'assets/Cartes/Ilanus.JPEG',
+    color: '#f5d979'
+  },
    {
     id: 'king-mathis',
     name: 'King Mathis',
