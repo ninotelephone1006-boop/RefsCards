@@ -584,6 +584,69 @@ const cardsDatabase = [
     emoji: '🦖',
     image: 'assets/Cartes/soyer-rex.png',
     color: '#c084fc'
+  },
+  {
+    id: 'le-meilleur-investissement',
+    name: 'Le Meilleur Investissement',
+    description: '38 % de protéines, 0 % de regrets 🥩',
+    rarity: 'mythic',
+    emoji: '🥩',
+    image: 'assets/Cartes/meilleur-investissement.jpg',
+    color: '#ffb372'
+  },
+  {
+    id: 'le-son',
+    name: 'Le Son',
+    description: 'Ne monte pas le son, il est maudit 🔊',
+    rarity: 'ultrasecret',
+    emoji: '🔊',
+    image: 'assets/Cartes/le-son.jpg',
+    color: '#c084fc'
+  },
+  {
+    id: 'capuche-mystere',
+    name: 'Capuche Mystère',
+    description: "On ne voit que ses yeux, et c'est déjà trop 🌫️",
+    rarity: 'superrare',
+    emoji: '🌫️',
+    image: 'assets/Cartes/capuche-mystere.jpg',
+    color: '#67e0d0'
+  },
+  {
+    id: 'prophete-de-la-teuf',
+    name: 'Le Prophète de la Teuf',
+    description: 'Il a vu la lumière (verte) de la soirée 🎈',
+    rarity: 'ultraepic',
+    emoji: '🎈',
+    image: 'assets/Cartes/prophete-de-la-teuf.jpg',
+    color: '#ff8fd1'
+  },
+  {
+    id: 'jeune-sapeur',
+    name: 'Jeune Sapeur',
+    description: "Il éteint les incendies, pas les rumeurs 🚒",
+    rarity: 'uncommon',
+    emoji: '🚒',
+    image: 'assets/Cartes/jeune-sapeur.jpg',
+    color: '#9dbfc4'
+  },
+  {
+    id: 'cami-du-dimanche',
+    name: 'Le Cami du Dimanche',
+    description: 'Tenue officielle du dimanche après-midi 👕',
+    rarity: 'common',
+    emoji: '👕',
+    image: 'assets/Cartes/cami-du-dimanche.jpg',
+    color: '#e6ebdf'
+  },
+  {
+    id: 'le-regard',
+    name: 'Le Regard',
+    description: 'Il te fixe. Il te connaît. Il sait. 👁️',
+    rarity: 'unique',
+    emoji: '👁️',
+    image: 'assets/Cartes/le-regard.jpg',
+    color: '#fef08a'
   }
 ];
 
