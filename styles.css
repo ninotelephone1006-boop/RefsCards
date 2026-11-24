@@ -3299,3 +3299,324 @@ body:has(.inspect.is-open) .update-banner{display:none}
   .shiny-cine *,.cf.mutation-shiny,.cf.mutation-shiny::after,.cf-mutation{animation:none!important}
   .shiny-cine .sc-star{display:none}
 }
+
+/* ==========================================================================
+   PACK ULTRA RARE (20 000 🪙 · ×30) + ANIMATION D'OUVERTURE PRISMATIQUE
+   ========================================================================== */
+
+/* --- Boutique & Inventaire --- */
+.shop-card-ultra {
+  border-color: #e2e8f066;
+  background: linear-gradient(155deg, #1b172cF5, #0e1320f5 52%, #190e26f5);
+  box-shadow: 0 0 42px -10px #67e8f966, inset 0 1px 0 #ffffff33;
+}
+.shop-card-ultra::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 25%, #ffffff1c 45%, #67e8f922 52%, #f0abfc1c 60%, transparent 78%);
+  background-size: 260% 100%;
+  animation: ultra-shimmer 5.5s ease-in-out infinite;
+}
+.shop-badge-ultra {
+  background: linear-gradient(100deg, #e2e8f0, #67e8f9 45%, #f0abfc);
+  color: #0b0714;
+  box-shadow: 0 4px 16px -4px #67e8f9cc;
+}
+.shop-card-ultra .shop-img {
+  box-shadow: 0 10px 26px -6px #000, 0 0 28px -4px #e2e8f0aa, 0 0 34px -8px #67e8f999;
+}
+.shop-ultra-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: linear-gradient(100deg, #67e8f933, #f0abfc33);
+  border: 1px solid #e2e8f066;
+  color: #f8fafc;
+  vertical-align: middle;
+}
+.shop-buy-ultra {
+  background: linear-gradient(100deg, #f8fafc, #67e8f9 36%, #c084fc 70%, #f472b6);
+  background-size: 200% 100%;
+  color: #0b0614;
+  font-weight: 800;
+  box-shadow: 0 8px 26px -6px #67e8f9cc, 0 0 22px -8px #f0abfc99;
+  animation: text-flow 4s linear infinite;
+}
+.shop-open-ultra:not(:disabled) {
+  border-color: #e2e8f088;
+  color: #f8fafc;
+  background: linear-gradient(100deg, #67e8f918, #f0abfc18);
+}
+
+.inventory-card-ultra {
+  border-color: #e2e8f066;
+  background: linear-gradient(160deg, #1d1a33d9, #0c1424e6 55%, #1d102be6);
+  box-shadow: 0 16px 38px -18px #67e8f988;
+}
+.inventory-card-ultra .inventory-qty-badge {
+  background: linear-gradient(100deg, #67e8f933, #f0abfc33);
+  border-color: #e2e8f080;
+  color: #f8fafc;
+}
+.inventory-card-ultra .inventory-open-btn {
+  border-color: #e2e8f080;
+  background: linear-gradient(135deg, #f1f5f9, #67e8f9 45%, #c084fc);
+  color: #0b0614;
+}
+
+.pack-odds-ultra-note {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  background: linear-gradient(100deg, #f8fafc, #67e8f9, #f0abfc, #fde047);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-top: 2px;
+}
+
+/* --- Booster Ultra Rare prêt à être déchiré --- */
+.pack-view[data-pack-type='ultra'] .pack-halo {
+  width: min(470px, 100vw);
+  background: radial-gradient(circle, #ffffff38 0%, #67e8f924 28%, #f0abfc1a 50%, transparent 70%);
+}
+.pack-view[data-pack-type='ultra'] .pack-halo::before {
+  inset: 0;
+  background: conic-gradient(from 0deg, #ffffffaa, #67e8f988, transparent 22%, #f0abfc99, #fde04777, transparent 52%, #ffffff99, #67e8f988, transparent 82%);
+  animation: spin-slow 9s linear infinite;
+}
+.pack[data-pack-type='ultra'] {
+  filter: drop-shadow(0 28px 38px #000000cc) drop-shadow(0 0 36px #67e8f966) drop-shadow(0 0 60px #f0abfc44);
+}
+.pack[data-pack-type='ultra']:hover {
+  filter: drop-shadow(0 28px 38px #000000dd) drop-shadow(0 0 46px #ffffff88) drop-shadow(0 0 74px #67e8f977);
+}
+.pack[data-pack-type='ultra']::after {
+  opacity: 0.72;
+  background: linear-gradient(115deg, transparent 22%, #ffffff66 36%, #67e8f955 46%, #f0abfc55 56%, #fde04744 64%, transparent 78%);
+  background-size: 260% 260%;
+  animation: sheen 4.2s linear infinite;
+}
+.pack[data-pack-type='ultra'] .cut-fill {
+  background: linear-gradient(90deg, #ffffff, #67e8f9 40%, #f0abfc 75%, #fde047);
+  box-shadow: 0 0 12px #ffffff, 0 0 26px #67e8f9cc, 0 0 46px #f0abfc99;
+}
+.pack[data-pack-type='ultra'] .cut-arrow {
+  color: #67e8f9;
+  text-shadow: 0 0 16px #ffffff, 0 0 28px #67e8f9;
+}
+
+/* --- Cinématique d'ouverture Ultra Rare --- */
+.pack.is-ultra-ripped {
+  animation: ultra-pack-ascend 1.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.pack.is-ultra-ripped .pack-flap.is-gone {
+  animation: ultra-flap-fly 0.85s cubic-bezier(0.18, 0.9, 0.32, 1) forwards;
+}
+
+.ultra-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.ultra-opening[hidden] { display: none; }
+
+.ultra-aurora {
+  position: absolute;
+  inset: -20%;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 48%, #ffffff55 0%, #67e8f936 22%, #c084fc2e 45%, transparent 70%),
+    conic-gradient(from 0deg at 50% 48%, #67e8f922, #f0abfc26, #fde04720, #ffffff28, #67e8f922);
+  mix-blend-mode: screen;
+}
+.ultra-opening.is-active .ultra-aurora {
+  animation: ultra-aurora-in 1.4s ease-out forwards;
+}
+
+.ultra-beams {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 155vmax;
+  height: 155vmax;
+  margin: -77.5vmax 0 0 -77.5vmax;
+  border-radius: 50%;
+  opacity: 0;
+  background: repeating-conic-gradient(
+    from 0deg,
+    #ffffffaa 0deg 3deg,
+    transparent 3deg 11deg,
+    #67e8f999 11deg 15deg,
+    transparent 15deg 24deg,
+    #f0abfc88 24deg 27deg,
+    transparent 27deg 36deg
+  );
+  -webkit-mask-image: radial-gradient(circle, #000 4%, #000c 36%, transparent 64%);
+  mask-image: radial-gradient(circle, #000 4%, #000c 36%, transparent 64%);
+  mix-blend-mode: screen;
+}
+.ultra-opening.is-active .ultra-beams {
+  animation: ultra-beams-charge 0.38s ease-in forwards, ultra-beams-spin 8s linear infinite;
+}
+.ultra-opening.is-burst .ultra-beams {
+  animation: ultra-beams-burst 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards, ultra-beams-spin 6s linear infinite;
+}
+
+.ultra-rings {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 0;
+  height: 0;
+}
+.ultra-rings i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 84vmin;
+  height: 84vmin;
+  margin: -42vmin 0 0 -42vmin;
+  border-radius: 50%;
+  border: 2px solid #ffffffdd;
+  box-shadow: 0 0 26px #67e8f9cc, inset 0 0 22px #f0abfc88;
+  opacity: 0;
+  transform: scale(0.08);
+}
+.ultra-rings i:nth-child(2) {
+  border-color: #67e8f9dd;
+  border-width: 3px;
+}
+.ultra-rings i:nth-child(3) {
+  border-color: #f0abfcdd;
+  border-style: dashed;
+}
+.ultra-opening.is-burst .ultra-rings i {
+  animation: ultra-ring-wave 0.95s cubic-bezier(0.12, 0.9, 0.25, 1) forwards;
+}
+.ultra-opening.is-burst .ultra-rings i:nth-child(2) { animation-delay: 0.09s; }
+.ultra-opening.is-burst .ultra-rings i:nth-child(3) { animation-delay: 0.18s; }
+
+.ultra-core {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 58vmin;
+  height: 58vmin;
+  margin: -29vmin 0 0 -29vmin;
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle, #ffffff 0%, #e0f2fecc 24%, #67e8f988 44%, #f0abfc33 62%, transparent 74%);
+  filter: blur(2px);
+  mix-blend-mode: screen;
+}
+.ultra-opening.is-active .ultra-core {
+  animation: ultra-core-charge 0.36s ease-in forwards;
+}
+.ultra-opening.is-burst .ultra-core {
+  animation: ultra-core-explode 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ultra-flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 48%, #ffffff, #e0f2febb 38%, #f0abfc55 75%, transparent);
+}
+.ultra-opening.is-burst .ultra-flash {
+  animation: ultra-supernova 0.95s ease-out forwards;
+}
+
+.stage.ultra-shake {
+  animation: ultra-shake 0.72s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.reveal-view[data-pack-type='ultra'] .table-glow {
+  background: radial-gradient(circle, #ffffff44 0%, #67e8f936 30%, #f0abfc24 52%, transparent 72%);
+  opacity: 0.92;
+}
+.card.is-ultra-ejecting {
+  filter: drop-shadow(0 0 22px #67e8f988);
+}
+
+@keyframes ultra-shimmer {
+  0%, 100% { background-position: 140% 0; }
+  50% { background-position: -60% 0; }
+}
+@keyframes ultra-pack-ascend {
+  0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+  30% { transform: translateY(-10px) scale(1.06) rotate(-1.5deg); filter: brightness(1.45) drop-shadow(0 0 40px #ffffff); }
+  52% { transform: translateY(-18px) scale(1.16) rotate(1deg); filter: brightness(2.2) drop-shadow(0 0 80px #67e8f9); }
+  100% { transform: translateY(-34px) scale(1.36); opacity: 0; filter: brightness(3); }
+}
+@keyframes ultra-flap-fly {
+  0% { transform: translateY(0) rotateX(0deg); opacity: 1; }
+  100% { transform: translateY(-170px) translateX(64px) rotateZ(24deg) scale(0.85); opacity: 0; }
+}
+@keyframes ultra-aurora-in {
+  0% { opacity: 0; transform: scale(0.75); }
+  30% { opacity: 0.9; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes ultra-beams-charge {
+  0% { opacity: 0; transform: scale(0.15); }
+  100% { opacity: 0.65; transform: scale(0.55); }
+}
+@keyframes ultra-beams-burst {
+  0% { opacity: 0.95; transform: scale(0.45); }
+  35% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+@keyframes ultra-beams-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ultra-ring-wave {
+  0% { opacity: 1; transform: scale(0.08); }
+  100% { opacity: 0; transform: scale(2.25); }
+}
+@keyframes ultra-core-charge {
+  0% { opacity: 0; transform: scale(0.12); }
+  100% { opacity: 0.95; transform: scale(0.68); }
+}
+@keyframes ultra-core-explode {
+  0% { opacity: 1; transform: scale(0.6); }
+  25% { opacity: 1; transform: scale(1.85); }
+  100% { opacity: 0; transform: scale(2.7); }
+}
+@keyframes ultra-supernova {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+@keyframes ultra-shake {
+  0%, 100% { transform: none; }
+  12% { transform: translate3d(-9px, 6px, 0) rotate(-0.8deg); }
+  24% { transform: translate3d(8px, -7px, 0) rotate(0.7deg); }
+  36% { transform: translate3d(-7px, -5px, 0) rotate(-0.5deg); }
+  48% { transform: translate3d(6px, 5px, 0) rotate(0.4deg); }
+  62% { transform: translate3d(-4px, 3px, 0); }
+  78% { transform: translate3d(2px, -2px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-card-ultra::before,
+  .shop-buy-ultra,
+  .pack[data-pack-type='ultra']::after,
+  .pack.is-ultra-ripped,
+  .ultra-opening *,
+  .stage.ultra-shake {
+    animation: none !important;
+  }
+  .ultra-opening { display: none !important; }
+}
+

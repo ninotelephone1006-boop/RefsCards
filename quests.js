@@ -74,13 +74,14 @@ const RefsQuests = (() => {
 
   /* Types de boosters pouvant être offerts par une quête (clés de
      `state.packStock` dans app.js). */
-  const PACK_KEYS = ['classic', 'rare', 'legend', 'video'];
+  const PACK_KEYS = ['classic', 'rare', 'legend', 'video', 'ultra'];
 
   const PACK_LABELS = {
     classic: 'Pack Classique',
     rare: 'Pack Rare',
     legend: 'Pack Légende',
-    video: 'Pack Vidéo'
+    video: 'Pack Vidéo',
+    ultra: 'Pack Ultra Rare'
   };
 
   /* ------------------------------------------------------------- les 70 quêtes
