@@ -32,7 +32,6 @@ const RefsQuests = (() => {
   const METRICS = [
     'packsOpened',   // boosters ouverts
     'packsBought',   // packs achetés dans le Shop
-    'freePacks',     // packs gratuits quotidiens récupérés
     'fusions',       // fusions réalisées
     'marketSales',   // ventes du marché récupérées (paiement encaissé)
     'marketEarned',  // pièces cumulées gagnées grâce aux ventes
@@ -52,7 +51,6 @@ const RefsQuests = (() => {
   const METRIC_LABELS = {
     packsOpened: 'booster(s) ouvert(s)',
     packsBought: 'pack(s) acheté(s)',
-    freePacks: 'pack(s) gratuit(s) récupéré(s)',
     fusions: 'fusion(s)',
     marketSales: 'vente(s) encaissée(s)',
     marketEarned: 'pièces gagnées en vendant',
@@ -105,11 +103,6 @@ const RefsQuests = (() => {
       id: 'q02', icon: '🃏', title: 'Petite collection',
       desc: 'Possède 5 cartes différentes.',
       metric: 'unique', target: 5, reward: { coins: 150, xp: 60 }
-    },
-    {
-      id: 'q03', icon: '🎁', title: 'Le gratuit d’abord',
-      desc: 'Récupère un pack gratuit dans le Shop.',
-      metric: 'freePacks', target: 1, reward: { coins: 100, xp: 40 }
     },
     {
       id: 'q04', icon: '⚗️', title: 'Doublon radieux',
@@ -240,11 +233,6 @@ const RefsQuests = (() => {
       metric: 'marketSales', target: 2, reward: { coins: 0, xp: 160, packs: { classic: 2 } }
     },
     {
-      id: 'q29', icon: '🎁', title: 'Journée faste',
-      desc: 'Récupère 3 packs gratuits.',
-      metric: 'freePacks', target: 3, reward: { coins: 0, xp: 140, packs: { rare: 1 } }
-    },
-    {
       id: 'q30', icon: '📚', title: 'Douze en tout',
       desc: 'Possède 12 cartes différentes.',
       metric: 'unique', target: 12, reward: { coins: 0, xp: 180, packs: { classic: 2 } }
@@ -310,11 +298,6 @@ const RefsQuests = (() => {
       metric: 'marketBuys', target: 2, reward: { coins: 0, xp: 260, packs: { classic: 2 } }
     },
     {
-      id: 'q43', icon: '🎁', title: 'Six gratuits',
-      desc: 'Récupère 6 packs gratuits.',
-      metric: 'freePacks', target: 6, reward: { coins: 0, xp: 280, packs: { rare: 1 } }
-    },
-    {
       id: 'q44', icon: '👑', title: 'Deux Légendaires',
       desc: 'Possède 2 cartes Légendaires ou plus.',
       metric: 'legendaryPlus', target: 2, reward: { coins: 0, xp: 400, packs: { legend: 1 } }
@@ -368,11 +351,6 @@ const RefsQuests = (() => {
       id: 'q54', icon: '✦', title: 'Deux shiny',
       desc: 'Possède 2 cartes shiny.',
       metric: 'shiny', target: 2, reward: { coins: 0, xp: 500, packs: { legend: 1 } }
-    },
-    {
-      id: 'q55', icon: '🎁', title: 'Dix gratuits',
-      desc: 'Récupère 10 packs gratuits.',
-      metric: 'freePacks', target: 10, reward: { coins: 0, xp: 400, packs: { video: 1 } }
     },
     {
       id: 'q56', icon: '📚', title: 'Vingt-deux uniques',
@@ -464,7 +442,6 @@ const RefsQuests = (() => {
         [45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 110, 120, 130, 140, 150, 160, 175, 180, 200, 225, 250, 275, 300, 350, 400, 450, 500]],
       ['packsBought', '🛍️', 'Acheteur', (n) => `Achète ${fr(n)} packs dans le Shop.`,
         [20, 25, 30, 35, 40, 45, 50, 60, 65, 75, 80, 90, 100, 110, 125, 150]],
-      ['freePacks', '🎁', 'Fidèle', (n) => `Récupère ${fr(n)} packs gratuits.`, [15, 20, 30, 40, 50, 75, 100]],
       ['fusions', '⚗️', 'Alchimiste', (n) => `Réalise ${fr(n)} fusions.`,
         [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 125, 150]],
       ['marketSales', '🏷️', 'Marchand', (n) => `Encaisse ${fr(n)} ventes sur le marché.`, [15, 20, 30, 40, 50, 75, 100, 150]],
@@ -484,7 +461,9 @@ const RefsQuests = (() => {
       ['questsDone', '🏆', 'Aventurier', (n) => `Termine ${fr(n)} quêtes.`, [20, 30, 40, 50, 60, 80, 100, 125, 150, 175, 200, 225, 250]],
       ['coins', '💰', 'Fortune', (n) => `Aie ${fr(n)} pièces en poche.`, [1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000]]
     ];
-    let seq = QUESTS.length;
+    /* Les identifiants des quêtes restent stables même si on retire une
+       chaîne entière : les sauvegardes gardent leurs quêtes terminées. */
+    let seq = Math.max(70, QUESTS.length);
     let k = 0;
     for (const [metric, icon, noun, desc, targets] of SPEC) {
       targets.slice().sort((a, b) => a - b).forEach((target, i, all) => {
@@ -531,8 +510,6 @@ const RefsQuests = (() => {
     { id: 'a08', icon: '🛒', title: 'Client', desc: 'Achète ton premier pack.', metric: 'packsBought', target: 1, xp: 50 },
     { id: 'a09', icon: '🛍️', title: 'Accro au shopping', desc: 'Achète 10 packs.', metric: 'packsBought', target: 10, xp: 150 },
     { id: 'a10', icon: '🏬', title: 'Grossiste', desc: 'Achète 25 packs.', metric: 'packsBought', target: 25, xp: 300 },
-    { id: 'a11', icon: '🎁', title: 'Quotidien', desc: 'Récupère 3 packs gratuits.', metric: 'freePacks', target: 3, xp: 60 },
-    { id: 'a12', icon: '📅', title: 'Fidèle au rendez-vous', desc: 'Récupère 10 packs gratuits.', metric: 'freePacks', target: 10, xp: 150 },
     { id: 'a13', icon: '👋', title: 'Premier ami', desc: 'Ajoute ton premier ami.', metric: 'friends', target: 1, xp: 50 },
     { id: 'a14', icon: '👥', title: 'Sociable', desc: 'Aie 3 amis.', metric: 'friends', target: 3, xp: 100 },
     { id: 'a15', icon: '🌟', title: 'Star du jeu', desc: 'Aie 5 amis.', metric: 'friends', target: 5, xp: 200 },
@@ -596,7 +573,7 @@ const RefsQuests = (() => {
      3…). Seule l'étape en cours de chaque chaîne est active, et l'étape
      suivante est annoncée : rien n'est débloqué en cachette. */
   const CATEGORIES = [
-    { id: 'boosters', icon: '📦', label: 'Boosters', metrics: ['packsOpened', 'packsBought', 'freePacks'] },
+    { id: 'boosters', icon: '📦', label: 'Boosters', metrics: ['packsOpened', 'packsBought'] },
     { id: 'collection', icon: '📚', label: 'Collection', metrics: ['unique', 'total'] },
     { id: 'rarity', icon: '💎', label: 'Raretés', metrics: ['rarePlus', 'epicPlus', 'legendaryPlus', 'shiny'] },
     { id: 'trade', icon: '⚗️', label: 'Fusion & marché', metrics: ['fusions', 'marketSales', 'marketEarned', 'marketBuys'] },

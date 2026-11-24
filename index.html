@@ -393,6 +393,12 @@
           <p class="kicker"><span>✦</span> TON STOCK DE BOOSTERS <span>✦</span></p>
           <h2>Inventaire</h2>
           <p class="inventory-summary" id="inventory-summary" aria-live="polite">Aucun pack en inventaire.</p>
+          <div class="inventory-stats" id="inventory-stats" aria-label="Résumé de ton inventaire">
+            <div class="inventory-stat"><b id="inv-stat-packs">0</b><span>Boosters</span></div>
+            <div class="inventory-stat"><b id="inv-stat-cards">0</b><span>Cartes à découvrir</span></div>
+            <div class="inventory-stat"><b id="inv-stat-types">0</b><span>Types en stock</span></div>
+          </div>
+          <button class="inventory-sell-link" id="inventory-sell-link" type="button">🏷️ Vendre un pack</button>
         </div>
 
         <div class="inventory-grid" id="inventory-grid"></div>
@@ -545,7 +551,11 @@
                       <button class="qty-btn" id="market-qty-plus" type="button" aria-label="Vendre une carte de plus">+</button>
                       <span class="market-qty-hint" id="market-qty-hint" aria-live="polite"></span>
                     </div>
-                    <label for="market-price">Prix par carte (en pièces, libre)</label><input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+                    <label for="market-price">Prix par carte (en pièces, libre)</label>
+                    <div class="market-price-wrap">
+                      <input id="market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+                      <button class="mini-btn market-price-suggest" id="market-suggest-price" type="button" title="Remplir avec le prix conseillé">Prix conseillé</button>
+                    </div>
                     <button class="mini-btn primary" id="market-submit" type="submit">Mettre en vente</button>
                   </form>
                 </div>
@@ -564,7 +574,11 @@
                       <button class="qty-btn" id="pack-market-qty-plus" type="button" aria-label="Vendre un pack de plus">+</button>
                       <span class="market-qty-hint" id="pack-market-qty-hint" aria-live="polite"></span>
                     </div>
-                    <label for="pack-market-price">Prix par pack (en pièces, libre)</label><input id="pack-market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+                    <label for="pack-market-price">Prix par pack (en pièces, libre)</label>
+                    <div class="market-price-wrap">
+                      <input id="pack-market-price" type="number" min="0" max="1000000000" step="1" required placeholder="Prix libre">
+                      <button class="mini-btn market-price-suggest" id="pack-market-suggest-price" type="button" title="Remplir avec le prix conseillé">Prix conseillé</button>
+                    </div>
                     <button class="mini-btn primary" id="pack-market-submit" type="submit">Mettre les packs en vente</button>
                   </form>
                 </div>
@@ -705,6 +719,7 @@
           <button class="inspect-x" id="inspect-x" type="button" aria-label="Fermer l'inspection">✕</button>
           <div class="inspect-card" id="inspect-card"></div>
         </div>
+        <button class="inspect-sell" id="inspect-sell" type="button" hidden>🏷️ Vente rapide</button>
       </div>
 
       <!-- ============================== QUÊTES =============================== -->
@@ -719,11 +734,11 @@
                 <span class="level-xp" id="level-xp" aria-live="polite">0 / 100 XP</span>
               </div>
               <div class="level-bar" aria-hidden="true"><i id="level-fill"></i></div>
-              <p class="quests-count" id="quests-count" aria-live="polite">0 / 271 terminées</p>
+              <p class="quests-count" id="quests-count" aria-live="polite">0 / 260 terminées</p>
             </div>
             <div class="quests-tabs" role="tablist" aria-label="Sections des quêtes">
               <button class="chip is-active" type="button" role="tab" aria-selected="true" data-quest-tab="quests">Quêtes</button>
-              <button class="chip" type="button" role="tab" aria-selected="false" data-quest-tab="achievements">Succès · <span id="ach-count">0 / 30</span></button>
+              <button class="chip" type="button" role="tab" aria-selected="false" data-quest-tab="achievements">Succès · <span id="ach-count">0 / 28</span></button>
             </div>
           </div>
 
