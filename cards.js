@@ -408,6 +408,15 @@ const cardsDatabase = [
     color: '#8fc8ef'
   },
   {
+    id: 'ilanus',
+    name: 'ilanus zoom',
+    description: 'ZOOOMING',
+    rarity: 'legendary',
+    emoji: '🔍',
+    image: 'assets/Cartes/Ilanus.JPEG',
+    color: '#f5d979'
+  },
+   {
     id: 'king-mathis',
     name: 'King Mathis',
     description: 'il est de droite',
