@@ -442,6 +442,20 @@ const cardsDatabase = [
     emoji: '🦌',
     image: 'assets/Cartes/daleu-de-gazelle.jpeg',
     color: '#c6a0eb'
+  },
+  {
+    id: 'urbex-in-the-chiote',
+    name: 'Urbex in the chiote',
+    description: 'ils ont etain la lumiere',
+    rarity: 'rare',
+    emoji: '🔦',
+    color: '#8fc8ef',
+    video: {
+      src: 'assets/Cartes/videos/urbexchiote.MP4',
+      fps: 30,
+      sound: true,
+      loop: true
+    }
   }
 ];
 
