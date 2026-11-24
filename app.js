@@ -240,7 +240,7 @@
     rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
     legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
     video: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 },
-    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 21.4, divine: 14, secret: 10, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.1 }
+    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 20.9, divine: 14, secret: 10, ultrasecret: 0.8, hypersecret: 0.2, unique: 0.1 }
   };
   /* Slots par pack : 'std' = table complète ; { minRank } = garantie
      (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
