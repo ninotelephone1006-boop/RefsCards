@@ -613,7 +613,7 @@ const cardsDatabase = [
     color: '#67e0d0'
   },
   {
-    id: 'prophete-de-la-teuf',
+    id: 'yanouchibre',
     name: 'yanouchibre',
     description: '',
     rarity: 'ultraepic',
