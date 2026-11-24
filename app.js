@@ -2881,6 +2881,13 @@
   }
 
   function applySave(d) {
+    /* Une sauvegarde écrite par une ancienne version contient encore
+       `freeDate` / `freeUsed` (« 3 gratuits/jour »). Les règles actuelles
+       n'autorisent plus ces clés : leur présence fait refuser chaque set
+       merge (le document fusionné est jugé à elles), d'où « Accès cloud
+       refusé » même app et règles à jour. On les signale pour suppression. */
+    legacySaveKeys = Boolean(d) && (Object.prototype.hasOwnProperty.call(d, 'freeDate')
+      || Object.prototype.hasOwnProperty.call(d, 'freeUsed'));
     state.coins = Math.max(0, Number(d && d.coins) || 0);
     state.firstPack = !d || d.firstPack !== false;
     state.collection = ((d && d.collection) || [])
@@ -2987,7 +2994,7 @@
     clearTimeout(saveTimer);
     const userId = currentUser.uid;
     const db = cloudDb;
-    const data = {
+    const data = withLegacyStrip({
         coins: state.coins,
         firstPack: state.firstPack,
         collection: state.collection.map((c) => c.id),
@@ -3013,10 +3020,11 @@
         achievements: questState.achievements.slice(),
         notifications: questState.notifications.slice(0, QUEST_NOTIFICATIONS_MAX),
         updatedAt: serverTimestamp()
-      };
+      });
     saveQueue = saveQueue.then(async () => {
       try {
         await db.collection('playerSaves').doc(userId).set(data, { merge: true });
+        legacySaveKeys = false;
         return true;
       } catch (error) {
         if (!noteCloudError('Sauvegarde cloud impossible', error)) {
@@ -3040,6 +3048,10 @@
     currentUser = user;
     currentEmail = user.email || '';
     applySave(saveData);
+    /* Sauvegarde d'une ancienne version : on retire freeDate/freeUsed du
+       document cloud dès l'ouverture (fire-and-forget ; les écritures suivantes
+       réessaient via withLegacyStrip si nécessaire). */
+    stripLegacySaveKeys().catch(() => { /* déjà signalé par noteCloudError */ });
     syncHudName();
     syncHudAvatar();
     /* Profil public (pseudo, avatar, code ami) chargé AVANT d'afficher le
@@ -3679,6 +3691,7 @@
   let profileTimer = 0;
   let pseudoTimer = 0;              // auto-sauvegarde du pseudo pendant la frappe
   let rulesHelpShown = false;       // un seul toast « règles » par session
+  let legacySaveKeys = false;       // sauvegarde chargée d'une ancienne version (freeDate / freeUsed encore présents)
 
   function snapshotDocs(snap) {
     if (!snap) return [];
@@ -3695,6 +3708,49 @@
       }
     } catch (error) { /* repli ci-dessous */ }
     return new Date();
+  }
+
+  /* Suppression ciblée d'un champ document : FieldValue.delete() retire la clé
+     du document cloud malgré le merge, ce qui referme la principale cause
+     d'« Accès cloud refusé » chez les comptes anciens (voir legacySaveKeys). */
+  function deleteFieldValue() {
+    try {
+      if (window.firebase && firebase.firestore && firebase.firestore.FieldValue
+        && typeof firebase.firestore.FieldValue.delete === 'function') {
+        return firebase.firestore.FieldValue.delete();
+      }
+    } catch (error) { /* repli ci-dessous */ }
+    return undefined;
+  }
+
+  /* Ajoute la suppression des champs hérités (freeDate / freeUsed) à une
+     charge utile de set/update en merge, si la sauvegarde chargée en
+     contenait. Renvoie la charge telle quelle sinon. */
+  function withLegacyStrip(data) {
+    if (!legacySaveKeys) return data;
+    const del = deleteFieldValue();
+    if (!del) return data;
+    return Object.assign({}, data, { freeDate: del, freeUsed: del });
+  }
+
+  /* Nettoyage unique juste après le chargement : si la sauvegarde cloud
+     contient encore les champs hérités « 3 gratuits/jour », on les supprime
+     tout de suite. Sans cela, les règles (hasOnly) refusent TOUTE écriture en
+     merge — le joueur voit « Accès cloud refusé » alors que l'app et les
+     règles sont à jour. En cas d'échec, chaque écriture réessaie
+     (withLegacyStrip). */
+  async function stripLegacySaveKeys() {
+    if (!legacySaveKeys || !cloudReady()) return;
+    const del = deleteFieldValue();
+    if (!del) return; // SDK sans FieldValue.delete : la prochaine sauvegarde réessaiera
+    const uid = currentUser.uid;
+    const db = cloudDb;
+    try {
+      await db.collection('playerSaves').doc(uid).set({ freeDate: del, freeUsed: del }, { merge: true });
+      if (currentUser && currentUser.uid === uid) legacySaveKeys = false;
+    } catch (error) {
+      noteCloudError('Anciens champs de sauvegarde non supprimés', error);
+    }
   }
 
   function cloudReady() {
