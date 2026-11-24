@@ -11,7 +11,7 @@ service cloud.firestore {
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'streakDate', 'streak', 'claimedDays', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'streakDate', 'streak', 'claimedDays', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'updatedAt', 'freeDate', 'freeUsed'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
@@ -37,6 +37,19 @@ service cloud.firestore {
         // Il reste toléré pour que les anciennes sauvegardes puissent être
         // réécrites avec merge sans être refusées ; le jeu ne l'écrit plus.
         && (!('questBaseline' in request.resource.data) || request.resource.data.questBaseline is map)
+        // `freeDate` / `freeUsed` : anciens champs « 3 gratuits/jour », remplacés
+        // par streakDate/streak/claimedDays. Le jeu les supprime désormais du
+        // document au chargement (FieldValue.delete) ; ils restent tolérés pour
+        // que les anciennes sauvegardes puissent être réécrites avec merge sans
+        // être refusées (leur présence fait échouer hasOnly) ; le jeu ne les
+        // écrit plus.
+        && (!('freeDate' in request.resource.data)
+            || (request.resource.data.freeDate is string
+                && request.resource.data.freeDate.size() <= 10))
+        && (!('freeUsed' in request.resource.data)
+            || (request.resource.data.freeUsed is number
+                && request.resource.data.freeUsed >= 0
+                && request.resource.data.freeUsed <= 10000))
         && (!('notifications' in request.resource.data) || (request.resource.data.notifications is list && request.resource.data.notifications.size() <= 50))
         && (!('packStock' in request.resource.data)
             || (request.resource.data.packStock is map
