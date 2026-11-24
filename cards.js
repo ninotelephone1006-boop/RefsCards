@@ -579,7 +579,7 @@ const cardsDatabase = [
   {
     id: 'soyer-rex',
     name: 'Soyer Rex',
-    description: "J'ai de très bon tarifs",
+    description: "il a de très bon tarifs",
     rarity: 'ultrasecret',
     emoji: '🦖',
     image: 'assets/Cartes/soyer-rex.png',
@@ -588,7 +588,7 @@ const cardsDatabase = [
   {
     id: 'le-meilleur-investissement',
     name: 'saint bridou',
-    description: '38 % de protéines, 0 % de regrets 🥩',
+    description: 'meilleur achat',
     rarity: 'mythic',
     emoji: '🥩',
     image: 'assets/Cartes/meilleur-investissement.jpg',
@@ -597,7 +597,7 @@ const cardsDatabase = [
   {
     id: 'le-son',
     name: 'royer Son',
-    description: 'Ne monte pas le son, il est maudit 🔊',
+    description: '',
     rarity: 'ultrasecret',
     emoji: '🔊',
     image: 'assets/Cartes/le-son.jpg',
@@ -606,7 +606,7 @@ const cardsDatabase = [
   {
     id: 'capuche-mystere',
     name: 'Capuche Mystère',
-    description: "On ne voit que ses yeux, et c'est déjà trop 🌫️",
+    description: "",
     rarity: 'superrare',
     emoji: '🌫️',
     image: 'assets/Cartes/capuche-mystere.jpg',
@@ -615,7 +615,7 @@ const cardsDatabase = [
   {
     id: 'prophete-de-la-teuf',
     name: 'yanouchibre',
-    description: 'Il a vu la lumière (verte) de la soirée 🎈',
+    description: '',
     rarity: 'ultraepic',
     emoji: '🎈',
     image: 'assets/Cartes/prophete-de-la-teuf.jpg',
@@ -623,8 +623,8 @@ const cardsDatabase = [
   },
   {
     id: 'jeune-sapeur',
-    name: 'Jeune sapeur',
-    description: "Il éteint les incendies, pas les rumeurs 🚒",
+    name: 'Jeune bricoleur',
+    description: "",
     rarity: 'uncommon',
     emoji: '🚒',
     image: 'assets/Cartes/jeune-sapeur.jpg',
@@ -633,7 +633,7 @@ const cardsDatabase = [
   {
     id: 'sexy lelio',
     name: 'sexy lelio',
-    description: 'Tenue officielle du dimanche après-midi 👕',
+    description: '',
     rarity: 'common',
     emoji: '👕',
     image: 'assets/Cartes/cami-du-dimanche.jpg',
@@ -642,7 +642,7 @@ const cardsDatabase = [
   {
     id: 'le-regard',
     name: 'creepy brazil',
-    description: 'Il te fixe. Il te connaît. Il sait. 👁️',
+    description: 'Il te fixe..',
     rarity: 'unique',
     emoji: '👁️',
     image: 'assets/Cartes/le-regard.jpg',
