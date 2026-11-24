@@ -309,7 +309,8 @@ function yesterdayKey() {
     console.log('PASS pack légende : visible immédiatement dans Inventaire et Pack sans reload, 800 🪙, 10 cartes');
   }
 
-  /* 6. Inventaire vide : bouton « Aller au Shop » visible dans l'onglet Pack. */
+  /* 6. Inventaire vide : message « Aucun booster » + bouton Shop, sans bandeau
+        vide devant le booster (l'ancien .pack-inventory est supprimé). */
   {
     const { w, doc } = await boot({
       coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
@@ -317,11 +318,32 @@ function yesterdayKey() {
     });
     assert.equal(doc.getElementById('pack-stock-label').textContent, 'Aucun booster');
     assert.equal(doc.getElementById('pack-area').hidden, true);
+    assert.equal(doc.getElementById('pack-inventory'), null, 'plus de conteneur vide .pack-inventory');
+    assert.equal(doc.getElementById('pack-empty').hidden, false, 'carte « Aucun booster » affichée');
+    const goShop = doc.getElementById('pack-go-shop');
+    assert.ok(goShop, 'bouton Aller au Shop dans l\'onglet Pack');
+    goShop.click();
+    await wait(20);
+    assert.equal(doc.getElementById('app').dataset.tab, 'shop', 'le bouton ouvre le Shop');
     assert.equal(doc.getElementById('open-classic').disabled, true);
     assert.equal(doc.getElementById('open-rare').disabled, true);
     assert.equal(doc.getElementById('pack-type-rare'), null);
     w.close();
-    console.log('PASS inventaire vide → bouton Aller au Shop');
+    console.log('PASS inventaire vide → carte Aucun booster + bouton Aller au Shop');
+  }
+
+  /* 6bis. Un booster en stock : la carte « Aucun booster » disparaît et le
+         booster reste visible (aucun bandeau au-dessus de lui). */
+  {
+    const { w, doc } = await boot({
+      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      packStock: { classic: 2, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
+    });
+    assert.equal(doc.getElementById('pack-area').hidden, false, 'booster visible');
+    assert.equal(doc.getElementById('pack-empty').hidden, true, 'carte vide masquée');
+    assert.equal(doc.getElementById('pack-inventory'), null, 'pas de barre au-dessus du booster');
+    w.close();
+    console.log('PASS booster en stock → pas de barre, booster visible');
   }
 
   console.log('PASS shop flow (boutique, inventaire, calendrier de connexion, rare)');

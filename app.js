@@ -229,6 +229,8 @@
   const packImgMain = $('pack-img-main');
   const packImgFlap = $('pack-img-flap');
   const packStockLabel = $('pack-stock-label');
+  const packEmpty = $('pack-empty');
+  const packGoShop = $('pack-go-shop');
   const freeClaim = $('free-claim');
   const freeLabel = $('free-label');
   const freeMsg = $('free-msg');
@@ -727,7 +729,10 @@
     const empty = selected <= 0 && !demo && state.phase === 'pack';
     const head = document.querySelector('.pack-head');
     if (head) head.hidden = total === 0 && !demo && state.phase === 'pack';
-    if (packStockLabel) packStockLabel.textContent = total === 0 && !demo ? 'Aucun booster' : '';
+    /* Aucun booster : on affiche une carte d'invitation (Shop + cadeau du
+       jour) au lieu du paquet. Plus de bandeau vide au-dessus du booster. */
+    if (packStockLabel) packStockLabel.textContent = 'Aucun booster';
+    if (packEmpty) packEmpty.hidden = !empty;
     if (packArea) packArea.hidden = empty;
     if (packOdds) packOdds.hidden = empty;
     if (pack) {
@@ -3819,6 +3824,7 @@
   on(openLegend, 'click', () => openFromInventory('legend'));
   on(openVideo, 'click', () => openFromInventory('video'));
   on(inventoryGoShop, 'click', () => setTab('shop'));
+  on(packGoShop, 'click', () => { SFX.tick(); setTab('shop'); });
   if (inventoryGrid) {
     on(inventoryGrid, 'click', (e) => {
       const btn = e.target.closest('[data-open-pack]');
