@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-7">
+  <meta name="app-version" content="2026.11.24-8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-8" defer></script>
+  <script src="app.js?v=2026.11.24-9" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -248,8 +248,8 @@
               </div>
               <div class="shop-info">
                 <h3>Pack Classique</h3>
-                <p class="shop-desc">5 cartes · chances normales</p>
-                <p class="shop-odds">Valeur moyenne ≈ 394 🪙 par pack</p>
+                <p class="shop-desc">5 cartes · 1 Rare+ garantie par pack</p>
+                <p class="shop-odds">Valeur moyenne ≈ 451 🪙 par pack</p>
                 <p class="shop-stock" id="shop-stock-classic">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs classiques">
                   <button class="qty-btn" type="button" data-pack="classic" data-delta="-1" aria-label="Moins">−</button>
@@ -272,8 +272,8 @@
               </div>
               <div class="shop-info">
                 <h3>Pack Rare <span class="shop-rare-tag">doré</span></h3>
-                <p class="shop-desc">5 cartes · les raretés élevées sont plus fréquentes que les communes · chances de Shiny ×2</p>
-                <p class="shop-odds">Valeur moyenne ≈ 604 🪙 par pack</p>
+                <p class="shop-desc">5 cartes · 1 Rare+ et 1 Épique+ garanties · chances de Shiny ×2</p>
+                <p class="shop-odds">Valeur moyenne ≈ 878 🪙 par pack</p>
                 <p class="shop-stock" id="shop-stock-rare">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs rares">
                   <button class="qty-btn" type="button" data-pack="rare" data-delta="-1" aria-label="Moins">−</button>
@@ -319,7 +319,7 @@
               <div class="shop-info">
                 <h3>Pack Vidéo</h3>
                 <p class="shop-desc">2 cartes animées · fps, son et boucle réglés carte par carte</p>
-                <p class="shop-odds">Valeur moyenne ≈ 535 🪙 par pack</p>
+                <p class="shop-odds">Valeur moyenne ≈ 153 🪙 par pack</p>
                 <p class="shop-stock" id="shop-stock-video">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs vidéo">
                   <button class="qty-btn" type="button" data-pack="video" data-delta="-1" aria-label="Moins">−</button>
@@ -336,14 +336,14 @@
             </article>
 
             <article class="shop-card shop-card-ultra" data-pack="ultra">
-              <span class="shop-badge shop-badge-ultra" aria-hidden="true">CHANCES ×30</span>
+              <span class="shop-badge shop-badge-ultra" aria-hidden="true">GROSSES RARETÉS</span>
               <div class="shop-img-wrap">
                 <img class="shop-img" src="assets/packetultra.png" alt="Pack Ultra Rare Refs Cards" draggable="false">
               </div>
               <div class="shop-info">
-                <h3>Pack Ultra Rare <span class="shop-ultra-tag">×30</span></h3>
-                <p class="shop-desc">5 cartes · 30× plus de chance d’obtenir les cartes de grosse rareté · chances de Shiny ×7</p>
-                <p class="shop-odds">Raretés Mythique à Secrète massivement boostées</p>
+                <h3>Pack Ultra Rare <span class="shop-ultra-tag">ultra</span></h3>
+                <p class="shop-desc">5 cartes · Épique+, Mythique+ et Légendaire+ garantis · chances de Shiny ×7</p>
+                <p class="shop-odds">Valeur moyenne ≈ 1 964 🪙 par pack</p>
                 <p class="shop-stock" id="shop-stock-ultra">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs ultra rares">
                   <button class="qty-btn" type="button" data-pack="ultra" data-delta="-1" aria-label="Moins">−</button>
