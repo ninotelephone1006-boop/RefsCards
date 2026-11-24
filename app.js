@@ -4819,6 +4819,8 @@
   const friendPseudo = $('friend-pseudo');
   const friendCodeLabel = $('friend-code-label');
   const friendStats = $('friend-stats');
+  const friendFriends = $('friend-friends');
+  const friendFriendsEmpty = $('friend-friends-empty');
   const friendCards = $('friend-cards');
   const friendCardsEmpty = $('friend-cards-empty');
   const friendClose = $('friend-close');
@@ -5073,6 +5075,9 @@
         uniqueCards: stats.unique,
         bestRarity: stats.best ? stats.best.rarity : null,
         collection: collectionIds(),
+        /* Liste publique d'amis : c'est ce qui permet d'afficher « ses amis »
+           sur le profil d'un joueur et de mettre les amis en commun devant. */
+        friends: friends.slice(0, 500),
         updatedAt: serverTimestamp()
       }, { merge: true });
       return true;
@@ -5352,7 +5357,7 @@
     if (!force && friendProfiles.has(uid)) return friendProfiles.get(uid);
     const fallback = {
       pseudo: 'Joueur', avatar: '', friendCode: '',
-      coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: []
+      coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: [], friends: []
     };
     if (!cloudReady()) return fallback;
     try {
@@ -5367,7 +5372,10 @@
           totalCards: Number(d.totalCards) || 0,
           uniqueCards: Number(d.uniqueCards) || 0,
           bestRarity: d.bestRarity || null,
-          collection: Array.isArray(d.collection) ? d.collection : []
+          collection: Array.isArray(d.collection) ? d.collection : [],
+          friends: Array.isArray(d.friends)
+            ? d.friends.filter((uid) => typeof uid === 'string' && uid).slice(0, 500)
+            : []
         };
         friendProfiles.set(uid, data);
         return data;
@@ -5966,6 +5974,50 @@
     if (friendDetail) friendDetail.hidden = true;
   }
 
+  /* Amis d'un autre joueur, avec ceux qu'on a en commun en premier. Leurs
+     profils publics sont chargés à la demande (les amis en commun sont déjà
+     en cache) ; la fiche se redessine quand un pseudo/avatar arrive. */
+  const friendFriendsFetching = new Set();
+
+  function renderFriendFriends(uid) {
+    if (!friendFriends) return;
+    const data = friendProfiles.get(uid);
+    const mine = currentUser && currentUser.uid;
+    const others = ((data && data.friends) || [])
+      .filter((other) => other !== uid && other !== mine)
+      .map((other) => ({ uid: other, mutual: friends.includes(other) }))
+      .sort((a, b) => {
+        if (a.mutual !== b.mutual) return a.mutual ? -1 : 1;
+        const pa = friendProfiles.get(a.uid);
+        const pb = friendProfiles.get(b.uid);
+        return String((pa && pa.pseudo) || 'Joueur').localeCompare(
+          String((pb && pb.pseudo) || 'Joueur'), 'fr', { sensitivity: 'base' }
+        );
+      });
+    if (friendFriendsEmpty) friendFriendsEmpty.hidden = others.length > 0;
+    const frag = document.createDocumentFragment();
+    others.forEach(({ uid: otherUid, mutual }) => {
+      const info = friendProfiles.get(otherUid) || { pseudo: 'Joueur', avatar: '' };
+      const row = el('div', 'friend-row friend-friends-row');
+      row.append(friendIdentity(info));
+      if (mutual) row.append(el('span', 'friend-mutual-tag', 'En commun'));
+      const view = el('button', 'mini-btn', 'Profil');
+      view.type = 'button';
+      view.setAttribute('aria-label', `Voir le profil de ${info.pseudo || 'ce joueur'}`);
+      on(view, 'click', () => openFriendDetail(otherUid));
+      row.append(view);
+      frag.append(row);
+      if (!friendProfiles.has(otherUid) && !friendFriendsFetching.has(otherUid)) {
+        friendFriendsFetching.add(otherUid);
+        fetchFriendProfile(otherUid).then(() => {
+          friendFriendsFetching.delete(otherUid);
+          if (selectedFriendUid === uid && friendProfiles.has(uid)) renderFriendDetail(uid);
+        });
+      }
+    });
+    friendFriends.replaceChildren(frag);
+  }
+
   function renderFriendDetail(uid) {
     const data = friendProfiles.get(uid);
     if (!data || !friendDetail) return;
@@ -5996,6 +6048,7 @@
         return card;
       }));
     }
+    renderFriendFriends(uid);
     if (friendCards) {
       const owned = new Map();
       for (const id of data.collection) owned.set(id, (owned.get(id) || 0) + 1);

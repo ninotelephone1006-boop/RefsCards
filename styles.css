@@ -2417,6 +2417,9 @@ html,body{background:var(--bg)}
 .friend-detail-id p{margin:3px 0 0;font-size:11px;color:#8d84a8}
 .friend-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
 .friend-stats .stat-value{font-size:16px}
+.friend-friends-block{margin-top:16px}
+.friend-friends .friend-row{flex-wrap:wrap}
+.friend-mutual-tag{flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#bbf7d0;background:#14532d80;border:1px solid #4ade8044;border-radius:999px;padding:4px 8px}
 .friend-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
 /* La carte (.cf) est en position:absolute : elle a besoin d'un conteneur qui
    porte le ratio 5:7, sinon les vignettes se chevauchent (bug visuel « Voir »). */

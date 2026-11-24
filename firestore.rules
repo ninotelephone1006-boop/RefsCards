@@ -98,7 +98,12 @@ service cloud.firestore {
         && request.resource.data.avatar is string
         && request.resource.data.avatar.size() <= 300000
         && request.resource.data.friendCode is string
-        && request.resource.data.friendCode.matches('^REFS-[A-Z0-9]{6}$');
+        && request.resource.data.friendCode.matches('^REFS-[A-Z0-9]{6}$')
+        // Liste publique d'amis (uids), pour afficher les amis d'un profil et
+        // les amis en commun.
+        && (!('friends' in request.resource.data)
+            || (request.resource.data.friends is list
+                && request.resource.data.friends.size() <= 500));
       allow delete: if false;
     }
 
