@@ -566,6 +566,15 @@ const cardsDatabase = [
     emoji: '🌸',
     image: 'assets/Cartes/girly-lelio.jpeg',
     color: '#ff8fd1'
+  },
+  {
+    id: 'porte-lelio-en-secret',
+    name: 'Porte Lelio en Secret',
+    description: 'On porte Lelio en secret, tu ne l\'as pas vu 🤫',
+    rarity: 'secret',
+    emoji: '🤫',
+    image: 'assets/Cartes/porte-lelio-en-secret.jpeg',
+    color: '#c79bff'
   }
 ];
 
