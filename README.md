@@ -61,6 +61,16 @@ Quand des cartes sont ajoutées à `cards.js`, le joueur est accueilli par une a
 - **Suite** : « VOIR MA COLLECTION → » ouvre l'onglet Collection, où ces mêmes cases grisées portent un badge **NOUVEAU** pendant la session. « Plus tard », le bouton ✕, le fond et Échap ferment l'annonce sans rien changer d'autre. L'annonce ne joue qu'une fois : la liste des cartes connues est mise à jour dès l'affichage.
 - **Aucun effet de bord** : ni carte offerte, ni pièce débitée, ni pack ajouté — l'annonce ne fait que présenter le catalogue. Le stockage local est protégé par `try/catch` : en navigation privée ou si `localStorage` est bloqué, le jeu démarre normalement (simplement sans annonce).
 
+## Offre de sortie : Pack Ultra Rare à −20 % pendant 24 h
+
+Pour la sortie du Pack Ultra Rare, le jeu affiche à l'entrée une annonce **« Sortie officielle »** (fenêtre `#promo-sheet`) et applique une vraie remise de **20 %** sur ce pack pendant **24 h** :
+
+- **Fenêtre de l'offre** : constante `ULTRA_PROMO` en tête de `app.js` (`startAt`, `durationMs: 24 h`, `discount: 0.2`, `pack: 'ultra'`). Changer `startAt` suffit à rejouer ou prolonger l'offre ; passé l'échéance, tout revient au prix normal sans nettoyage à faire.
+- **Remise réelle** : `promoUnitPrice('ultra')` (20 000 → 16 000 🪙) est utilisé partout — bouton du Shop (`ACHETER · 16 000 🪙 · −20 %`), ligne « SORTIE » de la carte Ultra, compte à rebours, débit des pièces dans `buyPacks()`. Aucun prix n'est écrit dans la sauvegarde : l'offre dépend seulement de l'heure.
+- **Annonce unique** : comme l'annonce du catalogue, elle apparaît une seule fois par navigateur (clé `refs-cards:promo-seen`, valeur = identifiant de l'offre), après l'annonce « Nouvelles cartes » si celle-ci est affichée. Elle ajoute aussi une notification dans la cloche (⚡ `system`) avec le prix remisé.
+- **Habillage** : aurore animée, rayons tournants, étincelles, badge `−20 %`, pack flottant, prix barré, compte à rebours vivant et jauge qui se vide. `prefers-reduced-motion` coupe les animations.
+- **Fin d'offre** : à zéro, la fenêtre se ferme d'elle-même, un toast prévient le joueur et le Shop réaffiche les prix normaux.
+
 ## Économie : pas d'argent pris, mais moins d'argent créé
 
 Les packs restent au-dessus de la valeur moyenne de leur contenu, et aucun solde n'est jamais réduit automatiquement (pas d'amende, pas de reset, pas de taxe). En revanche, le gain de pièces à la révélation d'un doublon diminue : `cardReward()` paie le premier exemplaire plein tarif, puis multiplie par `0,72` par exemplaire déjà possédé, avec un plancher à `35 %` du gain de base. Le message « Doublon : gain réduit. » l'indique pendant la révélation. Fermer cette robinet des doublons évite qu'un joueur s'enrichisse indéfiniment en ouvrant toujours la même carte, sans toucher à l'argent déjà gagné ni ajouter des packs ou des cartes.
