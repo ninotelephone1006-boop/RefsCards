@@ -4241,3 +4241,35 @@ body:has(.inspect.is-open) .update-banner{display:none}
   .pack-result-card { transition: none; }
   .pack-result-card:hover { transform: none; }
 }
+
+/* ----- « Ouvrir tout le pack » : éventail, retournements en cascade, envol -----
+   app.js pose .is-fan sur la pile et, sur chaque carte, --fan-x / --fan-y /
+   --fan-r / --fan-s (position, rotation, échelle par rapport à la boîte de la
+   pile) et --fan-delay (décalage de l'étalement). Les transformations gardent
+   l'ordre translate → scale → rotate de .is-flying : le passage éventail →
+   envol vers le butin est ainsi interpolé composante par composante. */
+.stack.is-fan { pointer-events: none; }
+.stack.is-fan .card.is-fanned {
+  z-index: calc(20 + var(--fan-i, 0));
+  transition: transform .62s var(--ease-spring) var(--fan-delay, 0ms), filter .4s ease;
+  transform: translate(var(--fan-x, 0px), var(--fan-y, 0px)) scale(var(--fan-s, 1)) rotate(var(--fan-r, 0deg)) !important;
+}
+.stack.is-fan .card-inner { transition-duration: .72s; }
+/* Chaque retournement de la cascade garde son balayage lumineux, plus vif. */
+.stack.is-fan .card.is-flipped .card-front::after { animation-duration: .8s; animation-delay: .3s; }
+/* La plus rare du lot : halo allumé qui respire, légèrement agrandie (via --fan-s). */
+.stack.is-fan .card.is-best::before { opacity: 1; animation: aura 1.3s ease-in-out infinite; }
+.stack.is-fan .card.is-best .card-front { box-shadow: 0 0 0 1px var(--r-color), 0 0 28px var(--r-glow); }
+/* Le bouton « Ouvrir tout » devient « Passer » pendant la cascade. */
+.open-all.is-skip {
+  border-color: #ffffff2e;
+  background: #1a1428;
+  color: #d9cff0;
+  box-shadow: none;
+  animation: none;
+}
+.open-all.is-skip span { color: #b8a9d9; }
+.open-all.is-skip:hover:not(:disabled) { border-color: #ffffff66; background: #251c38; }
+@media (prefers-reduced-motion: reduce) {
+  .stack.is-fan .card.is-best::before { animation: none; }
+}
