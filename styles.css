@@ -4279,3 +4279,14 @@ body:has(.inspect.is-open) .update-banner{display:none}
 #offer-price-label { display: block; margin: 1rem 0; }
 #offer-price-label[hidden] { display: none; }
 #offer-price { display: block; width: 100%; margin-top: .5rem; padding: .65rem; border-radius: .5rem; border: 1px solid #756b93; background: #171426; color: white; }
+
+/* Sortie Double Rare : néons roses assortis au nouveau booster. */
+.shop-card-double { border-color: #ed37ba; background: radial-gradient(circle at 20% 0%, #86165c 0, transparent 55%), #211026; }
+.shop-card-double.is-promo { box-shadow: 0 0 28px #ff23b94d; }
+.double-promo .sheet-promo-dialog { border-color: #ff62d2; }
+.double-promo .promo-aurora { filter: hue-rotate(100deg); }
+.double-promo .promo-pack img { filter: drop-shadow(0 0 22px #ff45ca); }
+.pack-opening[data-pack-type='doubleRare'] { --opening-color: #ff34c9; --opening-glow: #f510a5; }
+@media (prefers-reduced-motion: reduce) {
+  .double-promo *, .double-promo *::before, .double-promo *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-16">
+  <meta name="app-version" content="2026.11.24-18">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-13">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-18">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-17" defer></script>
+  <script src="app.js?v=2026.11.24-18" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -296,6 +296,24 @@
               </div>
             </article>
 
+            <article class="shop-card shop-card-double" data-pack="doubleRare">
+              <span class="shop-badge shop-badge-ultra">NOUVEAU · 10 CARTES</span>
+              <div class="shop-img-wrap"><img class="shop-img" src="assets/Packraredouble.png" alt="Pack Double Rare Refs Cards" draggable="false"></div>
+              <div class="shop-info">
+                <h3>Pack Double Rare <span class="shop-ultra-tag">×2</span></h3>
+                <p class="shop-desc">10 cartes · mêmes chances que le Pack Rare · 2 Rare+ et 2 Épique+ garanties · Shiny ×2</p>
+                <p class="shop-promo-line" id="double-promo-line" hidden><span class="shop-promo-off">−15 %</span><span class="shop-promo-txt">SORTIE · <s>1 700</s> <strong>1 445</strong> 🪙</span><span class="shop-promo-clock" id="double-promo-clock">48:00:00</span></p>
+                <p class="shop-stock" id="shop-stock-doubleRare">Tu en as 0</p>
+                <div class="qty-row" role="group" aria-label="Quantité de packs double rare">
+                  <button class="qty-btn" type="button" data-pack="doubleRare" data-delta="-1" aria-label="Moins">−</button>
+                  <span class="qty-val" id="qty-doubleRare" aria-live="polite">1</span>
+                  <button class="qty-btn" type="button" data-pack="doubleRare" data-delta="1" aria-label="Plus">+</button>
+                  <span class="qty-quick"><button class="qty-chip" type="button" data-pack="doubleRare" data-qty="1">×1</button><button class="qty-chip" type="button" data-pack="doubleRare" data-qty="5">×5</button><button class="qty-chip" type="button" data-pack="doubleRare" data-qty="10">×10</button></span>
+                </div>
+                <button class="shop-buy shop-buy-ultra" id="buy-doubleRare" type="button">ACHETER · 1 700 🪙</button>
+              </div>
+            </article>
+
             <article class="shop-card" data-pack="legend">
               <div class="shop-img-wrap">
                 <img class="shop-img" src="assets/packetlegende.png" alt="Pack Légende Refs Cards" draggable="false">
@@ -377,6 +395,7 @@
             <p class="shop-inventory-label" id="shop-inventory-label" aria-live="polite">Inventaire : 0 pack</p>
             <div class="inventory-open-actions">
               <button class="shop-open" id="open-classic" type="button">OUVRIR CLASSIQUE · ×0 →</button>
+              <button class="shop-open shop-open-rare" id="open-doubleRare" type="button">OUVRIR DOUBLE RARE · ×0 →</button>
               <button class="shop-open shop-open-rare" id="open-rare" type="button">OUVRIR RARE · ×0 →</button>
               <button class="shop-open" id="open-legend" type="button">OUVRIR LÉGENDE · ×0 →</button>
               <button class="shop-open shop-open-video" id="open-video" type="button">OUVRIR VIDÉO · ×0 →</button>
@@ -832,6 +851,22 @@
            Pack Ultra Rare sort et reste à −20 % pendant 24 h. La remise est
            réelle (voir PACK_PRICES / promoPrice dans app.js) ; la fenêtre est
            fermée automatiquement quand le compte à rebours atteint zéro. -->
+      <div class="sheet sheet-promo double-promo" id="double-promo-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="double-promo-title" aria-describedby="double-promo-desc">
+        <div class="sheet-backdrop" data-close-double></div>
+        <div class="sheet-dialog sheet-promo-dialog">
+          <button class="sheet-x" id="double-promo-x" type="button" aria-label="Fermer l'annonce">✕</button>
+          <div class="promo-aurora" aria-hidden="true"></div><div class="promo-rays" aria-hidden="true"></div>
+          <div class="promo-sparks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <p class="kicker promo-kicker">✦ NOUVEAU BOOSTER ✦</p>
+          <h3 class="promo-title" id="double-promo-title">Double Rare<em>.</em></h3>
+          <p class="promo-sub" id="double-promo-desc">Deux fois plus de cartes, les mêmes chances que le Pack Rare. Pour sa sortie : <strong>−15 % pendant 48 h</strong> !</p>
+          <div class="promo-body"><figure class="promo-pack"><span class="promo-halo" aria-hidden="true"></span><span class="promo-off" aria-hidden="true"><b>−15</b><small>%</small></span><img src="assets/Packraredouble.png" alt="Pack Double Rare" draggable="false"></figure>
+            <div class="promo-info"><p class="promo-price"><span class="promo-price-label">Prix de sortie</span><span class="promo-price-row"><s class="promo-price-old">1 700 🪙</s><strong class="promo-price-new">1 445 🪙</strong></span></p><p class="promo-perks">10 cartes · 2 Rare+ et 2 Épique+ garanties · Shiny ×2</p><p class="promo-timer" role="timer"><span class="promo-timer-label">Fin de l'offre dans</span><span class="promo-clock" id="double-sheet-clock">48:00:00</span></p></div></div>
+          <div class="sheet-actions promo-actions"><button class="mini-btn" id="double-promo-later" type="button">Plus tard</button><button class="mini-btn primary promo-cta" id="double-promo-see" type="button">DÉCOUVRIR LE PACK →</button></div>
+          <div class="promo-bar" aria-hidden="true"><i id="double-bar-fill"></i></div><p class="promo-hint">Offre de lancement limitée · Une seule annonce</p>
+        </div>
+      </div>
+
       <div class="sheet sheet-promo" id="promo-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="promo-title" aria-describedby="promo-desc">
         <div class="sheet-backdrop" data-close-promo></div>
         <div class="sheet-dialog sheet-promo-dialog">
