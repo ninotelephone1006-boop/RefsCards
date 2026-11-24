@@ -3087,3 +3087,97 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .coll-shiny-dot{top:5px;right:5px;font-size:15px}
 
 .quests-help{max-width:560px;margin:0 auto 18px;text-align:center;color:#a79fbd;font-size:13px;line-height:1.5}
+
+/* ==========================================================================
+   v2026.11.24-2 — Refonte visuelle : quêtes en catégories + animations
+   ========================================================================== */
+:root{--glow:#b388ff;--glow-2:#f0abfc;--surface:#17121f;--surface-2:#1e1729}
+
+/* ---- Quêtes : onglets de catégories ---- */
+.quest-cats{display:flex;gap:8px;max-width:760px;margin:0 auto 16px;padding:4px 2px 8px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x proximity}
+.quest-cats::-webkit-scrollbar{display:none}
+.quest-cat{position:relative;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:1px solid #ffffff14;border-radius:99px;background:var(--surface);color:#a79fbd;font:700 12.5px 'Space Grotesk',sans-serif;cursor:pointer;scroll-snap-align:center;transition:transform .25s var(--ease-spring),background .25s,color .25s,border-color .25s,box-shadow .25s}
+.quest-cat:hover{transform:translateY(-2px);color:#fff;border-color:#b388ff66}
+.quest-cat:active{transform:scale(.95)}
+.quest-cat.is-active{color:#fff;border-color:#c4a1ff;background:linear-gradient(135deg,#6d3fd6,#a855f7 60%,#d946ef);box-shadow:0 8px 22px -8px #a855f7}
+.quest-cat-icon{font-size:15px}
+.quest-cat-dot{display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#f0abfc;color:#2b0a3d;font:800 10.5px 'Space Grotesk',sans-serif;font-style:normal;animation:dot-ping 1.8s ease-in-out infinite}
+@keyframes dot-ping{0%,100%{box-shadow:0 0 0 0 #f0abfc88}50%{box-shadow:0 0 0 6px #f0abfc00}}
+
+/* ---- Quêtes : grille et cartes ---- */
+.quest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;max-width:760px;margin:0 auto}
+.quest-card + .quest-card{margin-top:0}
+.quest-card{margin:0;max-width:none;padding:16px;border-radius:20px;background:linear-gradient(160deg,var(--surface-2),var(--surface));border:1px solid #ffffff12;overflow:hidden;
+  opacity:0;animation:quest-in .55s var(--ease-out) forwards;animation-delay:calc(var(--i,0)*70ms);transition:transform .3s var(--ease-out),border-color .3s,box-shadow .3s}
+.quest-card:hover{transform:translateY(-3px);border-color:#b388ff55;box-shadow:0 18px 36px -22px #a855f7}
+@keyframes quest-in{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}
+.quest-card.is-new{animation:quest-in .55s var(--ease-out) forwards}
+.quest-head{display:flex;align-items:center;gap:12px}
+.quest-head .quest-icon{display:grid;place-items:center;flex:0 0 46px;height:46px;border-radius:14px;background:#a855f71f;border:1px solid #a855f744;font-size:23px;filter:none}
+.quest-head-text{min-width:0}
+.quest-card .quest-title{font-size:clamp(16px,4vw,19px)}
+.quest-step{margin:3px 0 0;font-size:11.5px;font-weight:600;color:#8d84a8}
+.quest-card .quest-desc{margin:11px 0 0;font-size:13px}
+.quest-pips{display:flex;gap:4px;margin:12px 0 0}
+.quest-pips i{flex:1 1 0;max-width:26px;height:4px;border-radius:4px;background:#ffffff14;transition:background .4s}
+.quest-pips i.is-done{background:#7c3aed}
+.quest-pips i.is-now{background:linear-gradient(90deg,#c4a1ff,#f0abfc);animation:pip-glow 1.6s ease-in-out infinite}
+@keyframes pip-glow{50%{opacity:.45}}
+.quest-bar{height:9px;position:relative}
+.quest-bar i{background:linear-gradient(90deg,#7c3aed,#c084fc,#f0abfc);background-size:200% 100%;transition:transform .9s var(--ease-out);animation:bar-flow 3s linear infinite;border-radius:6px}
+@keyframes bar-flow{to{background-position:-200% 0}}
+.quest-next{margin:12px 0 0;padding-top:10px;border-top:1px dashed #ffffff14;font-size:11.5px;color:#7d7595}
+.quest-card.is-ready{border-color:transparent;background:linear-gradient(160deg,#2a1640,#1a1226) padding-box,linear-gradient(120deg,#c084fc,#f0abfc,#fcd34d,#c084fc) border-box;background-size:auto,300% 300%;animation:quest-in .55s var(--ease-out) forwards,ready-border 4s linear infinite;animation-delay:calc(var(--i,0)*70ms),0s;box-shadow:0 18px 44px -24px #d946ef}
+@keyframes ready-border{to{background-position:0 0,300% 0}}
+.quest-card.is-ready::after{content:'Prête';top:12px;right:12px;font-size:10px;letter-spacing:.04em;background:linear-gradient(90deg,#f0abfc,#fcd34d);color:#2b0a3d}
+.quest-claim{background:linear-gradient(135deg,#7c3aed,#d946ef);box-shadow:0 10px 22px -10px #d946ef;position:relative;overflow:hidden}
+.quest-claim:not(:disabled)::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#ffffff55 50%,transparent 70%);transform:translateX(-120%);animation:buy-shine 2.8s ease-in-out infinite}
+.quest-card.is-claiming{animation:none;opacity:1;transform:scale(1.03);box-shadow:0 0 0 2px #f0abfc,0 0 50px -4px #d946ef;transition:transform .3s var(--ease-spring),box-shadow .3s}
+.quest-spark{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:#fcd34d;box-shadow:0 0 10px #f0abfc;pointer-events:none;animation:spark .55s var(--ease-out) forwards}
+.quest-spark:nth-child(3n){background:#f0abfc}.quest-spark:nth-child(3n+1){background:#c4a1ff}
+@keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+
+/* ---- Quêtes terminées repliables ---- */
+.quest-done{max-width:760px;margin:22px auto 0}
+.quest-done-title{cursor:pointer;margin:0;padding:11px 14px;border-radius:12px;background:var(--surface);border:1px solid #ffffff10;list-style:none;transition:background .2s}
+.quest-done-title::-webkit-details-marker{display:none}
+.quest-done-title::after{content:'▾';float:right;transition:transform .3s}
+.quest-done[open] .quest-done-title::after{transform:rotate(180deg)}
+.quest-done-title:hover{background:var(--surface-2)}
+.quest-done-list{margin-top:8px;animation:fade-in .3s ease}
+.quest-all-done{grid-column:1/-1}
+
+/* ---- Carte niveau ---- */
+.level-card{position:relative;overflow:hidden;background:linear-gradient(145deg,#24153a,#150f20)}
+.level-card::before{content:'';position:absolute;inset:-60% -20% auto;height:120%;background:radial-gradient(circle,#c084fc40,transparent 60%);animation:aura-drift 8s ease-in-out infinite alternate;pointer-events:none}
+@keyframes aura-drift{to{transform:translateX(35%)}}
+.level-bar{height:9px}
+.level-bar i{background:linear-gradient(90deg,#7c3aed,#f0abfc);transition:transform 1s var(--ease-out)}
+
+/* ---- Polish global : interactions et entrées ---- */
+.shop-card,.inventory-card,.stat-card{transition:transform .35s var(--ease-out),box-shadow .35s,border-color .35s}
+.shop-card:hover{transform:translateY(-5px);box-shadow:0 26px 50px -28px #a855f7;border-color:#b388ff66}
+.shop-card:hover .shop-img{transform:translateY(-4px) rotate(-2deg) scale(1.04)}
+.shop-img{transition:transform .5s var(--ease-spring)}
+.shop-buy,.shop-open,.mini-btn,.google-btn,.free-claim,.qty-btn,.qty-chip{transition:transform .2s var(--ease-spring),filter .2s,box-shadow .25s,background .25s}
+.shop-buy:hover,.shop-open:hover,.mini-btn:hover,.free-claim:hover{transform:translateY(-2px);filter:brightness(1.12)}
+.shop-buy:active,.shop-open:active,.mini-btn:active,.free-claim:active,.qty-btn:active,.qty-chip:active{transform:scale(.94)}
+.tab{transition:transform .25s var(--ease-spring),color .25s}
+.tab:active{transform:scale(.9)}
+.tab.is-active svg{filter:drop-shadow(0 0 8px #b388ff);animation:tab-pop .45s var(--ease-spring)}
+@keyframes tab-pop{0%{transform:scale(.8)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+.view{will-change:opacity,transform}
+.account-view .profile-hero,.online-panel.is-active{animation:fade-up .5s var(--ease-out) both}
+@keyframes fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.stats-grid>*,.coll-grid>*{animation:tile-in .5s var(--ease-out) both}
+.stats-grid>*:nth-child(n){animation-delay:calc(min(var(--i,0),12)*40ms)}
+.wallet{transition:box-shadow .3s}
+.wallet:hover{box-shadow:0 0 22px -4px #ffcf5c88}
+.toast{backdrop-filter:blur(10px)}
+.sheet-dialog{animation:dialog-in .45s var(--ease-spring)}
+.kicker span{display:inline-block;animation:star-pulse 2.6s ease-in-out infinite}
+
+@media (prefers-reduced-motion:reduce){
+  .quest-card,.quest-card.is-ready,.quest-bar i,.quest-claim::after,.quest-pips i.is-now,.quest-cat-dot,.level-card::before,.kicker span,.stats-grid>*,.coll-grid>*,.account-view .profile-hero,.online-panel.is-active{animation:none!important;opacity:1}
+  .quest-card:hover,.shop-card:hover,.shop-card:hover .shop-img{transform:none}
+}
