@@ -2674,7 +2674,7 @@ html,body{background:var(--bg)}
 .market-row-btn{width:28px;height:28px;font-size:14px}
 .market-row-qty{width:52px;padding:5px 6px;border:1px solid #725598;border-radius:8px;background:#0f0b14;color:#fff;font:inherit;font-size:13px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums}
 
-/* Marché global : toutes les annonces du jeu, vendeur affiché */
+/* Marché global : catalogue de cartes avec comparaison des vendeurs */
 .global-market-block{margin-top:20px}
 .global-market-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}
 .global-market-tools input,.global-market-tools select{flex:1 1 170px;min-width:0;padding:9px 11px;border:1px solid #725598;border-radius:9px;background:#0f0b14;color:#fff;font:inherit;font-size:13px}
@@ -2682,12 +2682,75 @@ html,body{background:var(--bg)}
 .global-market-tools select option{background:#160f20}
 .global-market-filter{font-size:11px;color:#c4a1ff;font-weight:700}
 .global-market-tools .mini-btn{flex:0 0 auto}
-.global-seller{padding:12px;border:1px solid #a855f733;border-radius:14px;background:#0f0b14f5;display:flex;flex-direction:column;gap:8px}
-.global-seller-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid #ffffff12}
-.global-seller-head .request-id{flex:1 1 180px}
-.global-seller-tag{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#c7a9ff;background:#241c2e;border:1px solid #8b5cf644;border-radius:999px;padding:4px 9px}
-.global-seller .trade-row{background:#161020}
+.global-market-section+.global-market-section{margin-top:22px;padding-top:18px;border-top:1px solid #ffffff14}
+.global-market-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+.global-market-section-title{margin:0!important;font:800 15px 'Space Grotesk',sans-serif!important;color:#eee7fa!important}
+.global-market-section-count{padding:4px 9px;border:1px solid #a855f733;border-radius:99px;background:#8b5cf60d;color:#cdb6ff;font-size:10px;font-weight:800;white-space:nowrap}
+.global-market-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media(min-width:540px){.global-market-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:900px){.global-market-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.global-market-product{min-width:0;overflow:hidden;border:1px solid #ffffff16;border-radius:15px;background:linear-gradient(145deg,#171020f5,#0f0b14f5);box-shadow:0 12px 28px -24px #000;transition:border-color .2s,box-shadow .2s,transform .2s}
+.global-market-product:hover,.global-market-product.is-expanded{border-color:#a855f766;box-shadow:0 16px 32px -23px #a855f7aa}
+.global-market-product-trigger{display:grid;grid-template-columns:clamp(68px,10vw,86px) minmax(0,1fr) 20px;align-items:center;gap:11px;width:100%;min-width:0;padding:11px;border:0;background:transparent;color:#f4efff;text-align:left;cursor:pointer}
+.global-market-product-trigger:focus-visible{outline:2px solid #c084fc;outline-offset:-3px;border-radius:14px}
+.global-market-card-preview{position:relative;display:block;width:100%;aspect-ratio:5/7;overflow:hidden;border:1px solid #ffffff20;border-radius:9px;background:#17111f;container-type:inline-size;box-shadow:0 7px 15px #0008}
+.global-market-card-preview .cf{border-radius:inherit}
+.global-market-card-preview .cf-top{gap:1.2cqw;padding:3cqw 3.2cqw 7cqw}
+.global-market-card-preview .cf-badge{font-size:clamp(4px,3.2cqw,6px);letter-spacing:.08em}
+.global-market-card-preview .cf-name{font-size:clamp(6px,8cqw,10px);line-height:1.05}
+.global-market-card-preview .cf-mutation{font-size:5px;padding:1px 4px}
+.global-market-card-preview .cf-bottom{display:none}
+.global-market-pack-preview{width:100%;height:100%;object-fit:contain;padding:5px;filter:drop-shadow(0 7px 8px #0009)}
+.global-market-card-fallback{display:grid;place-items:center;width:100%;height:100%;font-size:34px;background:radial-gradient(circle,#372647,#100b16)}
+.global-market-item-copy{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+.global-market-card-rarity{display:inline-flex;align-items:center;min-height:19px;padding:3px 7px;border:1px solid #ffffff1b;border-radius:99px;background:#ffffff0a;color:#bcb3cc;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.global-market-card-rarity[data-rarity="uncommon"]{color:#6fe0a8;border-color:#6fe0a866}
+.global-market-card-rarity[data-rarity="rare"]{color:#75c7ff;border-color:#5fb8ff88;box-shadow:0 0 8px #4aa8ff22}
+.global-market-card-rarity[data-rarity="superrare"]{color:#67e0d0;border-color:#3fd8c888;box-shadow:0 0 10px #3fd8c833}
+.global-market-card-rarity[data-rarity="epic"]{color:#d1a6ff;border-color:#a457ff99;box-shadow:0 0 12px #a457ff44}
+.global-market-card-rarity[data-rarity="ultraepic"]{color:#ff9dcf;border-color:#ff5cb899;box-shadow:0 0 13px #ff5cb844}
+.global-market-card-rarity[data-rarity="mythic"]{color:#ffb37e;border-color:#ff8a3d99;box-shadow:0 0 14px #ff8a3d55}
+.global-market-card-rarity[data-rarity="legendary"]{color:#ffe18a;border-color:#ffb347aa;box-shadow:0 0 15px #ffb34766}
+.global-market-card-rarity[data-rarity="divine"]{color:#baf7ff;border-color:#7ce8ffbb;box-shadow:0 0 16px #7ce8ff77}
+.global-market-card-rarity[data-rarity="secret"]{color:#efd9ff;border-color:#c79bffcc;box-shadow:0 0 18px #c79bff88}
+.global-market-card-title{display:block;max-width:100%;font:800 15px/1.12 'Space Grotesk',sans-serif;letter-spacing:-.025em;color:#f1f0eb;overflow-wrap:anywhere}
+.global-market-card-title[data-rarity="uncommon"]{color:var(--market-rarity-color,#6fe0a8);text-shadow:0 0 8px var(--market-rarity-glow,#57d39a66)}
+.global-market-card-title[data-rarity="rare"]{color:var(--market-rarity-color,#5fb8ff);text-shadow:0 0 10px var(--market-rarity-glow,#4aa8ff88)}
+.global-market-card-title[data-rarity="superrare"]{color:var(--market-rarity-color,#67e0d0);text-shadow:0 0 11px var(--market-rarity-glow,#3fd8c899),0 0 22px #3fd8c833}
+.global-market-card-title[data-rarity="epic"]{background:linear-gradient(100deg,#fff 0%,var(--market-rarity-color,#b47bff) 48%,#f5d7ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 5px var(--market-rarity-glow,#a457ff99))}
+.global-market-card-title[data-rarity="ultraepic"]{background:linear-gradient(100deg,#fff 0%,#ff8ccb 45%,#ffd7f0 72%,#ff5cb8 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 7px #ff5cb8cc);letter-spacing:-.015em}
+.global-market-card-title[data-rarity="mythic"]{background:linear-gradient(100deg,#fff4df 0%,#ffa469 38%,#ffe28a 72%,#ff8a3d 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 8px #ff8a3dcc);letter-spacing:0}
+.global-market-card-title[data-rarity="legendary"]{background:linear-gradient(100deg,#fffbe6 0%,#ffd45e 28%,#fff4b0 52%,#ffb347 78%,#fffbe6 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 9px #ffb347dd);letter-spacing:.015em;animation:market-rarity-glisten 3.2s linear infinite}
+.global-market-card-title[data-rarity="divine"]{background:linear-gradient(100deg,#fff 0%,#a7f3ff 24%,#f2fcff 48%,#7ce8ff 72%,#e5d3ff 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 10px #7ce8ff);letter-spacing:.02em;animation:market-rarity-glisten 2.8s linear infinite}
+.global-market-card-title[data-rarity="secret"]{background:linear-gradient(100deg,#fff 0%,#e9d4ff 22%,#ffdef4 42%,#c79bff 63%,#fff 82%,#d8faff 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 11px #c79bff) drop-shadow(0 0 18px #ff9ad566);letter-spacing:.025em;animation:market-rarity-glisten 2.3s linear infinite}
+@keyframes market-rarity-glisten{to{background-position:200% 0}}
+.global-market-pack-label{color:#ffd45e;border-color:#eab30866}
+.global-market-item-stats{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.global-market-stock{color:#f0e9ff;font-size:12px;font-weight:800}
+.global-market-floor{color:#a79bb9;font-size:11px;font-weight:600}
+.global-market-toggle-icon{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#ffffff0b;color:#b8a8cf;font-size:17px;transition:transform .2s,background .2s}
+.global-market-product.is-expanded .global-market-toggle-icon{transform:rotate(180deg);background:#8b5cf633;color:#fff}
+.global-market-offers{padding:10px;border-top:1px solid #ffffff12;background:#0d0912}
+.global-market-offers[hidden]{display:none}
+.global-market-offers-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;color:#aaa0b9;font-size:10px}
+.global-market-offers-heading strong{color:#e9d7ff;font-size:12px}
+.global-market-offer{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:9px;border:1px solid #ffffff12;border-radius:11px;background:#161020}
+.global-market-offer+.global-market-offer{margin-top:7px}
+.global-market-offer .request-id{flex:1 1 145px;min-width:0}
+.global-market-offer .friend-row-avatar,.global-market-offer .friend-row-fallback{width:34px;height:34px;font-size:13px}
+.global-market-offer .friend-row-id{min-width:0}
+.global-market-offer .friend-row-pseudo{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.global-market-offer .friend-row-sub{display:none}
+.global-market-offer-price-box{display:flex;align-items:baseline;gap:4px;white-space:nowrap}
+.global-market-offer-price{color:#f6edff;font:800 13px 'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
+.global-market-offer-unit,.global-market-offer-stock{color:#a99bb8;font-size:10px}
+.global-market-offer-stock{margin-left:3px}
+.global-market-seller-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.global-seller-tag{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#c7a9ff;background:#241c2e;border:1px solid #8b5cf644;border-radius:999px;padding:4px 8px}
+.global-market-qty-wrap{margin-left:auto}
+.global-market-buy{flex:0 0 auto}
 .qty-btn:disabled{opacity:.38;cursor:not-allowed;transform:none}
+@media(prefers-reduced-motion:reduce){.global-market-card-title[data-rarity="legendary"],.global-market-card-title[data-rarity="divine"],.global-market-card-title[data-rarity="secret"]{animation:none;background-position:0 0}}
 .market-busy{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#090510bd;color:#fff;font-weight:700}
 
 /* Mutation Shiny : couche visuelle indépendante des dix cadres de rareté. */

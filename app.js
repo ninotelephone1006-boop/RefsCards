@@ -1741,6 +1741,7 @@
     const videoConfig = cardVideoInfo(card);
     const frame = el('span', 'cf');
     const mutation = CardMutations.definition(card);
+    const showVideo = Boolean(videoConfig && !opts.disableVideo);
     if (mutation) {
       frame.classList.add(mutation.cssClass);
       frame.dataset.mutation = mutation.id;
@@ -1749,7 +1750,7 @@
     frame.style.setProperty('--r-ink', info.ink);
     frame.style.setProperty('--r-glow', info.glow);
     frame.dataset.rarity = card.rarity;
-    if (videoConfig) frame.dataset.video = '1';
+    if (showVideo) frame.dataset.video = '1';
     if (opts.mini) frame.classList.add('cf-mini');
 
     const img = el('img', 'cf-img');
@@ -1771,7 +1772,7 @@
 
     const bottom = el('span', 'cf-bottom');
     bottom.append(el('span', 'cf-desc', card.description || ''));
-    if (videoConfig) {
+    if (showVideo) {
       bottom.append(el('span', 'cf-video-tags', videoTagLabel(videoConfig)));
     }
     const meta = el('span', 'cf-meta');
@@ -1779,7 +1780,7 @@
     if (opts.index != null) meta.append(el('span', 'cf-num', `S01·${String(opts.index + 1).padStart(2, '0')}`));
     bottom.append(meta);
 
-    const video = videoConfig ? buildCardVideo(card, videoConfig, opts) : null;
+    const video = showVideo ? buildCardVideo(card, videoConfig, opts) : null;
     frame.append(fallback, img);
     if (video) frame.append(video);
     frame.append(top, bottom);
@@ -5134,8 +5135,8 @@
      le document de réserve, dans une transaction Firestore indivisible. */
   let marketListings = [];
   /* Marché global : toutes les annonces ouvertes du jeu, y compris celles de
-     joueurs qui ne sont pas mes amis. On y voit le pseudo du vendeur et on
-     peut l'acheter (ou l'ajouter en ami) directement. */
+     joueurs qui ne sont pas mes amis. Le catalogue regroupe par carte ; les
+     pseudos, prix et actions apparaissent quand on ouvre une carte. */
   let globalListings = [];
   let globalListingsLoaded = false;
   let marketGifts = [];
@@ -5213,6 +5214,21 @@
     }
     if (n > MAX_MARKET_QTY) {
       throw new Error(`Tu peux mettre au maximum ${MAX_MARKET_QTY} packs en vente à la fois.`);
+    }
+    return n;
+  }
+
+  function marketBuyQuantity(input, availableCount) {
+    const value = input && input.value.trim();
+    const n = Number(value);
+    if (!value || !/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < 1) {
+      throw new Error('Choisis une quantité entière à acheter.');
+    }
+    if (n > availableCount) {
+      throw new Error(`Il ne reste que ${availableCount} exemplaire${availableCount > 1 ? 's' : ''} à ce prix.`);
+    }
+    if (n > MAX_MARKET_QTY) {
+      throw new Error(`Tu peux acheter au maximum ${MAX_MARKET_QTY} exemplaires à la fois.`);
     }
     return n;
   }
@@ -5600,110 +5616,132 @@
     }
   }
 
-  /* Regroupe les annonces par vendeur, puis par carte / pack et par prix, pour
-     n'afficher qu'une ligne par vendeur et par offre (« ×3 dispo »). */
+  /* Le marché global est un catalogue : toutes les annonces d'une même carte
+     sont regroupées, quel que soit le vendeur ou le prix. Les mutations Shiny
+     ont un cardId distinct (« base::shiny ») et restent donc dans leur section. */
   function groupGlobalListings(list) {
-    const bySeller = new Map();
+    const byItem = new Map();
     for (const listing of list) {
-      const uid = listing.sellerUid;
-      if (!uid) continue;
-      if (!bySeller.has(uid)) bySeller.set(uid, []);
-      bySeller.get(uid).push(listing);
+      if (!listing.sellerUid) continue;
+      const isPack = isPackListing(listing);
+      const cardId = isPack ? '' : String(listing.cardId || '');
+      const card = cardId ? CardMutations.resolve(cardId) : null;
+      const key = isPack ? `pack:${listing.packType}` : `card:${cardId}`;
+      let item = byItem.get(key);
+      if (!item) {
+        item = {
+          key,
+          kind: isPack ? 'pack' : 'card',
+          cardId,
+          card,
+          packType: isPack ? listing.packType : '',
+          shiny: Boolean(card && CardMutations.definition(card)),
+          listings: []
+        };
+        byItem.set(key, item);
+      }
+      item.listings.push(listing);
     }
-    return [...bySeller.entries()].map(([uid, listings]) => {
-      const data = friendProfiles.get(uid) || { pseudo: 'Joueur', avatar: '' };
-      return { uid, data, groups: groupListings(listings) };
+    return [...byItem.values()];
+  }
+
+  function globalMarketItemName(item) {
+    if (item.kind === 'pack') return packName(item.packType);
+    return item.card ? CardMutations.label(item.card) : cardName(item.cardId);
+  }
+
+  function globalMarketOfferGroups(item) {
+    const bySellerAndPrice = new Map();
+    for (const listing of item.listings) {
+      const price = Number(listing.price) || 0;
+      const key = JSON.stringify([listing.sellerUid, price]);
+      let offer = bySellerAndPrice.get(key);
+      if (!offer) {
+        offer = {
+          uid: listing.sellerUid,
+          price,
+          ids: [],
+          createdAt: listing.createdAt || ''
+        };
+        bySellerAndPrice.set(key, offer);
+      }
+      offer.ids.push(listing.id);
+      if (String(listing.createdAt || '').localeCompare(String(offer.createdAt || '')) > 0) {
+        offer.createdAt = listing.createdAt;
+      }
+    }
+    const sort = (globalMarketSort && globalMarketSort.value) || 'cheap';
+    return [...bySellerAndPrice.values()].map((offer) => ({
+      ...offer,
+      data: friendProfiles.get(offer.uid) || { pseudo: 'Joueur', avatar: '' }
+    })).sort((a, b) => {
+      if (sort === 'expensive' && a.price !== b.price) return b.price - a.price;
+      if (sort === 'recent' && a.createdAt !== b.createdAt) {
+        return String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+      }
+      if (sort !== 'expensive' && sort !== 'recent' && a.price !== b.price) return a.price - b.price;
+      return String((a.data && a.data.pseudo) || '').localeCompare(
+        String((b.data && b.data.pseudo) || ''), 'fr', { sensitivity: 'base' }
+      ) || a.price - b.price;
     });
   }
 
-  function renderGlobalMarket() {
-    if (!globalMarketList) return;
-    const me = currentUser && currentUser.uid;
-    const rawQuery = (globalMarketSearch && globalMarketSearch.value || '').trim().toLowerCase();
-    const sort = (globalMarketSort && globalMarketSort.value) || 'recent';
-    let sellers = groupGlobalListings(globalListings.filter((l) => l.sellerUid !== me));
-    if (rawQuery) {
-      sellers = sellers.filter(({ data, groups }) =>
-        String((data && data.pseudo) || '').toLowerCase().includes(rawQuery)
-        || groups.some((group) => listingName({ cardId: group.cardId, packType: group.packType }).toLowerCase().includes(rawQuery)));
-    }
-    const openCount = sellers.reduce((total, seller) => total + seller.groups.reduce((sum, g) => sum + g.ids.length, 0), 0);
-    if (globalMarketCount) globalMarketCount.textContent = String(openCount);
-    setTabCount(onlineTabCounts.market, openCount);
-    if (!globalMarketList) return;
-    if (!sellers.length) {
-      globalMarketList.replaceChildren(el('p', 'online-empty', globalListingsLoaded
-        ? (rawQuery ? 'Aucune annonce ne correspond à ce filtre.' : 'Aucune annonce d’un autre joueur pour le moment. Mets les tiennes en vente juste au-dessus !')
-        : 'Chargement du marché global…'));
-      return;
-    }
-    const chronological = (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
-    const frag = document.createDocumentFragment();
-    for (const seller of sellers) {
-      const card = el('div', 'global-seller');
-      const head = el('div', 'global-seller-head');
-      head.append(friendIdentity(seller.data));
-      const isFriend = friends.includes(seller.uid);
-      if (isFriend) {
-        head.append(el('span', 'global-seller-tag', 'Ami'));
-        const view = el('button', 'mini-btn', 'Profil');
-        view.type = 'button';
-        on(view, 'click', () => openFriendDetail(seller.uid));
-        head.append(view);
-      } else if (pendingFriendUids.has(seller.uid)) {
-        head.append(el('span', 'global-seller-tag', 'Demande envoyée'));
-      } else {
-        const add = el('button', 'mini-btn primary', 'Ajouter en ami');
-        add.type = 'button';
-        add.setAttribute('aria-label', `Ajouter ${(seller.data && seller.data.pseudo) || 'ce vendeur'} en ami`);
-        on(add, 'click', async () => {
-          add.disabled = true;
-          const ok = await sendFriendRequest(seller.uid);
-          if (!ok) add.disabled = false;
-        });
-        head.append(add);
-      }
-      card.append(head);
-      seller.groups.sort((a, b) => {
-        const firstA = globalListings.find((l) => l.id === a.ids[0]) || {};
-        const firstB = globalListings.find((l) => l.id === b.ids[0]) || {};
-        if (sort === 'cheap') return a.price - b.price;
-        if (sort === 'expensive') return b.price - a.price;
-        return chronological(firstA, firstB);
+  function globalMarketSellerActions(uid, data) {
+    const actions = el('div', 'global-market-seller-actions');
+    if (friends.includes(uid)) {
+      actions.append(el('span', 'global-seller-tag', 'Ami'));
+      const view = el('button', 'mini-btn', 'Profil');
+      view.type = 'button';
+      on(view, 'click', () => openFriendDetail(uid));
+      actions.append(view);
+    } else if (pendingFriendUids.has(uid)) {
+      actions.append(el('span', 'global-seller-tag', 'Demande envoyée'));
+    } else {
+      const add = el('button', 'mini-btn', 'Ajouter en ami');
+      add.type = 'button';
+      add.setAttribute('aria-label', `Ajouter ${(data && data.pseudo) || 'ce vendeur'} en ami`);
+      on(add, 'click', async () => {
+        add.disabled = true;
+        const ok = await sendFriendRequest(uid);
+        if (!ok) add.disabled = false;
       });
-      card.append(...seller.groups.map((group) => globalListingRow(seller, group)));
-      frag.append(card);
+      actions.append(add);
     }
-    globalMarketList.replaceChildren(frag);
+    return actions;
   }
 
-  /* Une ligne d'annonce du marché global : nom, prix, quantité à acheter et
-     bouton « Acheter ». L'achat passe par la même transaction que le marché
-     d'un ami ; les règles Firestore décident si le vendeur doit être un ami. */
-  function globalListingRow(seller, group) {
-    const row = el('div', 'trade-row');
-    const count = group.ids.length;
-    const isPack = Boolean(group.packType);
-    const name = isPack ? packName(group.packType) : cardName(group.cardId);
+  function globalMarketOfferRow(item, offer) {
+    const row = el('div', 'global-market-offer');
+    const count = offer.ids.length;
+    const isPack = item.kind === 'pack';
+    const name = globalMarketItemName(item);
     const unit = isPack ? 'pack' : 'carte';
-    const label = count > 1
-      ? `${name} (×${count} dispo) · ${fmt(group.price)} 🪙 / ${unit}`
-      : `${name} · ${fmt(group.price)} 🪙`;
-    row.append(el('span', 'trade-text', label));
+    row.append(friendIdentity(offer.data));
+
+    const priceBox = el('div', 'global-market-offer-price-box');
+    priceBox.dataset.price = String(offer.price);
+    priceBox.append(
+      el('strong', 'global-market-offer-price', `${fmt(offer.price)} 🪙`),
+      el('span', 'global-market-offer-unit', `/ ${unit}`),
+      el('span', 'global-market-offer-stock', `${count} disponible${count > 1 ? 's' : ''}`)
+    );
+    row.append(priceBox, globalMarketSellerActions(offer.uid, offer.data));
+
     let qtyInput = null;
+    const maxQty = Math.min(count, MAX_MARKET_QTY);
     if (count > 1) {
-      const qtyWrap = el('div', 'market-row-qty-wrap');
+      const qtyWrap = el('div', 'market-row-qty-wrap global-market-qty-wrap');
       const minus = el('button', 'qty-btn market-row-btn', '−');
       minus.type = 'button';
       minus.setAttribute('aria-label', `Acheter ${isPack ? 'un pack' : 'une carte'} de moins`);
       qtyInput = el('input', 'market-row-qty');
       qtyInput.type = 'number';
       qtyInput.min = '1';
-      qtyInput.max = String(count);
+      qtyInput.max = String(maxQty);
       qtyInput.step = '1';
       qtyInput.value = '1';
       qtyInput.inputMode = 'numeric';
-      qtyInput.setAttribute('aria-label', `Quantité de ${name} à acheter`);
+      qtyInput.setAttribute('aria-label', `Quantité de ${name} à acheter à ${(offer.data && offer.data.pseudo) || 'ce vendeur'}`);
       const plus = el('button', 'qty-btn market-row-btn', '+');
       plus.type = 'button';
       plus.setAttribute('aria-label', `Acheter ${isPack ? 'un pack' : 'une carte'} de plus`);
@@ -5711,17 +5749,17 @@
         const raw = qtyInput.value.trim();
         const val = /^\d+$/.test(raw) ? Number(raw) : NaN;
         minus.disabled = !Number.isSafeInteger(val) || val <= 1;
-        plus.disabled = !Number.isSafeInteger(val) || val >= count;
+        plus.disabled = !Number.isSafeInteger(val) || val >= maxQty;
       };
       on(minus, 'click', () => {
         const cur = /^\d+$/.test(qtyInput.value.trim()) ? Number(qtyInput.value.trim()) : 1;
-        qtyInput.value = String(clamp(cur - 1, 1, count));
+        qtyInput.value = String(clamp(cur - 1, 1, maxQty));
         syncRowQty();
         SFX.tick();
       });
       on(plus, 'click', () => {
         const cur = /^\d+$/.test(qtyInput.value.trim()) ? Number(qtyInput.value.trim()) : 1;
-        qtyInput.value = String(clamp(cur + 1, 1, count));
+        qtyInput.value = String(clamp(cur + 1, 1, maxQty));
         syncRowQty();
         SFX.tick();
       });
@@ -5730,31 +5768,173 @@
       qtyWrap.append(minus, qtyInput, plus);
       row.append(qtyWrap);
     }
-    const buy = el('button', 'mini-btn primary', 'Acheter');
+
+    const buy = el('button', 'mini-btn primary global-market-buy', 'Acheter');
     buy.type = 'button';
+    buy.setAttribute('aria-label', `Acheter ${name} à ${(offer.data && offer.data.pseudo) || 'ce vendeur'} pour ${fmt(offer.price)} pièces`);
     on(buy, 'click', () => {
       try {
-        const quantity = qtyInput ? (isPack ? marketPackQuantity(qtyInput, count) : marketQuantity(qtyInput, count)) : 1;
-        const total = group.price * quantity;
+        const quantity = qtyInput ? marketBuyQuantity(qtyInput, count) : 1;
+        const total = offer.price * quantity;
         if (!Number.isSafeInteger(total)) throw new Error('Montant total trop élevé.');
         const noun = isPack ? 'pack' : 'carte';
         const nounPlural = isPack ? 'packs' : 'cartes';
-        const sellerName = (seller.data && seller.data.pseudo) || 'ce joueur';
-        const msg = quantity === 1
-          ? `Acheter « ${name} » à ${sellerName} pour ${fmt(group.price)} 🪙 ?`
-          : `Acheter ${quantity} ${isPack ? 'packs' : 'exemplaires'} de « ${name} » à ${sellerName} pour ${fmt(total)} 🪙 (${fmt(group.price)} 🪙 / ${noun}) ?`;
+        const sellerName = (offer.data && offer.data.pseudo) || 'ce joueur';
+        const message = quantity === 1
+          ? `Acheter « ${name} » à ${sellerName} pour ${fmt(offer.price)} 🪙 ?`
+          : `Acheter ${quantity} ${isPack ? 'packs' : 'exemplaires'} de « ${name} » à ${sellerName} pour ${fmt(total)} 🪙 (${fmt(offer.price)} 🪙 / ${unit}) ?`;
         askConfirm({
           title: quantity === 1 ? `Acheter ce ${noun} ?` : `Acheter ces ${nounPlural} ?`,
-          message: msg,
+          message,
           confirmLabel: 'Acheter',
           onConfirm: () => (quantity === 1
-            ? marketTransaction('buy', group.ids[0], null, { fromGlobal: true })
-            : marketTransaction('buy', null, { ids: group.ids, quantity, unitPrice: group.price }, { fromGlobal: true, sellerUid: seller.uid }))
+            ? marketTransaction('buy', offer.ids[0], null, { fromGlobal: true })
+            : marketTransaction('buy', null, { ids: offer.ids, quantity, unitPrice: offer.price }, { fromGlobal: true, sellerUid: offer.uid }))
         });
       } catch (error) { globalMarketInfo(error.message); }
     });
     row.append(buy);
     return row;
+  }
+
+  function globalMarketProduct(item) {
+    const product = el('article', 'global-market-product');
+    const name = globalMarketItemName(item);
+    const count = item.listings.length;
+    const prices = item.listings.map((listing) => Number(listing.price) || 0);
+    const lowestPrice = Math.min(...prices);
+    const preview = el('span', 'global-market-card-preview');
+    preview.setAttribute('aria-hidden', 'true');
+    if (item.card) {
+      preview.append(cardFrame(item.card, {
+        mini: true,
+        disableVideo: true,
+        alt: `${name} — ${(RARITIES[item.card.rarity] || RARITIES.common).label}`
+      }));
+    } else if (item.kind === 'pack') {
+      const image = el('img', 'global-market-pack-preview');
+      image.src = PACK_IMAGES[item.packType] || PACK_IMAGES.classic;
+      image.alt = '';
+      image.loading = 'lazy';
+      image.draggable = false;
+      preview.append(image);
+    } else {
+      preview.append(el('span', 'global-market-card-fallback', '🃏'));
+    }
+
+    const copy = el('span', 'global-market-item-copy');
+    const info = item.card ? (RARITIES[item.card.rarity] || RARITIES.common) : null;
+    if (info) {
+      const rarity = el('span', 'global-market-card-rarity', info.label);
+      rarity.dataset.rarity = item.card.rarity;
+      copy.append(rarity);
+    } else if (item.shiny) {
+      copy.append(el('span', 'global-market-card-rarity', '✦ Shiny'));
+    } else if (item.kind === 'pack') {
+      copy.append(el('span', 'global-market-card-rarity global-market-pack-label', 'BOOSTER'));
+    }
+    const title = el('strong', 'global-market-card-title', name);
+    if (info) {
+      title.dataset.rarity = item.card.rarity;
+      title.style.setProperty('--market-rarity-color', info.color);
+      title.style.setProperty('--market-rarity-glow', info.glow);
+    }
+    copy.append(title);
+    const stats = el('span', 'global-market-item-stats');
+    stats.append(
+      el('strong', 'global-market-stock', `${count} en vente`),
+      el('span', 'global-market-floor', `Dès ${fmt(lowestPrice)} 🪙`)
+    );
+    copy.append(stats);
+
+    const offersId = `global-market-offers-${encodeURIComponent(item.key)}`;
+    const trigger = el('button', 'global-market-product-trigger');
+    trigger.type = 'button';
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-controls', offersId);
+    trigger.setAttribute('aria-label', `${name}, ${count} en vente à partir de ${fmt(lowestPrice)} pièces. Afficher les vendeurs.`);
+    trigger.append(preview, copy, el('span', 'global-market-toggle-icon', '⌄'));
+
+    const offers = el('div', 'global-market-offers');
+    offers.id = offersId;
+    offers.hidden = true;
+    on(trigger, 'click', () => {
+      const expanded = trigger.getAttribute('aria-expanded') !== 'true';
+      trigger.setAttribute('aria-expanded', String(expanded));
+      product.classList.toggle('is-expanded', expanded);
+      offers.hidden = !expanded;
+      if (expanded && offers.dataset.loaded !== 'true') {
+        const heading = el('div', 'global-market-offers-heading');
+        heading.append(
+          el('strong', '', 'Vendeurs'),
+          el('span', '', (globalMarketSort && globalMarketSort.value) === 'expensive'
+            ? 'du plus cher au moins cher'
+            : (globalMarketSort && globalMarketSort.value) === 'recent'
+              ? 'annonces les plus récentes'
+              : 'du moins cher au plus cher')
+        );
+        const offerRows = globalMarketOfferGroups(item).map((offer) => globalMarketOfferRow(item, offer));
+        offers.replaceChildren(heading, ...offerRows);
+        offers.dataset.loaded = 'true';
+      }
+    });
+    product.append(trigger, offers);
+    return product;
+  }
+
+  function globalMarketSection(kind, title, items) {
+    if (!items.length) return null;
+    const section = el('section', 'global-market-section');
+    section.dataset.marketKind = kind;
+    section.setAttribute('aria-label', title);
+    const head = el('div', 'global-market-section-head');
+    head.append(
+      el('h4', 'global-market-section-title', title),
+      el('span', 'global-market-section-count', `${items.reduce((sum, item) => sum + item.listings.length, 0)} en vente`)
+    );
+    const grid = el('div', 'global-market-grid');
+    grid.append(...items.map(globalMarketProduct));
+    section.append(head, grid);
+    return section;
+  }
+
+  function renderGlobalMarket() {
+    if (!globalMarketList) return;
+    const me = currentUser && currentUser.uid;
+    const rawQuery = (globalMarketSearch && globalMarketSearch.value || '').trim().toLowerCase();
+    const items = groupGlobalListings(globalListings.filter((listing) => listing.sellerUid !== me));
+    const filtered = items.filter((item) => {
+      if (!rawQuery) return true;
+      const name = globalMarketItemName(item).toLowerCase();
+      const baseName = item.card ? String(item.card.name || '').toLowerCase() : '';
+      if (name.includes(rawQuery) || baseName.includes(rawQuery)) return true;
+      return item.listings.some((listing) => {
+        const seller = friendProfiles.get(listing.sellerUid);
+        return String((seller && seller.pseudo) || '').toLowerCase().includes(rawQuery);
+      });
+    });
+    const openCount = filtered.reduce((total, item) => total + item.listings.length, 0);
+    if (globalMarketCount) globalMarketCount.textContent = String(openCount);
+    setTabCount(onlineTabCounts.market, openCount);
+    if (!filtered.length) {
+      globalMarketList.replaceChildren(el('p', 'online-empty', globalListingsLoaded
+        ? (rawQuery ? 'Aucune annonce ne correspond à ce filtre.' : 'Aucune annonce d’un autre joueur pour le moment. Mets les tiennes en vente juste au-dessus !')
+        : 'Chargement du marché global…'));
+      return;
+    }
+
+    const byName = (a, b) => globalMarketItemName(a).localeCompare(
+      globalMarketItemName(b), 'fr', { sensitivity: 'base' }
+    );
+    const cards = filtered.filter((item) => item.kind === 'card' && !item.shiny).sort(byName);
+    const shiny = filtered.filter((item) => item.kind === 'card' && item.shiny).sort(byName);
+    const packs = filtered.filter((item) => item.kind === 'pack').sort(byName);
+    const sections = [
+      globalMarketSection('cards', '🃏 Cartes', cards),
+      globalMarketSection('shiny', '✦ Cartes Shiny', shiny),
+      globalMarketSection('packs', '📦 Packs', packs)
+    ].filter(Boolean);
+    globalMarketList.replaceChildren(...sections);
   }
 
   async function loadFriendListings(uid) {
