@@ -31,7 +31,7 @@ service cloud.firestore {
         && (!('marketEarned' in request.resource.data) || (request.resource.data.marketEarned is int && request.resource.data.marketEarned >= 0))
         && (!('marketBuys' in request.resource.data) || (request.resource.data.marketBuys is int && request.resource.data.marketBuys >= 0))
         && (!('xp' in request.resource.data) || (request.resource.data.xp is int && request.resource.data.xp >= 0))
-        && (!('quests' in request.resource.data) || (request.resource.data.quests is list && request.resource.data.quests.size() <= 100))
+        && (!('quests' in request.resource.data) || (request.resource.data.quests is list && request.resource.data.quests.size() <= 500))
         && (!('achievements' in request.resource.data) || (request.resource.data.achievements is list && request.resource.data.achievements.size() <= 200))
         // `questBaseline` : champ hérité (les quêtes se mesurent désormais à vie).
         // Il reste toléré pour que les anciennes sauvegardes puissent être

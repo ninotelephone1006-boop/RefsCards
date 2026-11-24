@@ -138,6 +138,21 @@
     });
     return stock;
   }
+  /* Charge utile Firestore : n'écrit `ultra` que s'il est > 0 ou déjà
+     présent dans la sauvegarde cloud, afin de rester compatible même si
+     firestore.rules n'a pas encore été republié avec le pack Ultra. */
+  function cloudPackStock(raw, includeUltra = false) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const stock = {
+      classic: clamp(Math.floor(Number(source.classic) || 0), 0, 100000),
+      rare: clamp(Math.floor(Number(source.rare) || 0), 0, 100000),
+      legend: clamp(Math.floor(Number(source.legend) || 0), 0, 100000),
+      video: clamp(Math.floor(Number(source.video) || 0), 0, 100000)
+    };
+    const ultra = clamp(Math.floor(Number(source.ultra) || 0), 0, 100000);
+    if (ultra > 0 || includeUltra) stock.ultra = ultra;
+    return stock;
+  }
   const TEAR_THRESHOLD = 0.75;
 
   /* Dix raretés, du plus courant au plus rare. `weight` est la probabilité de
@@ -494,7 +509,7 @@
 
   function addCoins(n) {
     if (!n) return;
-    state.coins = Math.max(0, state.coins + n);
+    state.coins = Math.max(0, Math.round(state.coins + n));
     updateCoins(n);
     save();
   }
@@ -3316,7 +3331,8 @@
        refusé » même app et règles à jour. On les signale pour suppression. */
     legacySaveKeys = Boolean(d) && (Object.prototype.hasOwnProperty.call(d, 'freeDate')
       || Object.prototype.hasOwnProperty.call(d, 'freeUsed'));
-    state.coins = Math.max(0, Number(d && d.coins) || 0);
+    cloudHasUltra = Boolean(d && d.packStock && Object.prototype.hasOwnProperty.call(d.packStock, 'ultra'));
+    state.coins = Math.max(0, Math.round(Number(d && d.coins) || 0));
     state.firstPack = !d || d.firstPack !== false;
     state.collection = ((d && d.collection) || [])
       .map((id) => CardMutations.resolve(id))
@@ -3338,18 +3354,6 @@
       .filter((id) => typeof id === 'string')
       .filter((id) => Quests.QUESTS.some((q) => q.id === id))
       .slice(0, Math.max(1, Quests.QUESTS.length));
-    /* Les quêtes ajoutées après la première série (q71+) ne doivent pas
-       donner rétroactivement leurs récompenses aux comptes déjà existants.
-       On les marque directement terminées au chargement, sans appeler le
-       flux de réclamation (donc ni pièces, ni XP, ni boosters). */
-    if (d && Array.isArray(d.quests) && d.quests.length) {
-      for (const quest of Quests.QUESTS) {
-        const match = /^q(\d+)$/.exec(quest.id);
-        if (match && Number(match[1]) > 70 && questState.completed.indexOf(quest.id) < 0) {
-          questState.completed.push(quest.id);
-        }
-      }
-    }
     questState.achievements = (Array.isArray(d && d.achievements) ? d.achievements : [])
       .filter((id) => typeof id === 'string')
       .filter((id) => Quests.ACHIEVEMENTS.some((a) => a.id === id))
@@ -3435,26 +3439,23 @@
     const userId = currentUser.uid;
     const db = cloudDb;
     const data = withLegacyStrip({
-        coins: state.coins,
-        firstPack: state.firstPack,
+        coins: clamp(Math.round(Number(state.coins) || 0), 0, 1000000000),
+        firstPack: Boolean(state.firstPack),
         collection: state.collection.map((c) => c.id),
-        friends,
-        packsOpened: state.packsOpened || 0,
-        packStock: PACK_TYPES.reduce((stock, type) => {
-          stock[type] = Math.max(0, Number(state.packStock[type]) || 0);
-          return stock;
-        }, {}),
-        streakDate: state.streakDate || '',
+        friends: friends.slice(0, 500),
+        packsOpened: Math.max(0, Math.floor(Number(state.packsOpened) || 0)),
+        packStock: cloudPackStock(state.packStock, cloudHasUltra),
+        streakDate: String(state.streakDate || '').slice(0, 10),
         streak: clamp(Math.floor(Number(state.streak) || 0), 0, 999),
         claimedDays: (state.claimedDays || []).slice(-31),
         /* Quêtes / succès / niveau / notifications + compteurs alimentant
            leur progression. */
-        fusions: Math.max(0, Number(state.fusions) || 0),
-        packsBought: Math.max(0, Number(state.packsBought) || 0),
-        freePacks: Math.max(0, Number(state.freePacks) || 0),
-        marketSales: Math.max(0, Number(state.marketSales) || 0),
-        marketEarned: Math.max(0, Number(state.marketEarned) || 0),
-        marketBuys: Math.max(0, Number(state.marketBuys) || 0),
+        fusions: Math.max(0, Math.floor(Number(state.fusions) || 0)),
+        packsBought: Math.max(0, Math.floor(Number(state.packsBought) || 0)),
+        freePacks: Math.max(0, Math.floor(Number(state.freePacks) || 0)),
+        marketSales: Math.max(0, Math.floor(Number(state.marketSales) || 0)),
+        marketEarned: Math.max(0, Math.floor(Number(state.marketEarned) || 0)),
+        marketBuys: Math.max(0, Math.floor(Number(state.marketBuys) || 0)),
         xp: Math.max(0, Math.floor(Number(questState.xp) || 0)),
         quests: questState.completed.slice(),
         achievements: questState.achievements.slice(),
@@ -3465,6 +3466,9 @@
       try {
         await db.collection('playerSaves').doc(userId).set(data, { merge: true });
         legacySaveKeys = false;
+        if (data.packStock && Object.prototype.hasOwnProperty.call(data.packStock, 'ultra')) {
+          cloudHasUltra = true;
+        }
         return true;
       } catch (error) {
         if (!noteCloudError('Sauvegarde cloud impossible', error)) {
@@ -3548,6 +3552,8 @@
     unsubscribeMarket();
     selectedFriendUid = null;
     rulesHelpShown = false;
+    legacySaveKeys = false;
+    cloudHasUltra = false;
     /* Quêtes / succès / notifications : on repart de zéro à la déconnexion
        pour ne pas laisser traîner l'état d'un autre joueur sur cet appareil. */
     questState.completed = [];
@@ -4142,6 +4148,7 @@
   let pseudoTimer = 0;              // auto-sauvegarde du pseudo pendant la frappe
   let rulesHelpShown = false;       // un seul toast « règles » par session
   let legacySaveKeys = false;       // sauvegarde chargée d'une ancienne version (freeDate / freeUsed encore présents)
+  let cloudHasUltra = false;        // packStock.ultra déjà présent dans la sauvegarde cloud
 
   function snapshotDocs(snap) {
     if (!snap) return [];
@@ -6351,7 +6358,8 @@
         } else throw new Error('Action inconnue.');
         if (nextCoins > MAX_COINS) throw new Error('Ton solde dépasserait la limite de pièces. Dépense-en avant de récupérer ce montant.');
         if (patch) tx.update(ref, patch);
-        tx.update(saveRef, { coins: nextCoins, collection: cards, packStock, updatedAt: serverTimestamp() });
+        const txPackStock = cloudPackStock(packStock, Object.prototype.hasOwnProperty.call(savedStock, 'ultra'));
+        tx.update(saveRef, { coins: nextCoins, collection: cards, packStock: txPackStock, updatedAt: serverTimestamp() });
         return { coins: nextCoins, cards, packStock };
       });
     };
