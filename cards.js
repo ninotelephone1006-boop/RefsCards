@@ -456,6 +456,20 @@ const cardsDatabase = [
       sound: true,
       loop: true
     }
+  },
+  {
+    id: 'lance-de-bettrave',
+    name: 'Lancé de bettrave',
+    description: 'skibidi lancé',
+    rarity: 'epic',
+    emoji: '🥬',
+    color: '#c6a0eb',
+    video: {
+      src: 'assets/Cartes/videos/lancédebettrave.MP4',
+      fps: 30,
+      sound: true,
+      loop: true
+    }
   }
 ];
 
