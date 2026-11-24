@@ -530,6 +530,15 @@ const cardsDatabase = [
     emoji: '🧔',
     image: 'assets/Cartes/maturebierry.PNG',
     color: '#fef08a'
+  },
+  {
+    id: 'yoga-lelio',
+    name: 'Yoga Lelio',
+    description: 'Célébrez Lelio, le plus grand yogueur de tous les temps ! 🧘‍♂️🔥',
+    rarity: 'epic',
+    emoji: '🧘',
+    image: 'assets/Cartes/yoga-lelio.jpg',
+    color: '#c6a0eb'
   }
 ];
 
