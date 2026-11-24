@@ -14,7 +14,7 @@
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer le cadeau du calendrier de connexion. */
-  const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1700, legend: 800, video: 1000, ultra: 20000 };
+  const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1700, legend: 800, video: 1000, ultra: 10000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
 
   /* ============================================ OFFRE DE SORTIE · ULTRA RARE
@@ -6325,11 +6325,12 @@
   }
 
   function isPackListing(listing) {
-    return Boolean(listing && (listing.packType === 'classic' || listing.packType === 'rare'));
+    return Boolean(listing && isPackType(listing.packType));
   }
 
   function packName(packType) {
-    return packType === 'rare' ? 'Pack Rare doré'
+    return packType === 'doubleRare' ? 'Pack Double Rare'
+      : packType === 'rare' ? 'Pack Rare doré'
       : packType === 'legend' ? 'Pack Légende'
         : packType === 'video' ? 'Pack Vidéo'
           : packType === 'ultra' ? 'Pack Ultra Rare'
@@ -6355,7 +6356,8 @@
   }
 
   function suggestedPackPrice(type) {
-    return Math.max(1, Math.round((PACK_PRICES[type === 'rare' ? 'rare' : 'classic'] || 500) / 2));
+    const base = PACK_PRICES[isPackType(type) ? type : 'classic'] || 500;
+    return Math.max(1, Math.round(base / 2));
   }
 
   /* Vente rapide : un seul clic depuis l'inspection d'une carte (ou depuis
@@ -6376,7 +6378,7 @@
   }
 
   function quickSellPack(type) {
-    const packType = type === 'rare' ? 'rare' : 'classic';
+    const packType = isPackType(type) ? type : 'classic';
     const ownedCount = Math.max(0, Number(state.packStock[packType]) || 0);
     if (ownedCount < 1) { marketInfo(`Tu ne possèdes aucun ${packName(packType)}.`); return; }
     const price = suggestedPackPrice(packType);
@@ -6459,7 +6461,7 @@
 
   function syncPackMarketQty({ reset = false, clampValue = true } = {}) {
     if (!packMarketType || !packMarketQty) return;
-    const type = packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const type = isPackType(packMarketType.value) ? packMarketType.value : 'classic';
     const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
     const maxSell = Math.min(ownedCount, MAX_MARKET_QTY);
     if (ownedCount < 1) {
@@ -7490,7 +7492,7 @@
     SFX.tick();
   });
   on($('pack-market-suggest-price'), 'click', () => {
-    const type = packMarketType && packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const type = packMarketType && isPackType(packMarketType.value) ? packMarketType.value : 'classic';
     if (packMarketPrice) packMarketPrice.value = String(suggestedPackPrice(type));
     SFX.tick();
   });
@@ -7558,7 +7560,7 @@
   on(packMarketType, 'change', () => syncPackMarketQty({ reset: true }));
   on(packMarketQtyMinus, 'click', () => {
     if (!packMarketQty || !packMarketType) return;
-    const type = packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const type = isPackType(packMarketType.value) ? packMarketType.value : 'classic';
     const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
     const maxSell = Math.min(ownedCount, MAX_MARKET_QTY);
     if (maxSell < 1) return;
@@ -7569,7 +7571,7 @@
   });
   on(packMarketQtyPlus, 'click', () => {
     if (!packMarketQty || !packMarketType) return;
-    const type = packMarketType.value === 'rare' ? 'rare' : 'classic';
+    const type = isPackType(packMarketType.value) ? packMarketType.value : 'classic';
     const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
     const maxSell = Math.min(ownedCount, MAX_MARKET_QTY);
     if (maxSell < 1) return;
@@ -7583,7 +7585,7 @@
   on($('pack-market-form'), 'submit', (e) => {
     e.preventDefault();
     try {
-      const type = packMarketType && packMarketType.value === 'rare' ? 'rare' : 'classic';
+      const type = packMarketType && isPackType(packMarketType.value) ? packMarketType.value : 'classic';
       const ownedCount = Math.max(0, Number(state.packStock[type]) || 0);
       if (ownedCount < 1) throw new Error(`Tu ne possèdes aucun ${packName(type)}.`);
       const quantity = packMarketQty ? marketPackQuantity(packMarketQty, ownedCount) : 1;
