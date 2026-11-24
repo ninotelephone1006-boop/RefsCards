@@ -449,6 +449,64 @@ const RefsQuests = (() => {
     }
   ];
 
+
+  /* ---- Saison 3 : 200 quêtes générées (q71 → q270). Chaque chaîne continue
+     au-delà de ses étapes existantes, avec des objectifs croissants et des
+     récompenses qui montent d'un cran à chaque étape. ---- */
+  (function addSeason3() {
+    const fr = (n) => Number(n).toLocaleString('fr-FR');
+    const TIERS = ['Habitué', 'Passionné', 'Confirmé', 'Vétéran', 'Expert', 'Maître', 'Grand maître',
+      'Champion', 'Élite', 'Légende', 'Mythique', 'Immortel', 'Titan', 'Divin'];
+    const SPEC = [
+      ['packsOpened', '📦', 'Boosters', (n) => `Ouvre ${fr(n)} boosters.`,
+        [45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 110, 120, 130, 140, 150, 160, 175, 180, 200, 225, 250, 275, 300, 350, 400, 450, 500]],
+      ['packsBought', '🛍️', 'Acheteur', (n) => `Achète ${fr(n)} packs dans le Shop.`,
+        [20, 25, 30, 35, 40, 45, 50, 60, 65, 75, 80, 90, 100, 110, 125, 150]],
+      ['freePacks', '🎁', 'Fidèle', (n) => `Récupère ${fr(n)} packs gratuits.`, [15, 20, 30, 40, 50, 75, 100]],
+      ['fusions', '⚗️', 'Alchimiste', (n) => `Réalise ${fr(n)} fusions.`,
+        [25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 125, 150]],
+      ['marketSales', '🏷️', 'Marchand', (n) => `Encaisse ${fr(n)} ventes sur le marché.`, [15, 20, 30, 40, 50, 75, 100, 150]],
+      ['marketEarned', '💼', 'Négociant', (n) => `Gagne ${fr(n)} pièces grâce à tes ventes.`,
+        [3000, 5000, 10000, 20000, 50000, 100000, 250000, 500000, 1000000]],
+      ['marketBuys', '🛒', 'Chineur', (n) => `Achète ${fr(n)} cartes sur le marché.`, [8, 10, 15, 20, 30, 40, 50, 75, 100]],
+      ['friends', '🤝', 'Sociable', (n) => `Aie ${fr(n)} amis.`, [7, 8, 9, 10, 11, 12, 15, 20, 25, 30, 40, 50]],
+      ['total', '🃏', 'Accumulateur', (n) => `Possède ${fr(n)} cartes en tout (doublons compris).`,
+        [100, 125, 150, 175, 200, 250, 300, 350, 400, 500, 600, 750, 900, 1000]],
+      ['rarePlus', '🔵', 'Chasseur', (n) => `Possède ${fr(n)} cartes Rares ou plus.`,
+        [15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 90, 100, 125, 150, 200]],
+      ['epicPlus', '🟣', 'Épique', (n) => `Possède ${fr(n)} cartes Épiques ou plus.`, [7, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100]],
+      ['legendaryPlus', '👑', 'Légendaire', (n) => `Possède ${fr(n)} cartes Légendaires ou plus.`,
+        [4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50]],
+      ['shiny', '✦', 'Éclat', (n) => `Possède ${fr(n)} cartes shiny.`, [3, 4, 5, 7, 10, 15, 20, 25, 30, 40, 50]],
+      ['level', '⭐', 'Ascension', (n) => `Atteins le niveau ${fr(n)}.`, [10, 12, 15, 18, 20, 25, 30, 35, 40, 50]],
+      ['questsDone', '🏆', 'Aventurier', (n) => `Termine ${fr(n)} quêtes.`, [20, 30, 40, 50, 60, 80, 100, 125, 150, 175, 200, 225, 250]],
+      ['coins', '💰', 'Fortune', (n) => `Aie ${fr(n)} pièces en poche.`, [1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000]]
+    ];
+    let seq = QUESTS.length;
+    let k = 0;
+    for (const [metric, icon, noun, desc, targets] of SPEC) {
+      targets.slice().sort((a, b) => a - b).forEach((target, i, all) => {
+        const t = (i + 1) / all.length;
+        const xp = Math.round((400 + 1600 * t) / 10) * 10;
+        const coins = Math.round((500 + 2500 * t) / 50) * 50;
+        const big = 1 + Math.floor(t * 2);
+        const rewards = [
+          { coins, xp },
+          { coins: 0, xp, packs: { rare: big } },
+          { coins: 0, xp, packs: { legend: big } },
+          { coins: Math.round(coins / 2 / 50) * 50, xp, packs: { video: 1 } }
+        ];
+        seq += 1;
+        QUESTS.push({
+          id: 'q' + seq, icon,
+          title: `${noun} : ${TIERS[Math.min(TIERS.length - 1, Math.floor(i * TIERS.length / all.length))]}`,
+          desc: desc(target), metric, target, reward: rewards[k % 4]
+        });
+        k += 1;
+      });
+    }
+  })();
+
   /* ------------------------------------------------------------ les 30 succès
      Non séquentiels : chacun se débloquera dès que sa condition sera vraie,
      y compris rétroactivement pour un joueur qui a déjà beaucoup progressé. */
@@ -482,7 +540,7 @@ const RefsQuests = (() => {
     { id: 'a27', icon: '⭐', title: 'Niveau 5', desc: 'Atteins le niveau 5.', metric: 'level', target: 5, xp: 150 },
     { id: 'a28', icon: '🌟', title: 'Niveau 10', desc: 'Atteins le niveau 10.', metric: 'level', target: 10, xp: 400 },
     { id: 'a29', icon: '🗺️', title: 'Baroudeur', desc: 'Termine 5 quêtes.', metric: 'questsDone', target: 5, xp: 150 },
-    { id: 'a30', icon: '🏆', title: 'Maître des quêtes', desc: 'Termine les 70 quêtes.', metric: 'questsDone', target: 70, xp: 500 }
+    { id: 'a30', icon: '🏆', title: 'Maître des quêtes', desc: 'Termine 70 quêtes.', metric: 'questsDone', target: 70, xp: 500 }
   ];
 
   /* Niveaux : le passage au niveau n coûte 100 × n XP. xpForLevel(n) renvoie
@@ -532,7 +590,8 @@ const RefsQuests = (() => {
     { id: 'collection', icon: '📚', label: 'Collection', metrics: ['unique', 'total'] },
     { id: 'rarity', icon: '💎', label: 'Raretés', metrics: ['rarePlus', 'epicPlus', 'legendaryPlus', 'shiny'] },
     { id: 'trade', icon: '⚗️', label: 'Fusion & marché', metrics: ['fusions', 'marketSales', 'marketEarned', 'marketBuys'] },
-    { id: 'social', icon: '👥', label: 'Amis & niveau', metrics: ['friends', 'level', 'questsDone'] }
+    { id: 'social', icon: '👥', label: 'Amis & niveau', metrics: ['friends', 'level', 'questsDone'] },
+    { id: 'wealth', icon: '💰', label: 'Fortune', metrics: ['coins'] }
   ];
 
   function categoryOf(quest) {
