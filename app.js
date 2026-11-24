@@ -2235,7 +2235,7 @@
         return;
       }
       if (!btn.classList.contains('is-revealed')) revealCard(btn, card);
-      else if (btn.classList.contains('is-flipped') && performance.now() - Number(btn.dataset.flipAt || 0) > 650) {
+      else if (!packCinematic && btn.classList.contains('is-flipped') && performance.now() - Number(btn.dataset.flipAt || 0) > 650) {
         sendToRecap(btn, card);
       }
     });
@@ -2451,8 +2451,10 @@
       delete btn._skipCharge;
       btn.dataset.flipAt = String(performance.now());
       btn.classList.add('is-flipped');
-      openAll.disabled = false;
-      if (remaining.length > 1) openAll.hidden = false;
+      if (!packCinematic) {
+        openAll.disabled = false;
+        if (remaining.length > 1) openAll.hidden = false;
+      }
       burst();
       if (CardMutations.definition(card)) shinyCinematic(card, quiet);
     };
@@ -2558,7 +2560,7 @@
   let flying = false;
 
   on(nextCard, 'click', () => {
-    if (state.phase !== 'reveal' || !current || flying) return;
+    if (state.phase !== 'reveal' || !current || flying || packCinematic) return;
     if (!current.node.classList.contains('is-flipped')) return;
     sendToRecap(current.node, current.data);
   });
@@ -2566,9 +2568,69 @@
   on(openAll, 'click', () => {
     if (state.phase !== 'reveal' || openAll.hidden || openAll.disabled || flying || !current) return;
     SFX.unlock();
+
+    /* Rareté au-dessus de Divine encore cachée dans la pile : « Ouvrir tout »
+       joue quand même sa mise en scène (retournement + suspense de son rang +
+       effet), puis termine le pack. */
+    const hiddenTop = remaining
+      .filter(({ node }) => !node.classList.contains('is-revealed'))
+      .map(({ data }) => data)
+      .filter((data) => RARITIES[data.rarity] && RARITIES[data.rarity].rank > RARITIES.divine.rank)
+      .sort((a, b) => RARITIES[b.rarity].rank - RARITIES[a.rarity].rank)[0];
+    if (hiddenTop) {
+      cinematicOpenAll(hiddenTop);
+      return;
+    }
+    finishOpenAllPack();
+  });
+
+  /* Une carte au-dessus de Divine encore cachée : elle passe devant, se
+     retourne avec son suspense habituel, puis le reste du pack est ouvert. */
+  let packCinematic = false;
+
+  function cinematicOpenAll(card) {
+    const item = remaining.find((r) => r.data === card);
+    if (!item) { finishOpenAllPack(); return; }
+    packCinematic = true;
+    openAll.disabled = true;
+    nextCard.hidden = true;
+    if (current && current.node !== item.node) current.node.classList.remove('is-top');
+    remaining = [item, ...remaining.filter((r) => r !== item)];
+    remaining.forEach((r, i) => {
+      r.node.style.setProperty('--depth', i);
+      r.node.classList.toggle('is-top', r === item);
+    });
+    current = item;
+    const startedAt = performance.now();
+    window.setTimeout(() => {
+      revealCard(item.node, item.data);
+      const waitFlip = () => {
+        if (state.phase !== 'reveal' || performance.now() - startedAt > 14000) {
+          packCinematic = false;
+          if (state.phase === 'reveal') finishOpenAllPack();
+          return;
+        }
+        if (!item.node.classList.contains('is-flipped')) {
+          window.setTimeout(waitFlip, 120);
+          return;
+        }
+        openAll.disabled = true;
+        nextCard.hidden = true;
+        window.setTimeout(() => {
+          packCinematic = false;
+          if (state.phase === 'reveal') finishOpenAllPack();
+        }, reduceMotion.matches ? 200 : 900);
+      };
+      waitFlip();
+    }, reduceMotion.matches ? 30 : 420);
+  }
+
+  function finishOpenAllPack() {
+    packCinematic = false;
+    openAll.disabled = true;
     let reward = 0;
     for (const { data, node } of remaining) {
-      // La carte affichée a déjà été ajoutée à la collection lors du flip.
+      // La carte affichée (ou révélée par la mise en scène) est déjà comptée.
       if (!node.classList.contains('is-revealed')) reward += collectPackCard(data).reward;
       state.loot.push(data);
     }
@@ -2582,10 +2644,10 @@
     remaining = [];
     current = null;
     finishPack();
-  });
+  }
 
   on(tableEl, 'click', (event) => {
-    if (event.target.closest('.card') || !current || flying || state.phase !== 'reveal') return;
+    if (event.target.closest('.card') || !current || flying || packCinematic || state.phase !== 'reveal') return;
     if (!current.node.classList.contains('is-top') || !current.node.classList.contains('is-flipped')) return;
     sendToRecap(current.node, current.data);
   });
@@ -3004,6 +3066,7 @@
     stack.replaceChildren();
     remaining = [];
     current = null;
+    packCinematic = false;
 
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
