@@ -635,6 +635,12 @@
                 <button id="friend-close" class="mini-btn" type="button">Fermer</button>
               </div>
               <div class="friend-stats" id="friend-stats"></div>
+              <div class="friend-friends-block">
+                <h4>👥 Ses amis</h4>
+                <p class="online-empty">Les amis que tu as aussi en commun apparaissent en premier.</p>
+                <div id="friend-friends" class="friends-list friend-friends"></div>
+                <p class="online-empty" id="friend-friends-empty" hidden>Cet ami n'a pas encore d'amis.</p>
+              </div>
               <form id="gift-form" class="market-form">
                 <label for="gift-amount">Donner des pièces à cet ami</label>
                 <input id="gift-amount" type="number" min="1" max="1000000000" step="1" required placeholder="Montant">
