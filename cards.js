@@ -525,7 +525,7 @@ const cardsDatabase = [
     id: 'maturebierry',
     name: 'Mature Bierry',
     description: 'le bierry mature',
-    rarity: 'unique',
+    rarity: 'epic',
     emoji: '🧔',
     image: 'assets/Cartes/maturebierry.PNG',
     color: '#fef08a'
