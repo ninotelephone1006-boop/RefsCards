@@ -299,6 +299,15 @@ const cardsDatabase = [
     color: '#8fc8ef'
   },
   {
+    id: 'teton-piter',
+    name: 'Téton Piter',
+    description: 'Une légende qui ne passe pas inaperçue.',
+    rarity: 'legendary',
+    emoji: '👀',
+    image: 'assets/Cartes/teton-piter.jpeg',
+    color: '#f5d979'
+  },
+  {
     id: 'mathis-date',
     name: 'Mathis Date',
     description: 'un gay refouler',
