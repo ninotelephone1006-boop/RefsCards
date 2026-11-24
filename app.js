@@ -2063,6 +2063,7 @@
       btn.dataset.flipAt = String(performance.now());
       btn.classList.add('is-flipped');
       burst();
+      if (CardMutations.definition(card)) shinyCinematic(card, quiet);
     };
     const sus = quiet ? null : SUSPENSE[card.rarity];
     if (sus) startCharge(btn, info, cx, cy, sus, doFlip);
@@ -2081,6 +2082,7 @@
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
       ? `${info.label.toUpperCase()} ! Touche la carte ou le bouton pour continuer.`
       : 'Touche la carte ou le bouton pour continuer.';
+    btn.dataset.isNew = isNew ? '1' : '0';
     if (!isNew) revealSub.textContent += ' Doublon : gain réduit.';
   }
 
@@ -2169,6 +2171,108 @@
     sendToRecap(current.node, current.data);
   });
 
+  /* ------------------------------------------- effets : nouvelle carte & shiny */
+
+  /* Étincelle DOM (indépendante du canvas) animée par WAAPI. */
+  function domSpark(x, y, color, spread = 70, life = 650) {
+    const p = el('i', 'fx-spark');
+    p.style.cssText = `left:${x}px;top:${y}px;background:${color};box-shadow:0 0 10px ${color}`;
+    document.body.append(p);
+    const a = Math.random() * Math.PI * 2;
+    const d = spread * (0.4 + Math.random() * 0.8);
+    const anim = p.animate([
+      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(0.1)`, opacity: 0 }
+    ], { duration: life, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+    anim.onfinish = () => p.remove();
+  }
+
+  /* Nouvelle carte : elle quitte la pile, tourne sur elle-même, rétrécit et
+     file jusqu'à l'icône Collection de la barre du bas, qui réagit. */
+  function flyToCollection(btn, card) {
+    const tab = document.querySelector('.tab[data-tab="collection"]');
+    const icon = tab && (tab.querySelector('svg') || tab);
+    if (!icon) return false;
+    const from = btn.getBoundingClientRect();
+    const to = icon.getBoundingClientRect();
+    if (!from.width) return false;
+    const info = RARITIES[card.rarity] || RARITIES.common;
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    const end = Math.max(0.06, 26 / from.width);
+    const ghost = el('div', 'coll-ghost');
+    ghost.style.cssText = `left:${from.left}px;top:${from.top}px;width:${from.width}px;height:${from.height}px;--g:${info.glow}`;
+    ghost.append(cardFrame(card, { eager: true, alt: '' }));
+    document.body.append(ghost);
+    btn.style.visibility = 'hidden';
+    const T = (x, y, sc, ry, rz) => `translate(${x}px,${y}px) perspective(900px) rotateY(${ry}deg) rotate(${rz}deg) scale(${sc})`;
+    const anim = ghost.animate([
+      { transform: T(0, 0, 1, 0, 0), opacity: 1, offset: 0 },
+      { transform: T(dx * 0.04, -48, 1.14, 200, -8), opacity: 1, offset: 0.22 },
+      { transform: T(dx * 0.62, dy * 0.55 - 40, 0.5, 760, 10), opacity: 1, offset: 0.68 },
+      { transform: T(dx, dy, end, 1440, 0), opacity: 0.85, offset: 1 }
+    ], { duration: 1150, easing: 'cubic-bezier(.55,.05,.25,1)', fill: 'forwards' });
+    const trail = window.setInterval(() => {
+      const r = ghost.getBoundingClientRect();
+      domSpark(r.left + r.width / 2, r.top + r.height / 2, Math.random() < 0.5 ? info.glow : '#ffffff', 36, 520);
+    }, 40);
+    anim.onfinish = () => {
+      window.clearInterval(trail);
+      ghost.remove();
+      landOnCollection(to, tab, info);
+    };
+    return true;
+  }
+
+  function landOnCollection(rect, tab, info) {
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    try { SFX.coin(); } catch (e) { /* son indisponible */ }
+    for (let i = 0; i < 18; i++) domSpark(x, y, i % 3 ? info.glow : '#ffffff', 64, 700);
+    const ring = el('i', 'fx-ring');
+    ring.style.cssText = `left:${x}px;top:${y}px;--g:${info.glow}`;
+    document.body.append(ring);
+    window.setTimeout(() => ring.remove(), 700);
+    const label = el('span', 'fx-float', '✦ Nouvelle carte !');
+    label.style.cssText = `left:${x}px;top:${rect.top - 8}px`;
+    document.body.append(label);
+    window.setTimeout(() => label.remove(), 1400);
+    if (tab) {
+      tab.classList.remove('is-bump');
+      void tab.offsetWidth;
+      tab.classList.add('is-bump');
+      window.setTimeout(() => tab.classList.remove('is-bump'), 800);
+    }
+  }
+
+  /* Cinématique shiny : voile sombre, rayons dorés qui tournent, éclat,
+     pluie d'étoiles et titre. Un toucher la ferme. */
+  function shinyCinematic(card, quiet) {
+    const ov = el('div', 'shiny-cine' + (quiet ? ' is-quiet' : ''));
+    ov.setAttribute('role', 'status');
+    ov.append(el('div', 'sc-rays'), el('div', 'sc-flare'));
+    for (let i = 0; i < (quiet ? 0 : 34); i++) {
+      const star = el('i', 'sc-star', i % 3 ? '✦' : '✧');
+      star.style.cssText = `left:${(Math.random() * 100).toFixed(1)}%;top:${(Math.random() * 100).toFixed(1)}%;font-size:${(10 + Math.random() * 20).toFixed(0)}px;animation-delay:${(Math.random() * 1.6).toFixed(2)}s`;
+      ov.append(star);
+    }
+    const text = el('div', 'sc-text');
+    text.append(el('p', 'sc-kicker', '✦ MUTATION RARE ✦'), el('h2', 'sc-title', 'SHINY !'), el('p', 'sc-name', card.name));
+    ov.append(text);
+    document.body.append(ov);
+    try { SFX.rarity('legendary'); } catch (e) { /* son indisponible */ }
+    if (!quiet) { try { shakeStage(); flashScreen(); } catch (e) { /* effets indisponibles */ } }
+    let closed = false;
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      ov.classList.add('is-out');
+      window.setTimeout(() => ov.remove(), 600);
+    };
+    ov.addEventListener('click', close);
+    window.setTimeout(close, quiet ? 1500 : 3000);
+  }
+
   function sendToRecap(btn, card) {
     if (flying) return;
     flying = true;
@@ -2183,10 +2287,13 @@
     const dy = to.top + to.height / 2 - (from.top + from.height / 2);
     const s = Math.max(0.16, to.width / from.width);
 
-    btn.classList.add('is-flying');
-    btn.style.setProperty('--fly-x', `${dx.toFixed(1)}px`);
-    btn.style.setProperty('--fly-y', `${dy.toFixed(1)}px`);
-    btn.style.setProperty('--fly-s', s.toFixed(3));
+    const toCollection = btn.dataset.isNew === '1' && !reduceMotion.matches && flyToCollection(btn, card);
+    if (!toCollection) {
+      btn.classList.add('is-flying');
+      btn.style.setProperty('--fly-x', `${dx.toFixed(1)}px`);
+      btn.style.setProperty('--fly-y', `${dy.toFixed(1)}px`);
+      btn.style.setProperty('--fly-s', s.toFixed(3));
+    }
 
     window.setTimeout(() => {
       flying = false; // libéré d'abord : une erreur plus bas ne peut plus bloquer le jeu

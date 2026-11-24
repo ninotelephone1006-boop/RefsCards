@@ -3181,3 +3181,68 @@ body:has(.inspect.is-open) .update-banner{display:none}
   .quest-card,.quest-card.is-ready,.quest-bar i,.quest-claim::after,.quest-pips i.is-now,.quest-cat-dot,.level-card::before,.kicker span,.stats-grid>*,.coll-grid>*,.account-view .profile-hero,.online-panel.is-active{animation:none!important;opacity:1}
   .quest-card:hover,.shop-card:hover,.shop-card:hover .shop-img{transform:none}
 }
+
+/* ==========================================================================
+   v2026.11.24-3 — Nouvelle carte → Collection, cinématique shiny, look shiny
+   ========================================================================== */
+/* ---- carte qui file vers l'onglet Collection ---- */
+.coll-ghost{position:fixed;z-index:10000;pointer-events:none;transform-origin:center;will-change:transform;filter:drop-shadow(0 0 22px var(--g,#b388ff))}
+.coll-ghost .cf{position:absolute;inset:0;width:100%;height:100%;display:block}
+.fx-spark{position:fixed;z-index:10001;width:6px;height:6px;border-radius:50%;pointer-events:none}
+.fx-ring{position:fixed;z-index:10001;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:2px solid var(--g,#fff);pointer-events:none;animation:fx-ring .7s var(--ease-out) forwards}
+@keyframes fx-ring{to{transform:scale(6);opacity:0;border-width:1px}}
+.fx-float{position:fixed;z-index:10002;transform:translate(-50%,0);padding:6px 12px;border-radius:99px;background:linear-gradient(90deg,#7c3aed,#d946ef);color:#fff;font:800 12px 'Space Grotesk',sans-serif;white-space:nowrap;pointer-events:none;box-shadow:0 8px 24px -6px #d946ef;animation:fx-float 1.4s var(--ease-out) forwards}
+@keyframes fx-float{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}20%{opacity:1;transform:translate(-50%,-14px) scale(1.08)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-48px) scale(1)}}
+.tab.is-bump svg{animation:tab-bump .75s var(--ease-spring)}
+.tab.is-bump::before{content:'';position:absolute;left:50%;top:38%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:radial-gradient(circle,#c084fcaa,transparent 70%);animation:fx-ring .75s ease-out forwards;pointer-events:none}
+@keyframes tab-bump{0%{transform:scale(1) rotate(0)}30%{transform:scale(1.5) rotate(-14deg)}60%{transform:scale(.9) rotate(8deg)}100%{transform:scale(1) rotate(0)}}
+
+/* ---- cinématique shiny ---- */
+.shiny-cine{position:fixed;inset:0;z-index:9990;display:grid;place-items:start center;cursor:pointer;overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,#0000 0 22%,#0a0612cc 70%,#05030acc);animation:sc-in .5s ease-out both}
+.shiny-cine.is-out{animation:sc-out .6s ease-in forwards}
+@keyframes sc-in{from{opacity:0}}
+@keyframes sc-out{to{opacity:0;transform:scale(1.06)}}
+.sc-rays{position:absolute;left:50%;top:50%;width:170vmax;height:170vmax;margin:-85vmax 0 0 -85vmax;
+  background:repeating-conic-gradient(from 0deg,#ffe78138 0 6deg,transparent 6deg 18deg);
+  -webkit-mask-image:radial-gradient(circle,#000 0,transparent 42%);mask-image:radial-gradient(circle,#000 0,transparent 42%);
+  mix-blend-mode:screen;animation:sc-spin 14s linear infinite,sc-rays-in 1s ease-out both}
+@keyframes sc-spin{to{transform:rotate(360deg)}}
+@keyframes sc-rays-in{from{opacity:0;scale:.3}}
+.sc-flare{position:absolute;left:50%;top:50%;width:80vmin;height:80vmin;margin:-40vmin 0 0 -40vmin;border-radius:50%;
+  background:radial-gradient(circle,#fff8c8aa,#ffd45e44 35%,transparent 65%);animation:sc-flare 1.4s ease-out both;mix-blend-mode:screen}
+@keyframes sc-flare{0%{transform:scale(.1);opacity:0}35%{opacity:1}100%{transform:scale(1.4);opacity:.45}}
+.sc-star{position:absolute;color:#fff3a6;text-shadow:0 0 10px #ffd45e,0 0 22px #ffb300;font-style:normal;pointer-events:none;opacity:0;animation:sc-star 2.2s ease-in-out infinite}
+@keyframes sc-star{0%{opacity:0;transform:translateY(14px) scale(.3) rotate(0)}40%{opacity:1;transform:translateY(-6px) scale(1.2) rotate(90deg)}100%{opacity:0;transform:translateY(-34px) scale(.4) rotate(200deg)}}
+.sc-text{position:relative;margin-top:clamp(70px,13vh,130px);text-align:center;padding:0 16px}
+.sc-kicker{margin:0;font:800 12px 'Space Grotesk',sans-serif;letter-spacing:.3em;color:#fff0aa;animation:sc-drop .7s .15s var(--ease-spring) both}
+.sc-title{margin:6px 0 0;font:900 clamp(46px,14vw,92px)/1 'Space Grotesk',sans-serif;letter-spacing:-.03em;
+  background:linear-gradient(100deg,#fff6c2,#ffd45e 25%,#ff9ad5 50%,#7ee8ff 75%,#fff6c2);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 22px #ffd45eaa);animation:sc-title .9s .1s var(--ease-spring) both,text-flow 3s linear infinite}
+@keyframes sc-title{0%{opacity:0;transform:scale(2.6) rotate(-6deg);filter:blur(14px)}100%{opacity:1;transform:none}}
+@keyframes sc-drop{from{opacity:0;transform:translateY(-16px)}}
+.sc-name{margin:8px 0 0;font:700 15px 'Space Grotesk',sans-serif;color:#fff;text-shadow:0 2px 14px #000;animation:sc-drop .7s .5s var(--ease-out) both}
+.shiny-cine.is-quiet .sc-rays,.shiny-cine.is-quiet .sc-flare{display:none}
+
+/* ---- look shiny : foil holographique, éclats, aura ---- */
+.cf.mutation-shiny{box-shadow:inset 0 0 0 2px #fff4b0,inset 0 0 22px #ffe78155,0 0 22px #f7dd8477;animation:shiny-aura 2.8s ease-in-out infinite}
+.cf.mutation-shiny::after{
+  background:
+    radial-gradient(circle at 18% 24%,#fff 0 1.4px,#fff0 3px),
+    radial-gradient(circle at 78% 16%,#fff 0 1.6px,#fff0 3.4px),
+    radial-gradient(circle at 62% 68%,#fff 0 1.2px,#fff0 3px),
+    radial-gradient(circle at 28% 84%,#fff 0 1.6px,#fff0 3.4px),
+    radial-gradient(circle at 88% 58%,#fff 0 1.2px,#fff0 3px),
+    radial-gradient(circle at var(--sx,50%) var(--sy,30%),#ffffff66,#fff0 38%),
+    linear-gradient(115deg,transparent 15%,#ffe78155 32%,#ffffffaa 45%,#9eefff66 58%,transparent 75%),
+    conic-gradient(from 20deg at 50% 50%,#ff6ec433,#ffe66d44,#6dffb333,#6dd5ff44,#c56dff44,#ff6ec433);
+  background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,250% 100%,100% 100%;
+  animation:mutation-shiny-sweep 4.5s ease-in-out infinite,shiny-foil 6s linear infinite}
+@keyframes shiny-foil{0%{filter:hue-rotate(0) brightness(1)}25%{filter:hue-rotate(90deg) brightness(1.35)}50%{filter:hue-rotate(180deg) brightness(1)}75%{filter:hue-rotate(270deg) brightness(1.35)}100%{filter:hue-rotate(360deg) brightness(1)}}
+@keyframes shiny-aura{0%,100%{box-shadow:inset 0 0 0 2px #fff4b0,inset 0 0 22px #ffe78155,0 0 18px #f7dd8466}50%{box-shadow:inset 0 0 0 2px #ffffff,inset 0 0 34px #ffe781aa,0 0 36px #ffd45eaa,0 0 64px #ff9ad555}}
+.cf-mutation{background:linear-gradient(100deg,#3a2a0a,#6b4a10 40%,#3a2a0a);background-size:200% 100%;animation:text-flow 3s linear infinite;box-shadow:0 0 12px #ffd45e88}
+.coll-tile:has(.coll-shiny-dot){box-shadow:0 0 0 1px #fff0aa88,0 0 20px -4px #ffd45e}
+@media (prefers-reduced-motion:reduce){
+  .shiny-cine *,.cf.mutation-shiny,.cf.mutation-shiny::after,.cf-mutation{animation:none!important}
+  .shiny-cine .sc-star{display:none}
+}
