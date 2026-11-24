@@ -16,6 +16,41 @@
      faut jouer, fusionner et récupérer le cadeau du calendrier de connexion. */
   const PACK_PRICES = { classic: 500, rare: 1000, legend: 800, video: 1000, ultra: 20000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
+
+  /* ============================================ OFFRE DE SORTIE · ULTRA RARE
+     Le Pack Ultra Rare sort et reste à −20 % pendant 24 h. La remise est
+     réelle : `promoUnitPrice('ultra')` sert au Shop comme au débit des pièces.
+     Pour prolonger / rejouer l'offre, il suffit de changer `startAt` (la durée
+     et la remise restent ci-dessous). Hors de la fenêtre, tout reprend le
+     prix normal — aucun état n'est écrit dans la sauvegarde du joueur. */
+  const ULTRA_PROMO = {
+    id: 'ultra-release-2026-11-24',
+    startAt: Date.parse('2026-11-24T14:00:00Z'),
+    durationMs: 24 * 60 * 60 * 1000,
+    discount: 0.2,
+    pack: 'ultra'
+  };
+  const PROMO_SEEN_KEY = 'refs-cards:promo-seen';
+
+  function promoEndsAt() {
+    return ULTRA_PROMO.startAt + ULTRA_PROMO.durationMs;
+  }
+
+  function promoActive(now = Date.now()) {
+    return now >= ULTRA_PROMO.startAt && now < promoEndsAt();
+  }
+
+  function promoMsLeft(now = Date.now()) {
+    return Math.max(0, promoEndsAt() - now);
+  }
+
+  /* Prix unitaire réellement débité : remise appliquée uniquement au pack en
+     promotion, et uniquement pendant la fenêtre de l'offre. */
+  function promoUnitPrice(type) {
+    const base = Number(PACK_PRICES[type]) || 0;
+    if (type !== ULTRA_PROMO.pack || !promoActive()) return base;
+    return Math.round(base * (1 - ULTRA_PROMO.discount));
+  }
   /* Calendrier de connexion : un cadeau gratuit chaque jour, de mieux en mieux.
      Le cycle fait 7 jours (le 7e est le jackpot) puis recommence ; le cran
      dépend des jours de connexion d'affilée (`streak`) : une journée sans
@@ -310,6 +345,14 @@
   const newCardsSheet = $('new-cards-sheet');
   const newCardsGrid = $('new-cards-grid');
   const newCardsDesc = $('new-cards-desc');
+  /* Annonce de sortie du Pack Ultra Rare (−20 % pendant 24 h). */
+  const promoSheet = $('promo-sheet');
+  const promoClock = $('promo-clock');
+  const promoBarFill = $('promo-bar-fill');
+  const promoPriceEl = $('promo-price');
+  const ultraPromoLine = $('ultra-promo-line');
+  const ultraPromoClock = $('ultra-promo-clock');
+  const ultraPromoPrice = $('ultra-promo-price');
   const pileLabel = $('pile-label');
   const footRight = $('foot-right');
   const revealTitle = $('reveal-title');
@@ -567,6 +610,9 @@
     if (!newCardsSheet || newCardsSheet.hidden) return;
     closeSheet(newCardsSheet);
     if (goToCollection) setTab('collection');
+    /* L'annonce du catalogue était prioritaire : l'offre de sortie passe
+       maintenant, si elle n'a pas déjà été vue. */
+    window.setTimeout(maybeShowUltraPromo, 420);
   }
 
   function announceNewCards() {
@@ -615,6 +661,136 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && newCardsSheet && !newCardsSheet.hidden) closeNewCards();
   });
+
+  /* ================================================ ANNONCE DE SORTIE · ULTRA
+     Même principe que l'annonce du catalogue : elle apparaît UNE fois, à
+     l'entrée du jeu, puis ne revient plus (identifiant de l'offre conservé
+     dans le navigateur). Elle est accompagnée d'une notification persistante
+     dans la cloche et d'un compte à rebours vivant. À zéro : la fenêtre se
+     ferme, le Shop reprend le prix normal et le joueur est prévenu. */
+
+  function readPromoSeen() {
+    try {
+      return window.localStorage.getItem(PROMO_SEEN_KEY) || '';
+    } catch (error) {
+      return ''; // stockage bloqué : on ne montre pas l'annonce en boucle
+    }
+  }
+
+  function writePromoSeen() {
+    try {
+      window.localStorage.setItem(PROMO_SEEN_KEY, ULTRA_PROMO.id);
+    } catch (error) { /* stockage indisponible : la page reste utilisable */ }
+  }
+
+  function promoClockText(ms) {
+    const total = Math.ceil(Math.max(0, ms) / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+  }
+
+  /* Les deux compteurs (fenêtre + ligne du Shop) et la jauge avancent ensemble. */
+  function tickPromo() {
+    const left = promoMsLeft();
+    const text = promoClockText(left);
+    if (promoClock && promoClock.textContent !== text) promoClock.textContent = text;
+    if (ultraPromoClock && ultraPromoClock.textContent !== text) ultraPromoClock.textContent = text;
+    if (promoBarFill) {
+      const ratio = promoActive() ? left / ULTRA_PROMO.durationMs : 0;
+      promoBarFill.style.transform = `scaleX(${Math.max(0, Math.min(1, ratio))})`;
+    }
+    if (!promoActive()) {
+      if (promoSheet && !promoSheet.hidden) {
+        closeSheet(promoSheet);
+        showToast('L’offre de sortie du Pack Ultra Rare est terminée.');
+      }
+      if (promoTimer) {
+        window.clearInterval(promoTimer);
+        promoTimer = null;
+      }
+      renderShop();
+    }
+  }
+
+  let promoTimer = null;
+  let promoShownThisPage = false;
+
+  function startPromoTimer() {
+    if (promoTimer || !promoActive()) return;
+    promoTimer = window.setInterval(tickPromo, 1000);
+  }
+
+  function refreshPromoShop() {
+    const active = promoActive();
+    const unit = promoUnitPrice(ULTRA_PROMO.pack);
+    if (ultraPromoLine) ultraPromoLine.hidden = !active;
+    if (promoPriceEl) promoPriceEl.textContent = `${fmt(unit)} 🪙`;
+    if (ultraPromoPrice) ultraPromoPrice.textContent = fmt(unit);
+    const card = document.querySelector('.shop-card-ultra');
+    if (card) card.classList.toggle('is-promo', active);
+    if (active) startPromoTimer();
+  }
+
+  function closePromo(goShop = false) {
+    if (!promoSheet || promoSheet.hidden) return;
+    closeSheet(promoSheet);
+    if (goShop) {
+      setTab('shop');
+      const card = document.querySelector('.shop-card-ultra');
+      if (card && typeof card.scrollIntoView === 'function') {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }
+
+  function showUltraPromo() {
+    if (!promoSheet || !promoActive()) return;
+    promoShownThisPage = true;
+    writePromoSeen();
+    refreshPromoShop();
+    tickPromo();
+    startPromoTimer();
+    pushNotification(
+      'system',
+      'Sortie du Pack Ultra Rare · −20 %',
+      'Le Pack Ultra Rare débarque. Pendant 24 h, il est à ' +
+      `${fmt(promoUnitPrice(ULTRA_PROMO.pack))} 🪙 au lieu de ${fmt(PACK_PRICES[ULTRA_PROMO.pack])} 🪙.`
+    );
+    openSheet(promoSheet);
+    window.setTimeout(() => {
+      if (promoSheet.hidden) return;
+      const cta = $('promo-see') || $('promo-later') || $('promo-x');
+      if (cta) cta.focus({ preventScroll: true });
+    }, 120);
+  }
+
+  /* Appelée à l'entrée du jeu, après l'annonce éventuelle du catalogue : les
+     deux fenêtres ne se superposent jamais (celle des nouvelles cartes passe
+     d'abord, l'offre arrive quand elle se referme). */
+  function maybeShowUltraPromo() {
+    refreshPromoShop();
+    if (!promoSheet || !promoActive()) return;
+    if (readPromoSeen() === ULTRA_PROMO.id || promoShownThisPage) return;
+    if (newCardsSheet && !newCardsSheet.hidden) return; // annonce catalogue en cours
+    showUltraPromo();
+  }
+
+  if (promoSheet) {
+    promoSheet.addEventListener('click', (e) => {
+      if (e.target && e.target.closest && e.target.closest('[data-close-promo]')) closePromo();
+    });
+    const promoX = $('promo-x');
+    const promoLater = $('promo-later');
+    const promoSee = $('promo-see');
+    if (promoX) promoX.addEventListener('click', () => closePromo());
+    if (promoLater) promoLater.addEventListener('click', () => closePromo());
+    if (promoSee) promoSee.addEventListener('click', () => closePromo(true));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !promoSheet.hidden) closePromo();
+    });
+  }
 
   /* ====================================================== SHOP · INVENTAIRE
      Les packs ne s'achètent plus en un clic depuis le récap : ils vont dans
@@ -811,8 +987,10 @@
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
       if (qtyEl) qtyEl.textContent = String(qty);
       if (btn) {
-        const total = PACK_PRICES[type] * qty;
-        btn.textContent = `ACHETER · ${fmt(total)} 🪙`;
+        const total = promoUnitPrice(type) * qty;
+        btn.textContent = type === ULTRA_PROMO.pack && promoActive()
+          ? `ACHETER · ${fmt(total)} 🪙 · −20 %`
+          : `ACHETER · ${fmt(total)} 🪙`;
         btn.disabled = state.coins < total;
       }
       document.querySelectorAll(`.qty-chip[data-pack="${type}"], .qty-btn[data-pack="${type}"]`).forEach((control) => {
@@ -826,6 +1004,7 @@
     updateBuy('legend', qtyLegend, buyLegend);
     updateBuy('video', qtyVideo, buyVideo);
     updateBuy('ultra', qtyUltra, buyUltra);
+    refreshPromoShop();
 
     const total = packTotal();
     if (shopInventoryLabel) {
@@ -992,7 +1171,7 @@
   function buyPacks(type) {
     SFX.unlock();
     const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
-    const total = PACK_PRICES[type] * qty;
+    const total = promoUnitPrice(type) * qty;
     if (state.coins < total) {
       SFX.snap();
       setShopMsg(`Pas assez de pièces : il te manque ${fmt(total - state.coins)} 🪙 pour ${qty} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)}${qty > 1 ? 's' : ''}.`);
@@ -3519,6 +3698,10 @@
     /* Annonce du catalogue : une fois le jeu affiché, on compare les cartes
        disponibles avec celles de la dernière visite (cf. announceNewCards). */
     announceNewCards();
+    /* Annonce de sortie du Pack Ultra Rare (−20 % / 24 h). Légèrement
+       différée pour laisser l'écran de chargement disparaître, et jamais
+       par-dessus l'annonce des nouvelles cartes. */
+    window.setTimeout(maybeShowUltraPromo, 900);
   }
 
   function showAuth() {

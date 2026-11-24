@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-11">
+  <meta name="app-version" content="2026.11.24-12">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-7">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-8">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-11" defer></script>
+  <script src="app.js?v=2026.11.24-12" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -344,6 +344,12 @@
                 <h3>Pack Ultra Rare <span class="shop-ultra-tag">ultra</span></h3>
                 <p class="shop-desc">5 cartes · Épique+, Mythique+ et Légendaire+ garantis · chances de Shiny ×7</p>
                 <p class="shop-odds">Valeur moyenne ≈ 1 964 🪙 par pack</p>
+                <!-- Offre de sortie : −20 % pendant 24 h (masquée hors promo) -->
+                <p class="shop-promo-line" id="ultra-promo-line" hidden>
+                  <span class="shop-promo-off">−20 %</span>
+                  <span class="shop-promo-txt">SORTIE · <s>20 000</s> <strong id="ultra-promo-price">16 000</strong> 🪙</span>
+                  <span class="shop-promo-clock" id="ultra-promo-clock">24:00:00</span>
+                </p>
                 <p class="shop-stock" id="shop-stock-ultra">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs ultra rares">
                   <button class="qty-btn" type="button" data-pack="ultra" data-delta="-1" aria-label="Moins">−</button>
@@ -783,6 +789,53 @@
             <button class="mini-btn primary" id="new-cards-see" type="button">VOIR MA COLLECTION →</button>
           </div>
           <p class="newcards-hint">Elles arrivent grisées avec leur numéro dans ta collection : à toi de les révéler en ouvrant des packs.</p>
+        </div>
+      </div>
+
+      <!-- ================= SORTIE DU PACK ULTRA RARE · −20 % ================ -->
+      <!-- Annonce affichée à l'entrée du jeu, une seule fois par offre : le
+           Pack Ultra Rare sort et reste à −20 % pendant 24 h. La remise est
+           réelle (voir PACK_PRICES / promoPrice dans app.js) ; la fenêtre est
+           fermée automatiquement quand le compte à rebours atteint zéro. -->
+      <div class="sheet sheet-promo" id="promo-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="promo-title" aria-describedby="promo-desc">
+        <div class="sheet-backdrop" data-close-promo></div>
+        <div class="sheet-dialog sheet-promo-dialog">
+          <button class="sheet-x" id="promo-x" type="button" aria-label="Fermer l'annonce du Pack Ultra Rare">✕</button>
+          <div class="promo-aurora" aria-hidden="true"></div>
+          <div class="promo-rays" aria-hidden="true"></div>
+          <div class="promo-sparks" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <p class="kicker promo-kicker"><span>✦</span> SORTIE OFFICIELLE <span>✦</span></p>
+          <h3 class="promo-title" id="promo-title">Pack Ultra Rare<em>.</em></h3>
+          <p class="promo-sub" id="promo-desc">Le booster le plus rare du jeu débarque. Pour fêter sa sortie, il passe à <strong>−20 %</strong> pendant 24 h — pas une minute de plus.</p>
+          <div class="promo-body">
+            <figure class="promo-pack">
+              <span class="promo-halo" aria-hidden="true"></span>
+              <span class="promo-off" aria-hidden="true"><b>−20</b><small>%</small></span>
+              <img src="assets/packetultra.png" alt="Pack Ultra Rare Refs Cards" draggable="false">
+            </figure>
+            <div class="promo-info">
+              <p class="promo-price">
+                <span class="promo-price-label">Prix de sortie</span>
+                <span class="promo-price-row">
+                  <s class="promo-price-old">20 000 🪙</s>
+                  <strong class="promo-price-new" id="promo-price">16 000 🪙</strong>
+                </span>
+              </p>
+              <p class="promo-perks">5 cartes · Épique+, Mythique+ et Légendaire+ garantis · Shiny ×7</p>
+              <p class="promo-timer" role="timer">
+                <span class="promo-timer-label">Fin de l'offre dans</span>
+                <span class="promo-clock" id="promo-clock">24:00:00</span>
+              </p>
+            </div>
+          </div>
+          <div class="sheet-actions promo-actions">
+            <button class="mini-btn" id="promo-later" type="button">Plus tard</button>
+            <button class="mini-btn primary promo-cta" id="promo-see" type="button">PROFITER DU −20 % →</button>
+          </div>
+          <div class="promo-bar" aria-hidden="true"><i id="promo-bar-fill"></i></div>
+          <p class="promo-hint" id="promo-hint">Une seule fois par joueur · l'offre se termine automatiquement.</p>
         </div>
       </div>
     </main>

@@ -2487,6 +2487,145 @@ html,body{background:var(--bg)}
   .newcard-tile::before{display:none}
 }
 
+
+/* ---- Annonce de sortie du Pack Ultra Rare · −20 % / 24 h ---- */
+.sheet-promo{z-index:74}
+.sheet-promo-dialog{width:min(100%,560px);padding:26px 20px 18px;overflow-y:auto;overflow-x:hidden;text-align:center;
+  border:1px solid #67e8f94d;border-radius:22px;
+  background:linear-gradient(165deg,#171a30fa,#0c0b18fe 58%,#170f26fe);
+  box-shadow:0 30px 90px -18px #000,0 0 0 1px #ffffff0a inset,0 0 60px -24px #67e8f9cc}
+.sheet-promo-dialog>*{position:relative;z-index:2}
+.sheet-promo-dialog::before{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(120% 62% at 50% -10%,#67e8f929,transparent 66%),
+             radial-gradient(80% 50% at 50% 108%,#f0abfc1f,transparent 70%)}
+.sheet-promo .sheet-x{z-index:5}
+.promo-aurora{position:absolute;z-index:0;inset:-40% -30% auto;height:340px;pointer-events:none;
+  background:conic-gradient(from 180deg at 50% 50%,#67e8f95c,#c084fc4d,#f472b645,#67e8f95c);
+  filter:blur(46px);opacity:.5;animation:promo-aurora-drift 11s ease-in-out infinite alternate}
+.promo-rays{position:absolute;z-index:0;left:50%;top:-120px;width:520px;height:520px;pointer-events:none;
+  transform:translateX(-50%);opacity:.22;
+  background:repeating-conic-gradient(from 0deg,#ffffff00 0deg 9deg,#ffffff2e 9deg 10.5deg);
+  mask-image:radial-gradient(closest-side,#000 10%,#0000 72%);
+  -webkit-mask-image:radial-gradient(closest-side,#000 10%,#0000 72%);
+  animation:promo-rays-turn 26s linear infinite}
+.promo-sparks{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden;border-radius:22px}
+.promo-sparks i{position:absolute;bottom:-8px;width:3px;height:3px;border-radius:50%;
+  background:#e0f7ff;box-shadow:0 0 8px #67e8f9,0 0 16px #f0abfc99;
+  animation:promo-spark-rise 5.2s linear infinite}
+.promo-sparks i:nth-child(1){left:12%;animation-delay:0s}
+.promo-sparks i:nth-child(2){left:28%;animation-delay:1.4s;width:2px;height:2px}
+.promo-sparks i:nth-child(3){left:46%;animation-delay:2.6s}
+.promo-sparks i:nth-child(4){left:63%;animation-delay:.8s;width:2px;height:2px}
+.promo-sparks i:nth-child(5){left:79%;animation-delay:3.4s}
+.promo-sparks i:nth-child(6){left:91%;animation-delay:2s;width:4px;height:4px}
+.sheet-promo .promo-kicker{color:#a7efff;letter-spacing:.22em;font-size:10px}
+.promo-title{margin:4px 0 8px;font-family:'Space Grotesk',sans-serif;
+  font-size:clamp(27px,7.6vw,38px);line-height:1.02;letter-spacing:-1.4px;
+  background:linear-gradient(96deg,#ffffff 6%,#c9f6ff 38%,#e7b8ff 66%,#ffd9ec 96%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 5px 18px #67e8f94d);
+  animation:promo-title-in .72s cubic-bezier(.2,1,.3,1) both}
+.promo-title em{font-style:normal;color:#67e8f9;-webkit-text-fill-color:#67e8f9}
+.promo-sub{margin:0 auto 16px;max-width:42ch;color:#ada6c4;font-size:13px;line-height:1.55}
+.promo-sub strong{color:#f3fbff;font-weight:700}
+.promo-body{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;
+  margin:0 0 14px}
+.promo-pack{position:relative;margin:0;flex:0 0 auto;display:grid;place-items:center;
+  width:150px;height:176px;animation:promo-pack-float 4.6s ease-in-out infinite}
+.promo-halo{position:absolute;inset:-14% -18%;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,#67e8f97a,#f0abfc3d 46%,transparent 70%);
+  filter:blur(16px);animation:promo-halo-breathe 3.4s ease-in-out infinite}
+.promo-pack img{position:relative;width:126px;max-height:170px;object-fit:contain;
+  border-radius:10px;
+  filter:drop-shadow(0 14px 26px #000c) drop-shadow(0 0 20px #67e8f98c);
+  animation:promo-pack-in .8s cubic-bezier(.2,1.2,.3,1) both}
+.promo-off{position:absolute;right:-6px;top:-4px;z-index:3;display:grid;place-items:center;
+  width:62px;height:62px;border-radius:50%;transform:rotate(-9deg);
+  background:linear-gradient(140deg,#ffe9a8,#ffb35c 52%,#f472b6);
+  color:#1a0d16;font-family:'Space Grotesk',sans-serif;line-height:1;
+  box-shadow:0 10px 26px -8px #ff9d5ccc,0 0 0 3px #0d0b18,0 0 0 4px #ffffff33;
+  animation:promo-badge-pop .8s .18s cubic-bezier(.2,1.5,.4,1) both, promo-badge-pulse 2.6s 1s ease-in-out infinite}
+.promo-off b{font-size:19px;font-weight:800;letter-spacing:-.6px;display:block;margin-top:4px}
+.promo-off small{font-size:10px;font-weight:800;letter-spacing:.06em;opacity:.75;display:block;margin-top:-2px}
+.promo-info{flex:1 1 200px;min-width:190px;display:flex;flex-direction:column;align-items:flex-start;gap:9px;
+  text-align:left}
+.promo-price{display:flex;flex-direction:column;gap:2px;margin:0;padding:9px 13px;width:100%;
+  border:1px solid #67e8f940;border-radius:13px;background:linear-gradient(120deg,#67e8f912,#f0abfc12)}
+.promo-price-label{font:700 9px 'Space Grotesk',sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#8fd8e8}
+.promo-price-row{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.promo-price-old{color:#8f86a6;font-size:13px;font-weight:600}
+.promo-price-new{font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:23px;letter-spacing:-.6px;
+  background:linear-gradient(96deg,#ffffff,#bdf3ff 46%,#f7c4ff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 12px #67e8f966)}
+.promo-perks{margin:0;color:#a49bc0;font-size:11.5px;line-height:1.5}
+.promo-timer{display:inline-flex;align-items:center;gap:8px;margin:0;padding:6px 11px 6px 9px;
+  border:1px solid #f0abfc47;border-radius:99px;background:#1b1125d9;
+  box-shadow:0 0 22px -10px #f0abfcaa}
+.promo-timer-label{font:600 10px 'DM Sans',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#cfa9e4}
+.promo-clock{font:700 14px 'Space Grotesk',sans-serif;letter-spacing:.06em;color:#fdf7ff;
+  font-variant-numeric:tabular-nums;text-shadow:0 0 12px #f0abfc99}
+.promo-actions{margin-top:4px;align-items:stretch}
+.promo-actions .mini-btn{min-width:112px}
+.promo-cta{flex:1 1 auto;padding:12px 18px;border:0;border-radius:12px;cursor:pointer;
+  font:800 12.5px 'Space Grotesk',sans-serif;letter-spacing:.06em;color:#0a0713;
+  background:linear-gradient(100deg,#f8fafc,#67e8f9 34%,#c084fc 70%,#f472b6);
+  background-size:220% 100%;box-shadow:0 12px 30px -10px #67e8f9cc,0 0 26px -12px #f0abfcaa;
+  animation:promo-cta-flow 5s linear infinite;transition:transform .18s var(--ease-out),box-shadow .18s}
+.promo-cta:hover{transform:translateY(-2px) scale(1.015);box-shadow:0 16px 34px -10px #67e8f9e6,0 0 30px -10px #f0abfccc}
+.promo-cta:active{transform:scale(.985)}
+.promo-bar{position:relative;height:4px;margin:14px 2px 8px;border-radius:99px;overflow:hidden;
+  background:#ffffff14;box-shadow:inset 0 1px 2px #0008}
+.promo-bar i{display:block;height:100%;width:100%;transform-origin:left center;
+  background:linear-gradient(90deg,#67e8f9,#c084fc 58%,#f472b6);
+  box-shadow:0 0 12px #67e8f9cc;transition:transform 1s linear}
+.promo-hint{margin:0;color:#7f779a;font-size:10.5px;letter-spacing:.02em}
+@keyframes promo-aurora-drift{0%{transform:translate3d(-6%,0,0) scale(1);opacity:.4}
+  100%{transform:translate3d(6%,10px,0) scale(1.12);opacity:.62}}
+@keyframes promo-rays-turn{to{transform:translateX(-50%) rotate(360deg)}}
+@keyframes promo-spark-rise{0%{opacity:0;transform:translateY(0) scale(.6)}
+  12%{opacity:.9}80%{opacity:.55}100%{opacity:0;transform:translateY(-330px) scale(1)}}
+@keyframes promo-title-in{from{opacity:0;transform:translateY(-12px) scale(.95);letter-spacing:2px}
+  to{opacity:1;transform:none;letter-spacing:-1.4px}}
+@keyframes promo-pack-in{from{opacity:0;transform:translateY(24px) rotate(-8deg) scale(.86)}to{opacity:1;transform:none}}
+@keyframes promo-pack-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes promo-halo-breathe{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:.95;transform:scale(1.08)}}
+@keyframes promo-badge-pop{0%{opacity:0;transform:rotate(-24deg) scale(.4)}70%{opacity:1;transform:rotate(-5deg) scale(1.12)}
+  100%{opacity:1;transform:rotate(-9deg) scale(1)}}
+@keyframes promo-badge-pulse{0%,100%{box-shadow:0 10px 26px -8px #ff9d5ccc,0 0 0 3px #0d0b18,0 0 0 4px #ffffff33}
+  50%{box-shadow:0 10px 30px -6px #ffb45ce6,0 0 0 3px #0d0b18,0 0 0 5px #ffe9a866}}
+@keyframes promo-cta-flow{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+@media(max-width:430px){
+  .promo-body{flex-direction:column;gap:10px}
+  .promo-pack{width:132px;height:158px}
+  .promo-pack img{width:110px}
+  .promo-off{width:56px;height:56px;right:-2px}
+  .promo-info{width:100%;align-items:center;text-align:center}
+  .promo-price{align-items:center}
+  .promo-price-row{justify-content:center}
+  .promo-actions{flex-direction:column-reverse}
+  .promo-actions .mini-btn{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  .promo-aurora,.promo-rays,.promo-sparks i,.promo-pack,.promo-halo,.promo-pack img,
+  .promo-off,.promo-cta,.promo-title{animation:none!important}
+  .promo-pack img,.promo-off,.promo-title{opacity:1;transform:none}
+}
+
+/* --- Ligne « offre de sortie » sur la carte du Pack Ultra dans le Shop --- */
+.shop-promo-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 2px;
+  padding:6px 8px;border:1px dashed #67e8f959;border-radius:9px;
+  background:linear-gradient(100deg,#67e8f914,#f0abfc14)}
+.shop-promo-off{flex:0 0 auto;padding:2px 6px;border-radius:6px;
+  background:linear-gradient(100deg,#ffe9a8,#ffb35c 55%,#f472b6);color:#1a0d16;
+  font:800 10px 'Space Grotesk',sans-serif;letter-spacing:.02em}
+.shop-promo-txt{color:#cfd9ea;font-size:11px}
+.shop-promo-txt s{color:#8a83a2}
+.shop-promo-txt strong{color:#f5fbff;font-weight:800}
+.shop-promo-clock{margin-left:auto;font:700 11px 'Space Grotesk',sans-serif;color:#9fe9f8;
+  font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.shop-card-ultra.is-promo{box-shadow:0 0 52px -10px #67e8f9aa,inset 0 1px 0 #ffffff44}
+
 @media(min-width:640px){
   .stats-grid{grid-template-columns:repeat(4,1fr)}
   .friend-stats{grid-template-columns:repeat(4,1fr)}
