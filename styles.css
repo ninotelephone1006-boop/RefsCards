@@ -4275,3 +4275,7 @@ body:has(.inspect.is-open) .update-banner{display:none}
 @media (prefers-reduced-motion: reduce) {
   .stack.is-fan .card.is-best::before { animation: none; }
 }
+
+#offer-price-label { display: block; margin: 1rem 0; }
+#offer-price-label[hidden] { display: none; }
+#offer-price { display: block; width: 100%; margin-top: .5rem; padding: .65rem; border-radius: .5rem; border: 1px solid #756b93; background: #171426; color: white; }
