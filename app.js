@@ -2404,6 +2404,54 @@
     btn._skipCharge = finish;
   }
 
+  /* Mise en scène d'une rareté autour du point (cx, cy) de la scène : bandeau,
+     halo de table, particules, secousse/flash et jingle selon le palier. Sert
+     à la révélation manuelle et au coup de projecteur de « Ouvrir tout ». */
+  function rarityBurst(card, cx, cy, quiet) {
+    const info = RARITIES[card.rarity] || RARITIES.common;
+    const fx = info.fx || 'calm';
+    revealKicker.innerHTML = `<span>✦</span> ${info.label.toUpperCase()} <span>✦</span>`;
+    clearEffects();
+    tableGlow.setAttribute('data-rarity', card.rarity);
+    app.dataset.rarity = card.rarity;
+
+    if (fx === 'calm') {
+      if (!quiet) {
+        const n = card.rarity === 'common' ? 10 : 18;
+        for (let i = 0; i < n; i++) FX.dot(cx, cy, info.glow, { speedMax: 170, g: -20, size: 3, life: 0.8 });
+      }
+    } else if (fx === 'rare') {
+      if (!quiet) {
+        FX.ring(cx, cy, info.glow, 190);
+        for (let i = 0; i < 26; i++) FX.spark(cx, cy, i % 2 ? '#ffffff' : info.glow, { speedMax: 380, g: 180, size: 2.4 });
+        for (let i = 0; i < 12; i++) FX.dot(cx, cy, info.glow, { speedMax: 220, g: -40, size: 4, life: 1 });
+      }
+    } else if (fx === 'epic') {
+      app.classList.add('slow-mo');
+      window.setTimeout(() => app.classList.remove('slow-mo'), 1600);
+      window.setTimeout(() => {
+        shakeStage();
+        flashScreen();
+        if (!quiet) {
+          FX.ring(cx, cy, info.glow, 260);
+          for (let i = 0; i < 46; i++) FX.spark(cx, cy, i % 3 ? info.glow : '#ffffff', { speedMax: 560, g: 320, size: 2.8, life: 0.9 });
+          for (let i = 0; i < 18; i++) FX.dot(cx, cy, info.glow, { speedMax: 300, g: -60, size: 5, life: 1.4 });
+        }
+      }, quiet ? 0 : 420);
+    } else {
+      rays.classList.add('on');
+      if (!quiet) {
+        FX.ring(cx, cy, '#ffffff', 300);
+        FX.rain([info.color, info.glow, '#ffffff', '#ffe9a3'], 90);
+        for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? info.glow : '#ffffff', { speedMax: 620, g: 260, size: 3, life: 1.1 });
+        FX.confetti(cx, cy, [info.color, info.glow, '#ffffff', '#ffe9a3'], 40);
+      }
+      window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
+    }
+
+    window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
+  }
+
   function revealCard(btn, card) {
     if (btn.classList.contains('is-revealed')) return;
     SFX.unlock();
@@ -2423,50 +2471,7 @@
     nextCard.hidden = false;
     nextCard.textContent = remaining.length === 1 ? 'TERMINER LE BOOSTER →' : 'CARTE SUIVANTE →';
 
-    const fx = info.fx || 'calm';
-    const burst = () => {
-      revealKicker.innerHTML = `<span>✦</span> ${info.label.toUpperCase()} <span>✦</span>`;
-    clearEffects();
-        tableGlow.setAttribute('data-rarity', card.rarity);
-      app.dataset.rarity = card.rarity;
-
-      if (fx === 'calm') {
-        if (!quiet) {
-          const n = card.rarity === 'common' ? 10 : 18;
-          for (let i = 0; i < n; i++) FX.dot(cx, cy, info.glow, { speedMax: 170, g: -20, size: 3, life: 0.8 });
-        }
-      } else if (fx === 'rare') {
-        if (!quiet) {
-          FX.ring(cx, cy, info.glow, 190);
-          for (let i = 0; i < 26; i++) FX.spark(cx, cy, i % 2 ? '#ffffff' : info.glow, { speedMax: 380, g: 180, size: 2.4 });
-          for (let i = 0; i < 12; i++) FX.dot(cx, cy, info.glow, { speedMax: 220, g: -40, size: 4, life: 1 });
-        }
-      } else if (fx === 'epic') {
-        app.classList.add('slow-mo');
-        window.setTimeout(() => app.classList.remove('slow-mo'), 1600);
-        window.setTimeout(() => {
-          shakeStage();
-          flashScreen();
-          if (!quiet) {
-            FX.ring(cx, cy, info.glow, 260);
-            for (let i = 0; i < 46; i++) FX.spark(cx, cy, i % 3 ? info.glow : '#ffffff', { speedMax: 560, g: 320, size: 2.8, life: 0.9 });
-            for (let i = 0; i < 18; i++) FX.dot(cx, cy, info.glow, { speedMax: 300, g: -60, size: 5, life: 1.4 });
-          }
-        }, quiet ? 0 : 420);
-      } else {
-        rays.classList.add('on');
-        if (!quiet) {
-          FX.ring(cx, cy, '#ffffff', 300);
-          FX.rain([info.color, info.glow, '#ffffff', '#ffe9a3'], 90);
-          for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? info.glow : '#ffffff', { speedMax: 620, g: 260, size: 3, life: 1.1 });
-          FX.confetti(cx, cy, [info.color, info.glow, '#ffffff', '#ffe9a3'], 40);
-        }
-        window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
-      }
-
-      window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
-
-    };
+    const burst = () => rarityBurst(card, cx, cy, quiet);
     const doFlip = () => {
       btn.classList.remove('is-charging');
       delete btn._skipCharge;
@@ -2596,12 +2601,14 @@
   });
 
   on(openAll, 'click', () => {
+    /* Pendant la cascade, le même bouton devient « Passer ». */
+    if (openingAll) { skipOpenAll(); return; }
     if (state.phase !== 'reveal' || openAll.hidden || openAll.disabled || flying || !current) return;
     SFX.unlock();
 
     /* Rareté au-dessus de Divine encore cachée dans la pile : « Ouvrir tout »
        joue quand même sa mise en scène (retournement + suspense de son rang +
-       effet), puis termine le pack. */
+       effet), puis le reste du pack s'ouvre en cascade. */
     const hiddenTop = remaining
       .filter(({ node }) => !node.classList.contains('is-revealed'))
       .map(({ data }) => data)
@@ -2611,7 +2618,7 @@
       cinematicOpenAll(hiddenTop);
       return;
     }
-    finishOpenAllPack();
+    openAllCascade();
   });
 
   /* Une carte au-dessus de Divine encore cachée : elle passe devant, se
@@ -2620,7 +2627,7 @@
 
   function cinematicOpenAll(card) {
     const item = remaining.find((r) => r.data === card);
-    if (!item) { finishOpenAllPack(); return; }
+    if (!item) { openAllCascade(); return; }
     packCinematic = true;
     openAll.disabled = true;
     nextCard.hidden = true;
@@ -2648,20 +2655,259 @@
         nextCard.hidden = true;
         window.setTimeout(() => {
           packCinematic = false;
-          if (state.phase === 'reveal') finishOpenAllPack();
+          if (state.phase === 'reveal') openAllCascade();
         }, reduceMotion.matches ? 200 : 900);
       };
       waitFlip();
     }, reduceMotion.matches ? 30 : 420);
   }
 
+  /* ------------------------------------------ « Ouvrir tout » : la cascade
+     Au lieu de faire disparaître la pile d'un coup, les cartes restantes
+     s'étalent sur la table, se retournent une à une (de la moins rare à la
+     plus rare, qui reçoit sa mise en scène de rareté), puis filent chacune
+     vers leur case du butin avant l'affichage du récap. Le bouton « Passer »,
+     un toucher sur la table, Entrée, Espace ou Échap sautent directement à
+     la fin ; « réduire les animations » garde l'ouverture instantanée. */
+  const OPEN_ALL_LABEL = openAll ? openAll.innerHTML : '';
+  const SKIP_GRACE_MS = 500; // un double-clic sur « Ouvrir tout » ne doit pas passer la cascade
+  let openingAll = false;
+  let cascadeStartedAt = 0;
+  let cascadeTimers = [];
+  let cascadeToken = 0;
+
+  function cascadeLater(fn, ms) {
+    const token = cascadeToken;
+    cascadeTimers.push(window.setTimeout(() => {
+      if (token !== cascadeToken || !openingAll || state.phase !== 'reveal') return;
+      try { fn(); } catch (err) { console.error(err); }
+    }, ms));
+  }
+
+  function clearCascade() {
+    cascadeToken++;
+    cascadeTimers.forEach((t) => window.clearTimeout(t));
+    cascadeTimers = [];
+    if (!openingAll) return;
+    openingAll = false;
+    stack.classList.remove('is-fan');
+    openAll.classList.remove('is-skip');
+    openAll.innerHTML = OPEN_ALL_LABEL;
+  }
+
+  const rarityRank = (card) => (RARITIES[card && card.rarity] || RARITIES.common).rank;
+
+  /* Répartition des cartes sur la table : on essaie chaque nombre de colonnes
+     et on garde celui qui laisse les cartes les plus grandes (une rangée sur
+     grand écran, deux ou trois sur mobile). Les positions sont relatives au
+     centre de la pile ; une légère courbe en éventail donne du relief. */
+  function fanLayout(count) {
+    const cardW = stack.clientWidth || stack.offsetWidth || 240;
+    const cardH = stack.clientHeight || stack.offsetHeight || cardW * 1.4;
+    const tw = tableEl.clientWidth || cardW * 1.1;
+    const th = tableEl.clientHeight || cardH * 1.05;
+    const gapX = Math.max(6, Math.round(tw * 0.016));
+    const gapY = 10;
+    let best = null;
+    for (let cols = 1; cols <= count; cols++) {
+      const rows = Math.ceil(count / cols);
+      const fitW = (tw * 0.96 - gapX * (cols - 1)) / (cols * cardW);
+      const fitH = (th * 0.98 - gapY * (rows - 1)) / (rows * cardH);
+      const scale = Math.min(fitW, fitH);
+      if (!best || scale > best.scale + 0.01) best = { cols, rows, scale };
+    }
+    const scale = clamp(best.scale, 0.16, 0.9);
+    const stepX = cardW * scale + gapX;
+    const stepY = cardH * scale + gapY;
+    const slots = [];
+    for (let i = 0; i < count; i++) {
+      const row = Math.floor(i / best.cols);
+      const col = i % best.cols;
+      const inRow = Math.min(best.cols, count - row * best.cols);
+      const cx = col - (inRow - 1) / 2;
+      slots.push({
+        x: cx * stepX,
+        y: (row - (best.rows - 1) / 2) * stepY + Math.abs(cx) * Math.min(6, stepY * 0.03),
+        r: inRow > 1 ? cx * Math.min(4, 10 / inRow) : 0
+      });
+    }
+    return { scale, slots, cols: best.cols, rows: best.rows };
+  }
+
+  function openAllCascade() {
+    if (openingAll) return;
+    const items = remaining.slice().sort((a, b) => rarityRank(a.data) - rarityRank(b.data));
+    if (!items.length || reduceMotion.matches) { finishOpenAllPack(); return; }
+    openingAll = true;
+    cascadeStartedAt = performance.now();
+    packCinematic = true;
+    openAll.hidden = false;
+    openAll.disabled = false;
+    openAll.classList.add('is-skip');
+    openAll.innerHTML = '<span aria-hidden="true">⏭</span> Passer';
+    nextCard.hidden = true;
+    setRecapCollapsed(false);
+    clearEffects();
+
+    const n = items.length;
+    const total = state.deck.length;
+    const layout = fanLayout(n);
+    revealKicker.innerHTML = '<span>✦</span> OUVERTURE COMPLÈTE <span>✦</span>';
+    revealTitle.innerHTML = 'Tout le pack<em>.</em>';
+    revealSub.textContent = 'Les cartes se retournent… Touche la table pour passer.';
+    footRight.textContent = `✦ ${n} CARTE${n > 1 ? 'S' : ''} D'UN COUP`;
+    /* Cartes déjà face visible : celles rangées dans le butin + celle du
+       dessus si elle était déjà retournée. */
+    let faceUp = total - n + items.filter(({ node }) => node.classList.contains('is-revealed')).length;
+    const pileText = () => `${Math.min(faceUp, total)} / ${total} RÉVÉLÉE${faceUp > 1 ? 'S' : ''}`;
+    pileLabel.textContent = pileText();
+
+    /* 1. Éventail : la pile s'étale, carte par carte. */
+    stack.classList.add('is-fan');
+    const fanStep = n > 6 ? 45 : 60;
+    items.forEach((item, i) => {
+      const { node } = item;
+      const p = layout.slots[i];
+      node.classList.remove('is-top', 'is-incoming', 'is-ejecting');
+      node.style.setProperty('--fan-i', String(i));
+      node.style.setProperty('--fan-x', `${p.x.toFixed(1)}px`);
+      node.style.setProperty('--fan-y', `${p.y.toFixed(1)}px`);
+      node.style.setProperty('--fan-r', `${p.r.toFixed(1)}deg`);
+      node.style.setProperty('--fan-s', layout.scale.toFixed(3));
+      node.style.setProperty('--fan-delay', `${i * fanStep}ms`);
+      node.classList.add('is-fanned');
+      cascadeLater(() => SFX.deal(), 40 + i * fanStep);
+    });
+
+    /* 2. Retournements en cascade, de la moins rare à la plus rare. */
+    const fanDone = 560 + (n - 1) * fanStep;
+    const flipStep = n > 6 ? 120 : 170;
+    items.forEach((item, i) => {
+      cascadeLater(() => {
+        item.node.style.setProperty('--fan-delay', '0ms');
+        if (cascadeFlip(item)) faceUp++;
+        pileLabel.textContent = pileText();
+      }, fanDone + i * flipStep);
+    });
+
+    /* 3. Coup de projecteur sur la plus rare du lot. */
+    const best = items[n - 1];
+    const bestInfo = RARITIES[best.data.rarity] || RARITIES.common;
+    const bestAt = fanDone + (n - 1) * flipStep + 420;
+    cascadeLater(() => cascadeSpotlight(best), bestAt);
+
+    /* 4. Envol vers le butin, puis le récap. */
+    const hold = bestInfo.fx === 'gold' ? 1500 : bestInfo.fx === 'epic' ? 1250 : 950;
+    const flyAt = bestAt + hold;
+    const flyStep = n > 6 ? 70 : 90;
+    const firstSlot = state.loot.length;
+    items.forEach((item, i) => cascadeLater(() => cascadeFly(item, firstSlot + i, i), flyAt + i * flyStep));
+    cascadeLater(finishOpenAllPack, flyAt + (n - 1) * flyStep + 720);
+  }
+
+  /* Retourne une carte de la cascade (comptée comme en révélation manuelle)
+     et renvoie true si elle n'était pas encore face visible. */
+  function cascadeFlip(item) {
+    const { node, data } = item;
+    const info = RARITIES[data.rarity] || RARITIES.common;
+    const firstTime = !node.classList.contains('is-revealed');
+    if (firstTime) {
+      node.classList.add('is-revealed');
+      const { isNew, reward } = collectPackCard(data);
+      addCoins(reward);
+      node.dataset.isNew = isNew ? '1' : '0';
+      if (CardMutations.definition(data)) shinyCinematic(data, false);
+    }
+    if (!node.classList.contains('is-flipped')) {
+      node.dataset.flipAt = String(performance.now());
+      node.classList.add('is-flipped');
+    }
+    node.setAttribute('aria-label', `${data.name}, ${info.label}.`);
+
+    const c = cardCenter(node);
+    const fx = info.fx || 'calm';
+    const count = fx === 'calm' ? 8 : fx === 'rare' ? 14 : 22;
+    for (let k = 0; k < count; k++) {
+      FX.dot(c.x, c.y, k % 3 === 2 ? '#ffffff' : info.glow, { speedMax: 150 + count * 6, g: -30, size: fx === 'calm' ? 3 : 4, life: 0.75 });
+    }
+    if (fx !== 'calm') FX.ring(c.x, c.y, info.glow, Math.max(70, c.r.width * 0.9));
+    if (fx === 'epic' || fx === 'gold') {
+      for (let k = 0; k < 14; k++) FX.spark(c.x, c.y, k % 2 ? '#ffffff' : info.glow, { speedMax: 320, g: 200, size: 2.4 });
+    }
+    SFX.tick();
+    return firstTime;
+  }
+
+  function cascadeSpotlight(item) {
+    const { node, data } = item;
+    const info = RARITIES[data.rarity] || RARITIES.common;
+    node.classList.add('is-best');
+    const s = parseFloat(node.style.getPropertyValue('--fan-s')) || 1;
+    const y = parseFloat(node.style.getPropertyValue('--fan-y')) || 0;
+    node.style.setProperty('--fan-s', (s * 1.12).toFixed(3));
+    node.style.setProperty('--fan-y', `${(y - 8).toFixed(1)}px`);
+    node.style.setProperty('--fan-r', '0deg');
+    const c = cardCenter(node);
+    rarityBurst(data, c.x, c.y, false);
+    revealTitle.replaceChildren(document.createTextNode(data.name), el('em', null, '.'));
+    revealSub.textContent = `La plus rare du pack · ${info.label}`;
+  }
+
+  function cascadeFly(item, slotIndex, i) {
+    const { node, data } = item;
+    const slot = recapSlots.children[slotIndex] || recapSlots.lastElementChild;
+    const base = stack.getBoundingClientRect();
+    const to = slot ? slot.getBoundingClientRect() : null;
+    node.classList.remove('is-fanned', 'is-best');
+    let dx = 0;
+    let dy = 60;
+    let s = 0.25;
+    if (to && base.width > 0 && to.width > 0) {
+      dx = to.left + to.width / 2 - (base.left + base.width / 2);
+      dy = to.top + to.height / 2 - (base.top + base.height / 2);
+      s = Math.max(0.12, to.width / base.width);
+    }
+    node.style.setProperty('--fly-x', `${dx.toFixed(1)}px`);
+    node.style.setProperty('--fly-y', `${dy.toFixed(1)}px`);
+    node.style.setProperty('--fly-s', s.toFixed(3));
+    node.classList.add('is-flying');
+    if (i % 2 === 0) SFX.whoosh();
+    cascadeLater(() => {
+      fillSlot(slotIndex, data);
+      recapCount.textContent = `${Math.min(slotIndex + 1, state.deck.length)} / ${state.deck.length}`;
+      detachCardNode(node);
+    }, 600);
+  }
+
+  function detachCardNode(node) {
+    node.querySelectorAll('video').forEach((video) => {
+      cardVideoObserver?.unobserve(video);
+      if (!video.paused) video.pause();
+    });
+    node.remove();
+  }
+
+  function skipOpenAll() {
+    if (!openingAll) return;
+    if (performance.now() - cascadeStartedAt < SKIP_GRACE_MS) return;
+    SFX.unlock();
+    finishOpenAllPack();
+  }
+
   function finishOpenAllPack() {
+    clearCascade();
     packCinematic = false;
     openAll.disabled = true;
     let reward = 0;
+    const newOnes = [];
     for (const { data, node } of remaining) {
       // La carte affichée (ou révélée par la mise en scène) est déjà comptée.
-      if (!node.classList.contains('is-revealed')) reward += collectPackCard(data).reward;
+      if (!node.classList.contains('is-revealed')) {
+        const got = collectPackCard(data);
+        reward += got.reward;
+        node.dataset.isNew = got.isNew ? '1' : '0';
+      }
+      if (node.dataset.isNew === '1') newOnes.push(data);
       state.loot.push(data);
     }
     addCoins(reward);
@@ -2674,9 +2920,13 @@
     remaining = [];
     current = null;
     finishPack();
+    /* L'onglet Collection réagit une fois pour toutes les nouvelles cartes,
+       juste après le jingle de fin pour ne pas s'y superposer. */
+    if (newOnes.length && !reduceMotion.matches) window.setTimeout(() => bumpCollectionTab(newOnes), 350);
   }
 
   on(tableEl, 'click', (event) => {
+    if (openingAll) { skipOpenAll(); return; }
     if (event.target.closest('.card') || !current || flying || packCinematic || state.phase !== 'reveal') return;
     if (!current.node.classList.contains('is-top') || !current.node.classList.contains('is-flipped')) return;
     sendToRecap(current.node, current.data);
@@ -2735,7 +2985,7 @@
     return true;
   }
 
-  function landOnCollection(rect, tab, info) {
+  function landOnCollection(rect, tab, info, text = '✦ Nouvelle carte !') {
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
     try { SFX.coin(); } catch (e) { /* son indisponible */ }
@@ -2744,7 +2994,7 @@
     ring.style.cssText = `left:${x}px;top:${y}px;--g:${info.glow}`;
     document.body.append(ring);
     window.setTimeout(() => ring.remove(), 700);
-    const label = el('span', 'fx-float', '✦ Nouvelle carte !');
+    const label = el('span', 'fx-float', text);
     label.style.cssText = `left:${x}px;top:${rect.top - 8}px`;
     document.body.append(label);
     window.setTimeout(() => label.remove(), 1400);
@@ -2754,6 +3004,21 @@
       tab.classList.add('is-bump');
       window.setTimeout(() => tab.classList.remove('is-bump'), 800);
     }
+  }
+
+  /* « Ouvrir tout » : les nouvelles cartes n'ont pas volé une par une vers
+     la Collection ; l'onglet réagit une seule fois pour tout le lot, aux
+     couleurs de la plus rare d'entre elles. */
+  function bumpCollectionTab(cards) {
+    const tab = document.querySelector('.tab[data-tab="collection"]');
+    const icon = tab && (tab.querySelector('svg') || tab);
+    if (!icon || !cards.length) return false;
+    const rect = icon.getBoundingClientRect();
+    if (!rect.width) return false;
+    const top = cards.reduce((a, b) => (rarityRank(b) > rarityRank(a) ? b : a), cards[0]);
+    const info = RARITIES[top.rarity] || RARITIES.common;
+    landOnCollection(rect, tab, info, cards.length > 1 ? `✦ ${cards.length} nouvelles cartes !` : '✦ Nouvelle carte !');
+    return true;
   }
 
   /* Cinématique shiny : voile sombre, rayons dorés qui tournent, éclat,
@@ -3093,6 +3358,7 @@
     resetTear();
     clearEffects();
     flash.classList.remove('run');
+    clearCascade();
     stack.replaceChildren();
     remaining = [];
     current = null;
@@ -3378,6 +3644,16 @@
       return;
     }
     if (app.dataset.tab !== 'pack' || state.phase !== 'reveal' || state.fusionOpen || !current) return;
+    /* Cascade « Ouvrir tout » : Entrée, Espace ou Échap passent à la fin
+       (le bouton « Passer » a déjà son propre clic clavier). */
+    if (openingAll) {
+      if ((e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') && document.activeElement !== openAll) {
+        e.preventDefault();
+        skipOpenAll();
+      }
+      return;
+    }
+    if (packCinematic) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
     if (document.activeElement === buyBtn || document.activeElement === fusionChip || document.activeElement === recapToggle || document.activeElement === openAll) return;
     e.preventDefault();
