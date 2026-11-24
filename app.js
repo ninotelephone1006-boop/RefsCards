@@ -1948,28 +1948,101 @@
   /* ============================================================ LES CARTES */
 
   /* Résout le visuel d'une carte : le premier fichier existant parmi les
-     candidats (assets/Cartes/<nom>.png, .jpg, ...). Renvoie une Promise qui
-     résout sur l'URL chargée, ou null si aucun visuel n'est disponible. */
-  const imageCache = new Map();
+     candidats (assets/Cartes/<nom>.png, .jpg, ...). Ne met jamais en cache un
+     échec réseau transitoire afin qu'un second affichage puisse réessayer. */
+  const resolvedImageCache = new Map();
+
+  function expandAssetUrls(srcs) {
+    const out = [];
+    const push = (u) => {
+      if (u && out.indexOf(u) === -1) out.push(u);
+    };
+    srcs.forEach((src) => {
+      push(src);
+      try {
+        push(encodeURI(src));
+        if (typeof src.normalize === 'function') {
+          push(encodeURI(src.normalize('NFC')));
+          push(encodeURI(src.normalize('NFD')));
+        }
+      } catch (error) { /* ignore URI malformée */ }
+    });
+    return out;
+  }
+
+  function cardImageCandidates(card) {
+    const raw = typeof cardImageSources === 'function'
+      ? cardImageSources(card)
+      : card && card.image ? [card.image] : [];
+    return expandAssetUrls(raw);
+  }
+
   function resolveCardImage(card) {
-    const srcs = typeof cardImageSources === 'function' ? cardImageSources(card) : card.image ? [card.image] : [];
+    const srcs = cardImageCandidates(card);
     if (!srcs.length) return Promise.resolve(null);
     const key = srcs.join('|');
-    if (imageCache.has(key)) return imageCache.get(key);
-    const tried = [];
+    if (resolvedImageCache.has(key)) return Promise.resolve(resolvedImageCache.get(key));
     const load = (i) => {
       if (i >= srcs.length) return Promise.resolve(null);
-      tried.push(srcs[i]);
       return new Promise((resolve) => {
         const probe = new Image();
-        probe.onload = () => resolve(srcs[i]);
+        probe.onload = () => {
+          resolvedImageCache.set(key, srcs[i]);
+          resolve(srcs[i]);
+        };
         probe.onerror = () => resolve(load(i + 1));
         probe.src = srcs[i];
       });
     };
-    const promise = load(0);
-    imageCache.set(key, promise);
-    return promise;
+    return load(0);
+  }
+
+  function attachCardImage(frame, img, video, card) {
+    const candidates = cardImageCandidates(card);
+    if (!candidates.length) return;
+    const key = candidates.join('|');
+    const cached = resolvedImageCache.get(key);
+    const ordered = cached
+      ? [cached, ...candidates.filter((u) => u !== cached)]
+      : candidates;
+
+    let idx = 0;
+    let retried = false;
+    let settled = false;
+
+    const markLoaded = (src) => {
+      if (settled) return;
+      settled = true;
+      if (src) resolvedImageCache.set(key, src);
+      frame.classList.add('has-img', 'has-src');
+      if (video && src) {
+        try { video.poster = src; } catch (error) { /* ignore */ }
+      }
+    };
+
+    const tryNext = () => {
+      if (settled) return;
+      if (idx >= ordered.length) {
+        if (!retried) {
+          retried = true;
+          idx = 0;
+          setTimeout(tryNext, 300);
+          return;
+        }
+        img.removeAttribute('src');
+        frame.classList.remove('has-src', 'has-img');
+        return;
+      }
+      const nextSrc = ordered[idx++];
+      img.src = nextSrc;
+      if (img.complete && img.naturalWidth > 0) {
+        markLoaded(nextSrc);
+      }
+    };
+
+    on(img, 'load', () => markLoaded(img.getAttribute('src') || ordered[Math.max(0, idx - 1)]));
+    on(img, 'error', () => tryNext());
+    tryNext();
   }
 
   /* ------------------------------------------------------- lecteurs vidéo
@@ -2050,23 +2123,24 @@
 
   /* Construit le lecteur d'une carte vidéo et le branche sur sa config. */
   function buildCardVideo(card, config, opts) {
+    const isStatic = Boolean(opts && opts.staticPreview);
     const video = document.createElement('video');
     video.className = 'cf-video';
     video.playsInline = true;
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
-    video.preload = config.preload || 'metadata';
-    video.loop = Boolean(config.loop);
+    video.preload = config.preload === 'none' ? 'none' : 'auto';
+    video.loop = isStatic ? false : Boolean(config.loop);
     /* Toujours démarrer en muet : c'est la seule façon d'obtenir l'autoplay
        sur tous les navigateurs. Le son s'active au clic (carte ou bouton 🔊). */
     video.muted = true;
     video.defaultMuted = true;
     video.dataset.fps = config.fps == null ? 'auto' : String(config.fps);
     video.dataset.sourceFps = config.sourceFps == null ? '' : String(config.sourceFps);
-    video.dataset.sound = config.sound ? 'on' : 'off';
-    video.dataset.loop = config.loop ? 'on' : 'off';
+    video.dataset.sound = !isStatic && config.sound ? 'on' : 'off';
+    video.dataset.loop = !isStatic && config.loop ? 'on' : 'off';
     video.dataset.audioActive = 'off';
-    video.dataset.autoplay = config.autoplay ? '1' : '0';
+    video.dataset.autoplay = !isStatic && config.autoplay ? '1' : '0';
     video.setAttribute('aria-label', `Vidéo de la carte ${card.name}${config.sound ? ', avec son' : ', sans son'}${config.loop ? ', en boucle' : ''}`);
     if (config.fps) video.style.setProperty('--video-fps', String(config.fps));
 
@@ -2075,21 +2149,28 @@
       try { video.playbackRate = rate; } catch (error) { /* ignore */ }
       video.dataset.playbackRate = String(rate);
     }
+    const markVideoReady = () => {
+      const frame = video.closest('.cf');
+      if (frame) frame.classList.add('has-video');
+    };
     on(video, 'loadedmetadata', () => {
       if (rate !== 1) {
         try { video.playbackRate = rate; } catch (error) { /* ignore */ }
       }
+      if (isStatic) {
+        try { video.currentTime = 0.05; } catch (error) { /* ignore */ }
+      }
     });
-    on(video, 'loadeddata', () => {
-      const frame = video.closest('.cf');
-      if (frame) frame.classList.add('has-video');
-    });
+    on(video, 'loadeddata', markVideoReady);
+    on(video, 'canplay', markVideoReady);
+    on(video, 'seeked', markVideoReady);
     on(video, 'ended', () => {
       const frame = video.closest('.cf');
       if (frame) frame.classList.add('is-video-ended');
     });
 
-    const sources = typeof cardVideoSources === 'function' ? cardVideoSources(card) : [];
+    const rawSources = typeof cardVideoSources === 'function' ? cardVideoSources(card) : [];
+    const sources = expandAssetUrls(rawSources);
     sources.forEach((src) => {
       const source = document.createElement('source');
       source.src = src;
@@ -2098,7 +2179,7 @@
     });
     if (!sources.length && config.src) video.src = config.src;
 
-    if (config.autoplay) observeCardVideo(video);
+    if (!isStatic && config.autoplay) observeCardVideo(video);
     return video;
   }
 
@@ -2147,7 +2228,9 @@
     const videoConfig = cardVideoInfo(card);
     const frame = el('span', 'cf');
     const mutation = CardMutations.definition(card);
+    const hasImageCandidate = cardImageCandidates(card).length > 0;
     const showVideo = Boolean(videoConfig && !opts.disableVideo);
+    const showStaticVideoPreview = Boolean(videoConfig && opts.disableVideo && !hasImageCandidate);
     if (mutation) {
       frame.classList.add(mutation.cssClass);
       frame.dataset.mutation = mutation.id;
@@ -2163,7 +2246,7 @@
     img.alt = opts.alt || '';
     img.draggable = false;
     img.decoding = 'async';
-    img.loading = opts.eager ? 'eager' : 'lazy';
+    img.loading = 'eager';
 
     const fallback = el('span', 'cf-fallback');
     fallback.style.setProperty('--art', card.color || '#cfd7c5');
@@ -2186,9 +2269,16 @@
     if (opts.index != null) meta.append(el('span', 'cf-num', `S01·${String(opts.index + 1).padStart(2, '0')}`));
     bottom.append(meta);
 
-    const video = showVideo ? buildCardVideo(card, videoConfig, opts) : null;
+    const video = showVideo
+      ? buildCardVideo(card, videoConfig, opts)
+      : showStaticVideoPreview
+        ? buildCardVideo(card, { ...videoConfig, autoplay: false, sound: false, loop: false }, { ...opts, staticPreview: true })
+        : null;
     frame.append(fallback, img);
-    if (video) frame.append(video);
+    if (video) {
+      frame.append(video);
+      if (video.readyState >= 2) frame.classList.add('has-video');
+    }
     frame.append(top, bottom);
     if (!opts.mini) {
       frame.append(el('span', 'cf-holo'), el('span', 'cf-shine'));
@@ -2196,15 +2286,7 @@
     const audioButton = showVideo && !opts.mini ? buildCardAudioButton(videoConfig) : null;
     if (audioButton) frame.append(audioButton);
 
-    resolveCardImage(card).then((src) => {
-      if (!src) return;
-      img.src = src;
-      if (video) {
-        try { video.poster = src; } catch (error) { /* ignore */ }
-      }
-      on(img, 'load', () => frame.classList.add('has-img'), { once: true });
-      frame.classList.add('has-src');
-    });
+    attachCardImage(frame, img, video, card);
 
     return frame;
   }

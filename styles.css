@@ -739,7 +739,6 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   overflow: hidden;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
-  transform-style: preserve-3d;
 }
 
 /* -- dos de carte : derriere.png (le bleu) recolore selon la couleur de la
@@ -866,8 +865,7 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   transition: opacity 0.4s ease, transform 0.6s var(--ease-out);
   z-index: 1;
 }
-.cf.has-img .cf-img { opacity: 1; transform: none; }
-.cf.has-src .cf-img { opacity: 1; }
+.cf.has-img .cf-img { opacity: 1; transform: translateZ(0); }
 
 .cf-fallback {
   position: absolute;
@@ -881,7 +879,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
     var(--art, #2f2932);
 }
 .cf-fallback .card-emoji { font-size: 20cqw; }
-.cf.has-img .cf-fallback { opacity: 0; transition: opacity 0.3s ease; }
+.cf.has-img .cf-fallback,
+.cf.has-video .cf-fallback { opacity: 0; transition: opacity 0.3s ease; }
 
 /* -- titre en haut, sur un dégradé sombre toujours lisible -- */
 .cf-top {
