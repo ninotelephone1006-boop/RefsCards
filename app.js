@@ -8,7 +8,9 @@
 
   /* Boutique : les packs s'achètent dans le Shop et vont dans l'inventaire
      (onglet Pack). Les prix sont réglés AU-DESSUS de la valeur moyenne d'un
-     pack (classique ≈ 394 🪙, rare ≈ 447 🪙 pour 5 cartes) : à 100 🪙,
+     pack (classique ≈ 451 🪙, rare ≈ 878 🪙, légende ≈ 788 🪙 pour 10 cartes,
+     vidéo ≈ 153 🪙 pour 2 cartes, ultra ≈ 1 964 🪙 — valeurs calculées depuis
+     les tables de rareté et les slots garantis, voir PACK_TABLES) : à 100 🪙,
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
      infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
      faut jouer, fusionner et récupérer le cadeau du calendrier de connexion. */
@@ -29,24 +31,11 @@
   ];
   const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
     'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-  // Pack rare : les raretés hautes sont boostées progressivement (plus le rang est
-  // élevé, plus le multiplicateur est grand), tandis que commune/inhabituelle sont
-  // réduites. Le total reste normalisé pour que les pourcentages affichés restent cohérents.
+  /* Compatibilité : ancien boost « par rang » du Pack Rare (remplacé par les
+     tables explicites PACK_TABLES ci-dessous). Conservé pour ne pas casser les
+     références existantes ; le tirage ne l'utilise plus. */
   const RARE_RANK_FACTOR_BASE = 0.45;
   const RARE_RANK_FACTOR_STEP = 0.32;
-  // Pack Ultra Rare : 30x plus de chance pour les cartes de grosse rareté.
-  const ULTRA_RARITY_MULTIPLIER = {
-    common: 0.02,
-    uncommon: 0.04,
-    rare: 0.08,
-    superrare: 0.25,
-    epic: 1.0,
-    ultraepic: 3.5,
-    mythic: 14,
-    legendary: 18,
-    divine: 52,
-    secret: 60
-  };
   /* Économie : une carte déjà possédée rapporte moins à chaque révélation.
      On ne retire jamais de pièces à personne — on limite seulement la création
      d'argent des doublons (sinon ouvrir toujours la même commune restait une
@@ -134,6 +123,52 @@
   const canFuseInto = (info) => Boolean(info && info.next && RARITIES[info.next] && RARITIES[info.next].rank <= FUSION_MAX_RANK);
 
   const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
+
+  /* ====================================================== SYSTÈME DE TIRAGE
+     Principe (refonte complète) : on tire d'abord la RARETÉ, puis la carte.
+     - Chaque pack a sa propre table de rareté (PACK_TABLES, en % par rareté,
+       somme = 100) et sa liste de slots (PACK_SLOTS). Un slot « std » tire
+       dans toute la table ; un slot { minRank } ne tire que dans les raretés
+       de rang >= minRank (poids renormalisés) : c'est la garantie
+       (« 1 Rare+ par pack classique », etc.).
+     - La carte est ensuite tirée UNIFORMÉMENT parmi les cartes du pool qui
+       ont cette rareté (plafond de 2 copies par pack, 1 pour le Pack Vidéo).
+       Chaque carte d'une même rareté a donc exactement la même chance : les
+       pourcentages affichés sous le booster sont les vraies probabilités.
+     - Si une rareté n'a aucune carte dans le pool (ex. Pack Vidéo, qui ne
+       contient que des Rare/Épique), elle est écartée et les poids sont
+       renormalisés sur les raretés disponibles. Si toutes les cartes d'une
+       rareté tirée sont déjà au plafond, on retire une autre rareté.
+     - Les chances Shiny restent multipliées par pack (rare ×2, ultra ×7).
+     Pour changer les probas, il suffit de modifier PACK_TABLES / PACK_SLOTS :
+     l'affichage des chances (renderOdds) et le tirage suivent automatiquement. */
+  const PACK_TABLES = {
+    classic: { common: 30, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5 },
+    rare: { common: 10, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2 },
+    legend: { common: 30, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5 },
+    video: { common: 30, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.5 },
+    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 22, divine: 14, secret: 10 }
+  };
+  /* Slots par pack : 'std' = table complète ; { minRank } = garantie
+     (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
+     La longueur de la liste = nombre de cartes du pack (cf. PACK_CARD_COUNT). */
+  const PACK_SLOTS = {
+    classic: ['std', 'std', 'std', 'std', { minRank: 2 }],
+    rare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
+    legend: ['std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std'],
+    video: ['std', 'std'],
+    ultra: ['std', 'std', { minRank: 4 }, { minRank: 6 }, { minRank: 7 }]
+  };
+  const PACK_SHINY_MULTIPLIER = { classic: 1, rare: 2, legend: 1, video: 1, ultra: 7 };
+  function packTableFor(packType) {
+    return PACK_TABLES[packType] || PACK_TABLES.classic;
+  }
+  function packSlotsFor(packType) {
+    return PACK_SLOTS[packType] || PACK_SLOTS.classic;
+  }
+  function packShinyFor(packType) {
+    return PACK_SHINY_MULTIPLIER[packType] || 1;
+  }
 
   const $ = (id) => document.getElementById(id);
   /* Sélecteur tolérant : renvoie null au lieu de lever une exception quand le
@@ -794,17 +829,17 @@
     const definitions = {
       classic: {
         title: 'Booster Classique',
-        desc: '5 cartes aléatoires · Chances standard de rareté.',
+        desc: '5 cartes · 1 Rare+ garantie par pack.',
         rare: false,
       },
       rare: {
         title: 'Booster Rare',
-        desc: '5 cartes aléatoires · Les raretés élevées sont plus fréquentes que les communes.',
+        desc: '5 cartes · 1 Rare+ et 1 Épique+ garanties · Shiny ×2.',
         rare: true,
       },
       legend: {
         title: 'Booster Légende',
-        desc: '10 cartes aléatoires · Chances standard de rareté.',
+        desc: '10 cartes · chances standard de rareté.',
         rare: false,
       },
       video: {
@@ -815,7 +850,7 @@
       },
       ultra: {
         title: 'Booster Ultra Rare',
-        desc: '5 cartes · 30× plus de chance pour les cartes de grosse rareté.',
+        desc: '5 cartes · Épique+, Mythique+ et Légendaire+ garantis · Shiny ×7.',
         rare: false,
         ultra: true,
       },
@@ -919,95 +954,96 @@
 
   /* --------------------------------------------------------------- tirage */
 
-  /* Poids unitaire d'une carte selon sa rareté. Chaque carte porte le poids de
-     sa rareté (plutôt que de répartir tout le palier entre ses cartes) : sinon,
-     une rareté ne comptant qu'une seule carte — comme Commune avec « Chasseur
-     Royer » — raflerait à elle seule 30 % de tous les tirages.
-     En pack rare (boosted) : les raretés sont rééquilibrées par rang — plus une
-     carte est rare, plus sa probabilité augmente, tandis que commune/inhabituelle
-     baissent. Cela rend les cartes rares plus fréquentes que les communes, avec
-     un petit bonus aussi sur les très hautes raretés (divine, secrète, etc.).
-     Le total est normalisé pour garder des pourcentages cohérents. Dans un même
-     booster, un 2e exemplaire d'une carte déjà tirée est atténué (×0,5) et
-     plafonné à 2 copies identiques. */
+  /* Nouveau moteur de tirage (voir PACK_TABLES / PACK_SLOTS plus haut) :
+     1. on tire la rareté du slot (table du pack, garantie éventuelle),
+     2. puis la carte, uniformément parmi les cartes de cette rareté.
+     Plafond : 2 copies d'une même carte par pack (1 pour le Pack Vidéo).
+     Si la rareté tirée n'a plus de carte disponible (plafond atteint), on
+     retire parmi les raretés encore disponibles. */
   const MAX_SAME_CARD_PER_PACK = 2;
-  const SECOND_COPY_WEIGHT_FACTOR = 0.5;
 
-  function rareRankMultiplier(rank) {
-    return RARE_RANK_FACTOR_BASE + rank * RARE_RANK_FACTOR_STEP;
-  }
-
-  function ultraRankMultiplier(rarity) {
-    return ULTRA_RARITY_MULTIPLIER[rarity] || 1;
-  }
-
-  function packRankMultiplier(card, boosted) {
-    if (boosted === 'ultra') return ultraRankMultiplier(card.rarity);
-    const info = RARITIES[card.rarity];
-    return info ? rareRankMultiplier(info.rank) : 1;
-  }
-
-  function cardBaseWeight(card, boosted, pool) {
-    const info = card && RARITIES[card.rarity];
-    if (!info) return 0;
-    if (!boosted) return info.weight;
-    const list = pool && pool.length ? pool : cardsDatabase;
-    let baseTotal = 0;
-    let boostedTotal = 0;
-    for (const c of list) {
-      const r = RARITIES[c.rarity];
-      if (!r) continue;
-      baseTotal += r.weight;
-      boostedTotal += r.weight * packRankMultiplier(c, boosted);
-    }
-    if (baseTotal <= 0 || boostedTotal <= 0) return info.weight;
-    return info.weight * packRankMultiplier(card, boosted) * (baseTotal / boostedTotal);
-  }
-
-  function rarityWeight(key, boosted, pool) {
-    const list = pool && pool.length ? pool : cardsDatabase;
-    const cards = list.filter((c) => c.rarity === key);
-    if (!cards.length) return 0;
-    return cards.reduce((sum, c) => sum + cardBaseWeight(c, boosted, list), 0);
-  }
-
-  function pickCard(forcedRarity, boosted, packCounts, pool, maxSame = MAX_SAME_CARD_PER_PACK) {
-    /* Un pool explicitement fourni est respecté même s'il est vide : le Pack
-       Vidéo ne doit jamais puiser dans les cartes image par accident. */
-    const source = pool || cardsDatabase;
-    const validCards = source.filter((c) => RARITIES[c.rarity]);
-    if (!validCards.length) return null;
-    let candidates = forcedRarity
-      ? validCards.filter((c) => c.rarity === forcedRarity)
-      : validCards;
-    if (!candidates.length) candidates = validCards;
-    if (packCounts) {
-      const underCap = candidates.filter((c) => (packCounts.get(c.id) || 0) < maxSame);
-      if (underCap.length) candidates = underCap;
-    }
-    const weights = candidates.map((c) => {
-      const copies = packCounts ? (packCounts.get(c.id) || 0) : 0;
-      const dupFactor = copies >= 1 ? SECOND_COPY_WEIGHT_FACTOR : 1;
-      return cardBaseWeight(c, boosted, validCards) * dupFactor;
+  /* Poids de chaque rareté pour un slot donné, restreints au pool :
+     - table du pack (PACK_TABLES),
+     - rang >= minRank pour un slot garanti,
+     - rareté présente dans le pool (au moins une carte).
+     Seul le rapport des poids compte : les pourcentages affichés sont les
+     poids renormalisés sur les raretés disponibles. */
+  function slotRarityWeights(packType, slot, pool) {
+    const table = packTableFor(packType);
+    const minRank = slot && typeof slot === 'object' ? (slot.minRank || 0) : 0;
+    const available = new Set();
+    (pool || []).forEach((c) => { if (RARITIES[c.rarity]) available.add(c.rarity); });
+    const weights = {};
+    Object.keys(RARITIES).forEach((key) => {
+      const w = Number(table[key]) || 0;
+      if (w <= 0) return;
+      if (RARITIES[key].rank < minRank) return;
+      if (!available.has(key)) return;
+      weights[key] = w;
     });
-    const total = weights.reduce((sum, w) => sum + w, 0);
-    if (total <= 0) return candidates[Math.floor(Math.random() * candidates.length)];
-    let roll = Math.random() * total;
-    for (let i = 0; i < candidates.length; i++) {
-      if ((roll -= weights[i]) < 0) return candidates[i];
+    /* Garantie impossible dans ce pool (ex. aucune carte Épique+ en vidéo) :
+       on retombe sur toutes les raretés disponibles du pool. */
+    if (!Object.keys(weights).length) {
+      Object.keys(RARITIES).forEach((key) => {
+        const w = Number(table[key]) || 0;
+        if (w > 0 && available.has(key)) weights[key] = w;
+      });
     }
-    return candidates[candidates.length - 1];
+    return weights;
   }
 
+  /* Tire une rareté selon ses poids (renormalisés). Renvoie null si vide. */
+  function rollRarity(weights) {
+    const keys = Object.keys(weights || {});
+    let total = 0;
+    keys.forEach((k) => { total += weights[k]; });
+    if (!keys.length || total <= 0) return null;
+    let roll = Math.random() * total;
+    for (let i = 0; i < keys.length; i++) {
+      if ((roll -= weights[keys[i]]) < 0) return keys[i];
+    }
+    return keys[keys.length - 1];
+  }
+
+  /* Cartes d'une rareté encore sous le plafond dans ce pack. */
+  function availableCards(rarity, packCounts, pool, maxSame) {
+    return (pool || []).filter((c) => c.rarity === rarity && (packCounts.get(c.id) || 0) < maxSame);
+  }
+
+  /* Tire une carte pour un slot : rareté d'abord, carte ensuite (uniforme).
+     Renvoie null si le pool est vide. */
+  function pickCardForSlot(packType, slot, packCounts, pool, maxSame) {
+    const validPool = (pool || []).filter((c) => RARITIES[c.rarity]);
+    if (!validPool.length) return null;
+    let weights = slotRarityWeights(packType, slot, validPool);
+    /* Exclut les raretés dont toutes les cartes sont déjà au plafond. */
+    const usable = {};
+    Object.keys(weights).forEach((key) => {
+      if (availableCards(key, packCounts, validPool, maxSame).length) usable[key] = weights[key];
+    });
+    if (Object.keys(usable).length) weights = usable;
+    const rarity = rollRarity(weights);
+    if (!rarity) return null;
+    const candidates = availableCards(rarity, packCounts, validPool, maxSame);
+    if (candidates.length) return candidates[Math.floor(Math.random() * candidates.length)];
+    /* Repli : n'importe quelle carte sous le plafond, sinon n'importe quelle
+       carte du pool (le pack est toujours rempli, même avec un pool minuscule). */
+    const underCap = validPool.filter((c) => (packCounts.get(c.id) || 0) < maxSame);
+    const fallback = underCap.length ? underCap : validPool;
+    return fallback[Math.floor(Math.random() * fallback.length)];
+  }
+
+  /* `boosted` est conservé pour compatibilité (anciens appels) : le pack
+     (et donc sa table + ses slots) est déduit de `type` ou du pack courant. */
   function drawPack(boosted, pool, type) {
+    const packType = isPackType(type) ? type : isPackType(state.currentPackType) ? state.currentPackType : 'classic';
+    const cardPool = pool && pool.length ? pool : packPool(packType);
     const drawn = [];
     const packCounts = new Map();
     const record = (card) => {
-      drawn.push(CardMutations.roll(card, Math.random, packType === 'rare' ? 2 : packType === 'ultra' ? 7 : 1));
+      drawn.push(CardMutations.roll(card, Math.random, packShinyFor(packType)));
       packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
     };
-    const packType = isPackType(type) ? type : isPackType(state.currentPackType) ? state.currentPackType : 'classic';
-    const cardPool = pool && pool.length ? pool : packPool(packType);
     const params = new URLSearchParams(window.location.search);
     const demoMode = params.get('demo') || sessionStorage.getItem('refs-demo');
     const wantsDemo = demoMode === '1' || demoMode === 'fusion' || demoMode === 'video';
@@ -1030,14 +1066,14 @@
         if (found) record(found);
       });
     }
-    while (drawn.length < cardCountFor(packType)) {
-      /* Le Pack Vidéo ne tire que 2 cartes : on évite les doublons dès qu'il
-         existe assez de cartes vidéo différentes (sinon le pool est rempli). */
-      const maxSame = packType === 'video' ? 1 : MAX_SAME_CARD_PER_PACK;
-      const card = pickCard(null, boosted, packCounts, cardPool, maxSame);
-      if (!card) break;
-      record(card);
-    }
+    /* Le Pack Vidéo ne tire que 2 cartes : on évite les doublons dès qu'il
+       existe assez de cartes vidéo différentes (sinon le pool est rempli). */
+    const maxSame = packType === 'video' ? 1 : MAX_SAME_CARD_PER_PACK;
+    packSlotsFor(packType).forEach((slot) => {
+      if (drawn.length >= cardCountFor(packType)) return;
+      const card = pickCardForSlot(packType, slot, packCounts, cardPool, maxSame);
+      if (card) record(card);
+    });
     // Tri croissant : la carte la moins rare est révélée en premier, la plus
     // rare reste au fond de la pile pour faire monter la tension.
     return drawn.sort((a, b) => RARITIES[a.rarity].rank - RARITIES[b.rarity].rank);
@@ -3068,32 +3104,42 @@
     openInspect(cardById(slot.dataset.cardId));
   });
 
-  /* Probabilités : générées depuis RARITIES pour rester toujours justes.
-     En pack rare : boost progressif par rang (les raretés élevées deviennent
-     plus fréquentes que les communes, voir cardBaseWeight/rarityWeight). */
+  /* Probabilités affichées : moyenne des distributions de chaque slot
+     (table du pack + garanties, restreinte au pool). Ce sont exactement les
+     chances du tirage (drawPack) : changer PACK_TABLES / PACK_SLOTS met
+     l'affichage à jour tout seul. `boosted` est conservé pour compatibilité. */
   function renderOdds(boosted, pool, packType) {
     if (!packOdds) return;
     packOdds.replaceChildren();
-    const list = pool && pool.length ? pool : cardsDatabase;
-    const total = Object.keys(RARITIES).reduce((sum, key) => sum + rarityWeight(key, boosted, list), 0);
+    const type = isPackType(packType) ? packType : 'classic';
+    const list = pool && pool.length ? pool : packPool(type);
+    const slots = packSlotsFor(type);
+    const blended = {};
+    slots.forEach((slot) => {
+      const weights = slotRarityWeights(type, slot, list);
+      const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+      if (total <= 0) return;
+      Object.entries(weights).forEach(([key, w]) => {
+        blended[key] = (blended[key] || 0) + (w / total) / slots.length;
+      });
+    });
     Object.entries(RARITIES).forEach(([key, r]) => {
-      const weight = rarityWeight(key, boosted, list);
-      if (weight <= 0) return;
+      const pct = (blended[key] || 0) * 100;
+      if (pct <= 0) return;
       const row = el('span', `odds odds-${key}`);
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const pct = total > 0 ? (weight / total) * 100 : r.weight;
       const label = `${r.label} ${pct.toFixed(1).replace(/\.0$/, '').replace('.', ',')} %`;
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
-    if (boosted === 'ultra') {
-      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : 30× POUR LES GROSSES RARETÉS · SHINY ×7'));
-    } else if (boosted) {
+    if (type === 'ultra') {
+      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : GROSSES RARETÉS MASSIVEMENT BOOSTÉES · SHINY ×7'));
+    } else if (type === 'rare') {
       packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES · SHINY ×2'));
     }
-    if (packType === 'video') {
+    if (type === 'video') {
       packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 2 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
     }
   }
