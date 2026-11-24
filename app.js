@@ -3129,6 +3129,18 @@
       .filter((id) => typeof id === 'string')
       .filter((id) => Quests.QUESTS.some((q) => q.id === id))
       .slice(0, Math.max(1, Quests.QUESTS.length));
+    /* Les quêtes ajoutées après la première série (q71+) ne doivent pas
+       donner rétroactivement leurs récompenses aux comptes déjà existants.
+       On les marque directement terminées au chargement, sans appeler le
+       flux de réclamation (donc ni pièces, ni XP, ni boosters). */
+    if (d && Array.isArray(d.quests) && d.quests.length) {
+      for (const quest of Quests.QUESTS) {
+        const match = /^q(\d+)$/.exec(quest.id);
+        if (match && Number(match[1]) > 70 && questState.completed.indexOf(quest.id) < 0) {
+          questState.completed.push(quest.id);
+        }
+      }
+    }
     questState.achievements = (Array.isArray(d && d.achievements) ? d.achievements : [])
       .filter((id) => typeof id === 'string')
       .filter((id) => Quests.ACHIEVEMENTS.some((a) => a.id === id))
