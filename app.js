@@ -3702,8 +3702,8 @@
   }
 
   /* Les refus « permission-denied » de Firestore ne sont PAS un problème de
-     connexion : ils signalent des règles non publiées (ou trop strictes) sur
-     le projet. On les détecte pour afficher un message actionnable au lieu
+     connexion : ils peuvent venir des règles, de la session ou de données /
+     requêtes incompatibles. On les détecte pour afficher un message au lieu
      de « vérifie ta connexion », qui envoyait les joueurs sur une mauvaise
      piste (ex. « Recherche impossible pour le moment » alors que le réseau
      fonctionnait). */
@@ -3715,17 +3715,17 @@
       || /missing or insufficient permissions/i.test(message);
   }
 
-  const RULES_HELP = 'Règles Firestore refusent l’accès (permission-denied). Republie-les avec « firebase deploy --only firestore:rules » (ou Firebase Console → Firestore Database → Rules → Publier), puis recharge la page.';
+  const RULES_HELP = 'Accès Firestore refusé (permission-denied). Vérifie le projet Firebase, la connexion et les règles publiées ; une opération peut aussi être incompatible avec ces règles. Voir la console et le README.';
 
   /* Journalise l'erreur cloud et, la première fois qu'un refus de règles
      survient durant la session, affiche un toast explicite. Renvoie true
      quand il s'agissait d'un refus de règles (pour adapter le message). */
   function noteCloudError(context, error) {
     if (isPermissionDenied(error)) {
-      console.warn(`${context}: règles Firestore insuffisantes (permission-denied).`, error);
+      console.warn(`${context}: accès Firestore refusé (permission-denied).`, error);
       if (!rulesHelpShown) {
         rulesHelpShown = true;
-        showToast('Accès cloud refusé par les règles Firestore : republie firestore.rules (voir le README).');
+        showToast(`Accès cloud refusé : ${context}. Voir la console et le README.`);
       }
       return true;
     }
@@ -5312,7 +5312,7 @@
       if (globalMarketList) {
         globalMarketList.replaceChildren(el('p', 'online-empty',
           isPermissionDenied(error)
-            ? 'Le marché global est refusé par les règles Firestore. Republie firestore.rules (voir le README), puis recharge la page.'
+            ? 'Accès au marché global refusé. Vérifie le projet, la connexion et les règles Firestore (voir le README et la console).'
             : 'Impossible de charger le marché global. Vérifie ta connexion et réessaie.'));
       }
       noteCloudError('Marché global illisible', error);
@@ -5480,9 +5480,12 @@
     if (!cloudReady() || !friendListings) return;
     friendListings.replaceChildren(el('p', 'online-empty', 'Chargement des ventes…'));
     try {
-      const snap = await cloudDb.collection('marketListings').where('sellerUid', '==', uid).get();
+      // Les règles ne rendent publiques que les annonces ouvertes. Une requête
+      // par vendeur seul pourrait inclure ses ventes terminées et est refusée,
+      // même si on filtre les résultats après coup. Évite un index composite.
+      const snap = await cloudDb.collection('marketListings').where('status', '==', 'open').get();
       if (selectedFriendUid !== uid) return;
-      const listings = snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })).filter((l) => l.status === 'open');
+      const listings = snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })).filter((l) => l.status === 'open' && l.sellerUid === uid);
       const groups = groupListings(listings);
       friendListings.replaceChildren(...(groups.length ? groups.map((group) => {
         const row = el('div', 'trade-row');

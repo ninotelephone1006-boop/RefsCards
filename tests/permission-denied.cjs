@@ -96,8 +96,9 @@ function makeStore() {
   /* Le journal signale les règles, pas une « connexion ». */
   assert.ok(warnings.some((line) => /permission-denied|insuffisantes/i.test(line)), `avertissement « règles » attendu dans la console, vu : ${warnings.join(' | ')}`);
 
-  /* Le toast unique prévient des règles à republier. */
-  assert.match(doc.getElementById('toast').textContent, /règles Firestore/i, 'toast parlant des règles Firestore');
+  /* Le toast indique le refus sans supposer que les règles sont obsolètes. */
+  assert.match(doc.getElementById('toast').textContent, /accès cloud refusé/i, 'toast signalant le refus');
+  assert.doesNotMatch(doc.getElementById('toast').textContent, /republie/i, 'ne suppose pas que les règles sont obsolètes');
 
   /* Ajout d'ami : message actionnable sur les règles, plus « vérifie ta connexion ». */
   doc.querySelector('[data-tab="online"]').click();
