@@ -9,11 +9,11 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-5">
+  <meta name="app-version" content="2026.11.24-6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-3">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-4">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-5" defer></script>
+  <script src="app.js?v=2026.11.24-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -469,15 +469,15 @@
             <section class="market-block global-market-block" aria-label="Marché global">
               <div class="block-head">
                 <h3>🌍 Marché global <span class="friends-count" id="global-market-count">0</span></h3>
-                <p class="block-sub">Toutes les annonces du jeu, même celles des joueurs qui ne sont pas tes amis. Achète directement, ou ajoute le vendeur en ami.</p>
+                <p class="block-sub">Les annonces sont regroupées par carte. Clique sur une carte pour comparer les vendeurs et leurs prix, du moins cher au plus cher. Les cartes Shiny ont leur propre section.</p>
               </div>
               <div class="global-market-tools">
-                <input id="global-market-search" type="search" autocomplete="off" placeholder="Filtrer par carte, pack ou pseudo" aria-label="Filtrer les annonces du marché global">
-                <label class="global-market-filter" for="global-market-sort">Trier</label>
-                <select id="global-market-sort" aria-label="Trier les annonces du marché global">
-                  <option value="recent">Plus récentes</option>
-                  <option value="cheap">Prix croissant</option>
+                <input id="global-market-search" type="search" autocomplete="off" placeholder="Filtrer par carte ou vendeur" aria-label="Filtrer les cartes et vendeurs du marché global">
+                <label class="global-market-filter" for="global-market-sort">Trier les offres</label>
+                <select id="global-market-sort" aria-label="Trier les offres du marché global">
+                  <option value="cheap" selected>Prix croissant</option>
                   <option value="expensive">Prix décroissant</option>
+                  <option value="recent">Plus récentes</option>
                 </select>
                 <button id="global-market-refresh" class="mini-btn" type="button">Actualiser</button>
               </div>
