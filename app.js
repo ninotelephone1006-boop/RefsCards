@@ -34,6 +34,13 @@
   // réduites. Le total reste normalisé pour que les pourcentages affichés restent cohérents.
   const RARE_RANK_FACTOR_BASE = 0.45;
   const RARE_RANK_FACTOR_STEP = 0.32;
+  /* Économie : une carte déjà possédée rapporte moins à chaque révélation.
+     On ne retire jamais de pièces à personne — on limite seulement la création
+     d'argent des doublons (sinon ouvrir toujours la même commune restait une
+     source infinie). Plancher à 35 % pour que les doublons aient encore un
+     intérêt, sans permettre de s'enrichir indéfiniment en farmant une carte. */
+  const DUPLICATE_REWARD_FACTOR = 0.72;
+  const MIN_DUPLICATE_REWARD_FACTOR = 0.35;
   const MAX_QTY = 10; // quantité max par achat (on peut racheter ensuite)
   const PACK_IMAGES = {
     classic: 'assets/packet.png',
@@ -189,6 +196,9 @@
   const collFusion = $('coll-fusion');
   const collFusionLabel = $('coll-fusion-label');
   const toast = $('toast');
+  const newCardsSheet = $('new-cards-sheet');
+  const newCardsGrid = $('new-cards-grid');
+  const newCardsDesc = $('new-cards-desc');
   const pileLabel = $('pile-label');
   const footRight = $('foot-right');
   const revealTitle = $('reveal-title');
@@ -379,6 +389,21 @@
     save();
   }
 
+  /* Pièces gagnées à la révélation d'une carte. Le premier exemplaire paie
+     plein tarif ; chaque exemplaire déjà possédé réduit le gain (plancher à
+     35 %). C'est un robinet d'argent, jamais une ponction : le solde existant
+     n'est jamais touché, seul le gain des doublons est plafonné. */
+  function cardReward(card, copiesOwned = 0) {
+    const info = RARITIES[card && card.rarity] || RARITIES.common;
+    const base = CardMutations.multiply(card, info.reward, 'reward');
+    if (!Number.isFinite(base) || base <= 0) return 0;
+    const copies = Math.max(0, Math.floor(Number(copiesOwned) || 0));
+    if (!copies) return Math.round(base);
+    const factor = Math.max(MIN_DUPLICATE_REWARD_FACTOR,
+      Math.pow(DUPLICATE_REWARD_FACTOR, copies));
+    return Math.max(1, Math.round(base * factor));
+  }
+
   let toastTimer = null;
   function showToast(message, duration = 3200) {
     toast.textContent = message;
@@ -386,6 +411,85 @@
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => toast.classList.remove('show'), duration);
   }
+
+  /* =========================================== NOUVELLES CARTES DU CATALOGUE
+     À chaque retour dans le jeu, on compare les identifiants de cards.js avec
+     ceux vus lors de la dernière visite (conservés dans le navigateur). Si le
+     catalogue a grandi, une annonce animée présente les nouvelles cartes en
+     gris, avec leur numéro — leur identité reste à découvrir dans les packs.
+     Aucun compte, aucune carte et aucune pièce n'est modifié par l'annonce. */
+
+  function readSeenCatalog() {
+    try {
+      const raw = window.localStorage.getItem(CATALOG_SEEN_KEY);
+      if (!raw) return null;
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) return null;
+      return new Set(list.filter((id) => typeof id === 'string'));
+    } catch (error) {
+      /* Navigation privée / stockage bloqué : pas d'annonce, le jeu continue. */
+      return null;
+    }
+  }
+
+  function writeSeenCatalog(ids) {
+    try {
+      window.localStorage.setItem(CATALOG_SEEN_KEY, JSON.stringify(ids));
+    } catch (error) { /* stockage indisponible : on garde la liste en mémoire */ }
+  }
+
+  function closeNewCards(goToCollection = false) {
+    if (!newCardsSheet || newCardsSheet.hidden) return;
+    closeSheet(newCardsSheet);
+    if (goToCollection) setTab('collection');
+  }
+
+  function announceNewCards() {
+    if (typeof cardsDatabase === 'undefined' || !Array.isArray(cardsDatabase) || !newCardsSheet) return;
+    const ids = cardsDatabase.map((c) => c.id);
+    const seen = readSeenCatalog();
+    writeSeenCatalog(ids);
+    if (!seen) return; // 1re visite : on apprend le catalogue, sans annonce
+
+    const added = cardsDatabase.filter((c) => !seen.has(c.id));
+    if (!added.length) return;
+    catalogNewIds.clear();
+    added.forEach((c) => catalogNewIds.add(c.id));
+    renderCollection(); // les nouvelles cases se signalent dans la collection
+
+    if (newCardsDesc) {
+      newCardsDesc.textContent = added.length === 1
+        ? 'Une nouvelle carte vient d’arriver dans le catalogue. Elle t’attend dans ta collection !'
+        : `${added.length} nouvelles cartes viennent d’arriver dans le catalogue. Elles t’attendent dans ta collection !`;
+    }
+    if (newCardsGrid) {
+      newCardsGrid.replaceChildren(...added.map((card, i) => {
+        const num = cardsDatabase.indexOf(card) + 1;
+        const tile = el('div', 'newcard-tile');
+        tile.style.setProperty('--i', i);
+        tile.setAttribute('aria-label', `Nouvelle carte verrouillée, numéro ${num}`);
+        tile.append(el('span', 'lock-q', '???'));
+        tile.append(el('span', 'lock-n', `N° ${String(num).padStart(3, '0')}`));
+        tile.append(el('span', 'newcard-flag', 'NOUVEAU'));
+        return tile;
+      }));
+    }
+    openSheet(newCardsSheet);
+    const later = $('new-cards-later');
+    window.setTimeout(() => {
+      if (!newCardsSheet.hidden) (later || $('new-cards-x')).focus({ preventScroll: true });
+    }, 80);
+  }
+
+  on(newCardsSheet, 'click', (e) => {
+    if (e.target && e.target.closest && e.target.closest('[data-close-newcards]')) closeNewCards();
+  });
+  on($('new-cards-x'), 'click', () => closeNewCards());
+  on($('new-cards-later'), 'click', () => closeNewCards());
+  on($('new-cards-see'), 'click', () => closeNewCards(true));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && newCardsSheet && !newCardsSheet.hidden) closeNewCards();
+  });
 
   /* ====================================================== SHOP · INVENTAIRE
      Les packs ne s'achètent plus en un clic depuis le récap : ils vont dans
@@ -1964,15 +2068,20 @@
     if (sus) startCharge(btn, info, cx, cy, sus, doFlip);
     else doFlip();
 
-    const isNew = !state.collection.some((c) => c.id === card.id);
+    /* On compte les exemplaires AVANT d'ajouter la carte : c'est ce nombre
+       qui fixe le gain du doublon (voir cardReward). Aucune pièce n'est
+       retirée au joueur, seul le gain est ajusté. */
+    const ownedBefore = state.collection.reduce((n, owned) => n + (owned.id === card.id ? 1 : 0), 0);
+    const isNew = ownedBefore === 0;
     state.collection.push(card);
     if (isNew) { fresh.add(card.id); tabBadge.hidden = false; }
-    addCoins(CardMutations.multiply(card, info.reward, 'reward'));
+    addCoins(cardReward(card, ownedBefore));
     state.packIndex = state.deck.indexOf(card) + 1;
     pileLabel.textContent = `CARTE ${state.packIndex} / ${state.deck.length} · RÉVÉLÉE`;
     revealSub.textContent = info.rank >= RARITIES.legendary.rank
       ? `${info.label.toUpperCase()} ! Touche la carte ou le bouton pour continuer.`
       : 'Touche la carte ou le bouton pour continuer.';
+    if (!isNew) revealSub.textContent += ' Doublon : gain réduit.';
   }
 
   /* ------------------------------------------------------- inspection grand */
@@ -2765,6 +2874,8 @@
   const collEmpty = $('coll-empty');
   const tabBadge = $('tab-badge');
   const fresh = new Set(); // cartes obtenues depuis la dernière visite de la collection
+  const catalogNewIds = new Set(); // cartes ajoutées au catalogue depuis la dernière visite
+  const CATALOG_SEEN_KEY = 'refs-cards:catalog-seen';
   let collFilter = 'all';
   /* Tri courant : critère (`collSortKey`, clé de COLL_SORTS) + sens inversé
      ou non (`collSortDirFlip`, piloté par le bouton ⇅). */
@@ -3072,6 +3183,9 @@
     setAuthBusy(false);
     resetAuthFeedback();
     setTab('pack');
+    /* Annonce du catalogue : une fois le jeu affiché, on compare les cartes
+       disponibles avec celles de la dernière visite (cf. announceNewCards). */
+    announceNewCards();
   }
 
   function showAuth() {
@@ -3530,9 +3644,13 @@
       shown++;
       const num = st.num;
       if (!n) {
-        const t = el('div', 'coll-tile is-locked');
+        const t = el('div', catalogNewIds.has(card.id)
+          ? 'coll-tile is-locked catalog-new'
+          : 'coll-tile is-locked');
         t.style.setProperty('--i', i);
-        t.setAttribute('aria-label', `Carte verrouillée, numéro ${num}`);
+        t.setAttribute('aria-label', catalogNewIds.has(card.id)
+          ? `Nouvelle carte verrouillée, numéro ${num}`
+          : `Carte verrouillée, numéro ${num}`);
         t.append(el('span', 'lock-q', '???'), el('span', 'lock-n', `N° ${String(num).padStart(3, '0')}`));
         frag.append(t);
         return;

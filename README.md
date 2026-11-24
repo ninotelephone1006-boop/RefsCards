@@ -52,6 +52,19 @@ Le site est statique : un onglet déjà ouvert continue d'exécuter les fichiers
 - **En déploiement** : à chaque mise en production, incrémente les `?v=` des fichiers modifiés **et** `<meta name="app-version">` dans `index.html`. Le bandeau n'apparaît que chez les onglets déjà ouverts : c'est exactement son rôle — les visiteurs qui arrivent après le déploiement reçoivent directement la nouvelle version.
 - **Réglages** : les constantes `FIRST_CHECK_DELAY`, `CHECK_INTERVAL` et `MIN_GAP` sont en tête de `version-check.js`. L'API `window.REFS_CARDS_VERSION_CHECK` expose `check(force)`, `state()`, `dismiss()` et `reload()` (utilisée par les tests et par les boutons).
 
+## Arrivée de nouvelles cartes
+
+Quand des cartes sont ajoutées à `cards.js`, le joueur est accueilli par une annonce **« Nouvelles cartes »** dès son retour dans le jeu (connexion Google ou session déjà active) :
+
+- **Détection** : `app.js` compare les identifiants du catalogue avec la liste mémorisée dans le navigateur (`localStorage`, clé `refs-cards:catalog-seen`). La toute première visite apprend simplement le catalogue, sans annonce. Ajouter une carte au tableau `cardsDatabase` suffit : rien d'autre à déclarer. Les cartes retirées du catalogue sont oubliées à la visite suivante.
+- **Animation** : les nouvelles cartes arrivent une par une, en gris, avec `???` et leur numéro (`N° 001`, `N° 002`, …) — leur identité reste un secret à découvrir dans les boosters. Le titre, les vignettes et le halo s'animent en cascade ; `prefers-reduced-motion` affiche tout sans animation.
+- **Suite** : « VOIR MA COLLECTION → » ouvre l'onglet Collection, où ces mêmes cases grisées portent un badge **NOUVEAU** pendant la session. « Plus tard », le bouton ✕, le fond et Échap ferment l'annonce sans rien changer d'autre. L'annonce ne joue qu'une fois : la liste des cartes connues est mise à jour dès l'affichage.
+- **Aucun effet de bord** : ni carte offerte, ni pièce débitée, ni pack ajouté — l'annonce ne fait que présenter le catalogue. Le stockage local est protégé par `try/catch` : en navigation privée ou si `localStorage` est bloqué, le jeu démarre normalement (simplement sans annonce).
+
+## Économie : pas d'argent pris, mais moins d'argent créé
+
+Les packs restent au-dessus de la valeur moyenne de leur contenu, et aucun solde n'est jamais réduit automatiquement (pas d'amende, pas de reset, pas de taxe). En revanche, le gain de pièces à la révélation d'un doublon diminue : `cardReward()` paie le premier exemplaire plein tarif, puis multiplie par `0,72` par exemplaire déjà possédé, avec un plancher à `35 %` du gain de base. Le message « Doublon : gain réduit. » l'indique pendant la révélation. Fermer cette robinet des doublons évite qu'un joueur s'enrichisse indéfiniment en ouvrant toujours la même carte, sans toucher à l'argent déjà gagné ni ajouter des packs ou des cartes.
+
 ## Dépannage : « je clique sur Se connecter avec Google et rien ne se passe »
 
 L'écran de compte affiche désormais toujours la cause d'un échec (message d'erreur, code technique `auth/…`). Correspondances utiles :
