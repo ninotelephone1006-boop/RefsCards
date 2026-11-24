@@ -268,6 +268,22 @@ service cloud.firestore {
             : cardAdded(resource.data.cardId) && stockUnchanged())
           && afterSave().coins == beforeSave().coins - resource.data.price)
         ||
+        // Achat d'une offre acceptée : l'offre, l'annonce et la sauvegarde
+        // changent atomiquement, sans permettre de réutiliser une acceptation.
+        (resource.data.sellerUid != request.auth.uid && resource.data.status == 'open'
+          && !('packType' in resource.data)
+          && request.resource.data.status == 'sold' && request.resource.data.buyerUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'buyerUid', 'price', 'offerId'])
+          && request.resource.data.offerId is string
+          && get(/databases/$(database)/documents/marketOffers/$(request.resource.data.offerId)).data.status == 'accepted'
+          && get(/databases/$(database)/documents/marketOffers/$(request.resource.data.offerId)).data.listingId == listingId
+          && get(/databases/$(database)/documents/marketOffers/$(request.resource.data.offerId)).data.buyerUid == request.auth.uid
+          && get(/databases/$(database)/documents/marketOffers/$(request.resource.data.offerId)).data.sellerUid == resource.data.sellerUid
+          && request.resource.data.price == get(/databases/$(database)/documents/marketOffers/$(request.resource.data.offerId)).data.price
+          && getAfter(/databases/$(database)/documents/marketOffers/$(request.resource.data.offerId)).data.status == 'completed'
+          && cardAdded(resource.data.cardId) && stockUnchanged()
+          && afterSave().coins == beforeSave().coins - request.resource.data.price)
+        ||
         // Le vendeur encaisse une seule fois, y compris après reconnexion.
         (resource.data.sellerUid == request.auth.uid && resource.data.status == 'sold'
           && request.resource.data.status == 'completed'
@@ -275,6 +291,43 @@ service cloud.firestore {
           && afterSave().coins == beforeSave().coins + resource.data.price
           && afterSave().collection == beforeSave().collection
           && stockUnchanged())
+      );
+      allow delete: if false;
+    }
+
+    // Les négociations ne réservent ni pièces ni carte : l'achat final est
+    // effectué séparément et échoue si l'annonce a entre-temps disparu.
+    match /marketOffers/{offerId} {
+      function signedIn() { return request.auth != null; }
+      function listing() { return get(/databases/$(database)/documents/marketListings/$(request.resource.data.listingId)).data; }
+      function party() { return signedIn() && (resource.data.buyerUid == request.auth.uid || resource.data.sellerUid == request.auth.uid); }
+      function actorTurn() { return (resource.data.turn == 'seller' && resource.data.sellerUid == request.auth.uid)
+        || (resource.data.turn == 'buyer' && resource.data.buyerUid == request.auth.uid); }
+      function priceValid() { return request.resource.data.price is int && request.resource.data.price >= 0
+        && request.resource.data.price < resource.data.listingPrice; }
+      allow read: if party();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['listingId', 'sellerUid', 'buyerUid', 'cardId', 'listingPrice', 'price', 'status', 'turn', 'createdAt'])
+        && request.resource.data.listingId is string
+        && request.resource.data.buyerUid == request.auth.uid && request.resource.data.sellerUid != request.auth.uid
+        && listing().status == 'open' && !('packType' in listing())
+        && request.resource.data.sellerUid == listing().sellerUid && request.resource.data.cardId == listing().cardId
+        && request.resource.data.listingPrice == listing().price
+        && request.resource.data.price is int && request.resource.data.price >= 0 && request.resource.data.price < listing().price
+        && request.resource.data.status == 'pending' && request.resource.data.turn == 'seller'
+        && request.resource.data.createdAt is timestamp;
+      allow update: if party() && (
+        (resource.data.status == 'pending' && actorTurn() && listing().status == 'open'
+          && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+              && request.resource.data.status in ['accepted', 'rejected'])
+            || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['price', 'turn'])
+              && priceValid() && request.resource.data.turn == (resource.data.turn == 'seller' ? 'buyer' : 'seller'))))
+        || (resource.data.status == 'accepted' && resource.data.buyerUid == request.auth.uid
+          && request.resource.data.status == 'completed'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && getAfter(/databases/$(database)/documents/marketListings/$(resource.data.listingId)).data.status == 'sold'
+          && getAfter(/databases/$(database)/documents/marketListings/$(resource.data.listingId)).data.offerId == offerId
+          && getAfter(/databases/$(database)/documents/marketListings/$(resource.data.listingId)).data.buyerUid == request.auth.uid)
       );
       allow delete: if false;
     }

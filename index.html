@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-12">
+  <link rel="stylesheet" href="styles.css?v=2026.11.24-13">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -35,7 +35,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-16" defer></script>
+  <script src="app.js?v=2026.11.24-17" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -598,6 +598,9 @@
                 <p class="block-sub">Les ventes et cadeaux reçus restent ici, même si tu étais hors ligne. Ils arrivent aussi tout seuls : la page se met à jour dès qu’un ami t’envoie des pièces.</p>
               </div>
               <div id="market-inbox" class="trades-list"></div>
+              <h4 class="market-sub">🤝 Négociations de cartes</h4>
+              <p class="block-sub">Les offres concernent une carte. Après acceptation, l’acheteur doit confirmer son achat ; la carte reste en vente entre-temps.</p>
+              <div id="market-offers" class="trades-list"></div>
               <h4 class="market-sub">📤 Cadeaux envoyés</h4>
               <p class="block-sub">Les pièces envoyées restent réservées jusqu’à ce que ton ami les récupère. Tu peux annuler un cadeau encore en attente : les pièces te sont alors rendues.</p>
               <div id="market-sent" class="trades-list"></div>
@@ -781,6 +784,7 @@
           <p class="kicker"><span>✦</span> CONFIRMER <span>✦</span></p>
           <h3 id="confirm-title">Confirmer ?</h3>
           <p class="sheet-sub" id="confirm-message"></p>
+          <label id="offer-price-label" hidden>Prix proposé en pièces <input id="offer-price" type="number" min="0" max="1000000000" step="1" inputmode="numeric"></label>
           <div class="sheet-actions">
             <button class="mini-btn" type="button" data-close>Annuler</button>
             <button class="mini-btn primary" type="button" id="confirm-ok">Confirmer</button>

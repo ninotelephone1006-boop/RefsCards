@@ -4242,6 +4242,7 @@
     globalListings = [];
     globalListingsLoaded = false;
     marketGifts = [];
+    receivedOffers = []; sentOffers = [];
     sentGifts = [];
     knownGiftIds = new Set();
     hadGiftSnapshot = false;
@@ -5777,7 +5778,9 @@
   function updateOnlineTabCounts() {
     const myOpen = marketListings.filter((l) => l.status === 'open').length;
     const income = marketListings.filter((l) => l.status === 'sold').length
-      + marketGifts.filter((g) => g.status === 'pending').length;
+      + marketGifts.filter((g) => g.status === 'pending').length
+      + receivedOffers.filter((o) => o.status === 'pending' && o.turn === 'seller').length
+      + sentOffers.filter((o) => (o.status === 'pending' && o.turn === 'buyer') || o.status === 'accepted').length;
     const requests = friendRequests.length + sentRequests.length;
     setTabCount(onlineTabCounts.market, globalMarketCount ? globalMarketCount.textContent : 0);
     setTabCount(onlineTabCounts.sell, myOpen);
@@ -6095,11 +6098,26 @@
   }
 
   function askConfirm({ title, message, confirmLabel, onConfirm }) {
+    const offerLabel = $('offer-price-label');
+    if (offerLabel) offerLabel.hidden = true;
     if (confirmTitle) confirmTitle.textContent = title || 'Confirmer ?';
     if (confirmMessage) confirmMessage.textContent = message || '';
     if (confirmOk) confirmOk.textContent = confirmLabel || 'Confirmer';
     confirmAction = onConfirm || null;
     openSheet(confirmSheet);
+  }
+
+  function askOfferPrice(title, message, max, callback) {
+    askConfirm({ title, message, confirmLabel: 'Envoyer', onConfirm: () => {
+      try {
+        const price = marketNumber($('offer-price'), 0);
+        if (price >= max) throw new Error('Le prix doit être inférieur au prix de l’annonce.');
+        callback(price);
+      } catch (error) { marketInfo(error.message); }
+    }});
+    const label = $('offer-price-label');
+    const input = $('offer-price');
+    if (label && input) { label.hidden = false; input.value = ''; input.max = String(max - 1); input.focus(); }
   }
 
   on(confirmOk, 'click', () => {
@@ -6128,6 +6146,8 @@
   let globalListings = [];
   let globalListingsLoaded = false;
   let marketGifts = [];
+  let receivedOffers = [];
+  let sentOffers = [];
   let sentGifts = [];                // cadeaux que J'AI envoyés (encore en attente)
   let marketBusy = false;
   let marketDone = Promise.resolve();
@@ -6462,6 +6482,7 @@
         return row;
       }) : [el('p', 'online-empty', 'Aucune annonce en cours. Crée ton marché ci-dessus : cartes ou packs, nombre et prix comme tu veux.') ]));
     }
+    renderOffers();
     if (marketInbox) {
       const income = [
         ...marketListings.filter((l) => l.status === 'sold').map((l) => ({ ...l, kind: 'sale' })),
@@ -6531,10 +6552,12 @@
         (error) => { noteCloudError(label, error); return null; }
       );
     };
-    const [listings, gifts, sent] = await Promise.all([
+    const [listings, gifts, sent, incomingOffers, outgoingOffers] = await Promise.all([
       fetchAll('marketListings', 'sellerUid', uid, 'Mes ventes illisibles'),
       fetchAll('coinGifts', 'toUid', uid, 'Cadeaux reçus illisibles'),
-      fetchAll('coinGifts', 'fromUid', uid, 'Cadeaux envoyés illisibles')
+      fetchAll('coinGifts', 'fromUid', uid, 'Cadeaux envoyés illisibles'),
+      fetchAll('marketOffers', 'sellerUid', uid, 'Offres reçues illisibles'),
+      fetchAll('marketOffers', 'buyerUid', uid, 'Offres envoyées illisibles')
     ]);
     if (!currentUser || currentUser.uid !== uid) return false;
     if (listings) {
@@ -6547,6 +6570,8 @@
       hadGiftSnapshot = true;
     }
     if (sent) sentGifts = sent;
+    if (incomingOffers) receivedOffers = incomingOffers;
+    if (outgoingOffers) sentOffers = outgoingOffers;
     renderMarket();
     return Boolean(listings || gifts || sent);
   }
@@ -6595,6 +6620,8 @@
     watch('marketListings', 'sellerUid', uid, (list) => { marketListings = list; }, 'Mes ventes illisibles (temps réel)');
     watch('coinGifts', 'toUid', uid, (list) => { marketGifts = list; }, 'Cadeaux reçus illisibles (temps réel)');
     watch('coinGifts', 'fromUid', uid, (list) => { sentGifts = list; }, 'Cadeaux envoyés illisibles (temps réel)');
+    watch('marketOffers', 'sellerUid', uid, (list) => { receivedOffers = list; }, 'Offres reçues illisibles');
+    watch('marketOffers', 'buyerUid', uid, (list) => { sentOffers = list; }, 'Offres envoyées illisibles');
     if (!stops.length) return;
     marketUnsub = () => {
       marketUnsub = null;
@@ -6825,6 +6852,13 @@
       } catch (error) { globalMarketInfo(error.message); }
     });
     row.append(buy);
+    if (!isPack && offer.price > 0) {
+      const negotiate = el('button', 'mini-btn', 'Proposer un prix');
+      negotiate.type = 'button';
+      on(negotiate, 'click', () => askOfferPrice('Proposer un prix', `Pour une carte « ${name} » : propose moins de ${fmt(offer.price)} 🪙.`, offer.price,
+        (price) => createOffer(offer.ids[0], price)));
+      row.append(negotiate);
+    }
     return row;
   }
 
@@ -7052,12 +7086,90 @@
           } catch (error) { marketInfo(error.message); }
         });
         row.append(buy);
+        if (!isPack && group.price > 0) {
+          const negotiate = el('button', 'mini-btn', 'Proposer un prix');
+          negotiate.type = 'button';
+          on(negotiate, 'click', () => askOfferPrice('Proposer un prix', `Pour une carte « ${name} » : propose moins de ${fmt(group.price)} 🪙.`, group.price,
+            (price) => createOffer(group.ids[0], price)));
+          row.append(negotiate);
+        }
         return row;
       }) : [el('p', 'online-empty', 'Aucune annonce en cours pour le moment.') ]));
     } catch (error) {
       if (selectedFriendUid === uid) friendListings.replaceChildren(el('p', 'online-empty', 'Impossible de charger les ventes. Réessaie.'));
       noteCloudError('Ventes de l’ami illisibles', error);
     }
+  }
+
+  async function createOffer(listingId, price) {
+    if (!cloudReady()) { marketInfo('Connecte-toi pour proposer un prix.'); return; }
+    const uid = currentUser.uid;
+    try {
+      const listingRef = cloudDb.collection('marketListings').doc(listingId);
+      const ref = cloudDb.collection('marketOffers').doc();
+      await cloudDb.runTransaction(async (tx) => {
+        const snap = await tx.get(listingRef);
+        const listing = snap.exists && snap.data();
+        if (!listing || listing.status !== 'open' || listing.sellerUid === uid || !listing.cardId || price >= listing.price) throw new Error('Cette annonce n’est plus disponible à ce prix.');
+        tx.set(ref, { listingId, sellerUid: listing.sellerUid, buyerUid: uid, cardId: listing.cardId, listingPrice: listing.price, price, status: 'pending', turn: 'seller', createdAt: serverTimestamp() });
+      });
+      marketInfo('Offre envoyée ! Retrouve-la dans « Récupérer ».');
+      await loadMarket();
+    } catch (error) { marketInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Offre impossible.')); }
+  }
+
+  async function respondOffer(offer, response, price) {
+    if (!cloudReady()) return;
+    const uid = currentUser.uid;
+    try {
+      const ref = cloudDb.collection('marketOffers').doc(offer.id);
+      await cloudDb.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists && snap.data();
+        if (!data || data.status !== 'pending' || (data.turn === 'seller' ? data.sellerUid : data.buyerUid) !== uid) throw new Error('Cette offre a déjà changé.');
+        const listingSnap = await tx.get(cloudDb.collection('marketListings').doc(data.listingId));
+        if (!listingSnap.exists || listingSnap.data().status !== 'open') throw new Error('Cette carte n’est plus en vente.');
+        if (response === 'counter') {
+          if (price >= data.listingPrice) throw new Error('Le prix doit rester inférieur au prix de l’annonce.');
+          tx.update(ref, { price, turn: data.turn === 'seller' ? 'buyer' : 'seller' });
+        } else tx.update(ref, { status: response === 'accept' ? 'accepted' : 'rejected' });
+      });
+      marketInfo(response === 'accept' ? 'Offre acceptée : l’acheteur peut confirmer son achat.' : response === 'counter' ? 'Contre-offre envoyée.' : 'Offre refusée.');
+      await loadMarket();
+    } catch (error) { marketInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Réponse impossible.')); }
+  }
+
+  function renderOffers() {
+    const container = $('market-offers');
+    if (!container || !currentUser) return;
+    const uid = currentUser.uid;
+    const offers = [...receivedOffers, ...sentOffers].filter((o) => o.status === 'pending' || o.status === 'accepted' || o.status === 'rejected');
+    container.replaceChildren(...(offers.length ? offers.map((offer) => {
+      const row = el('div', 'trade-row');
+      const isSeller = offer.sellerUid === uid;
+      const myTurn = offer.status === 'pending' && (isSeller ? offer.turn === 'seller' : offer.turn === 'buyer');
+      const otherUid = isSeller ? offer.buyerUid : offer.sellerUid;
+      const text = el('span', 'trade-text');
+      const describe = (pseudo) => { text.textContent = `${isSeller ? 'Offre de' : 'Offre à'} ${pseudo} · ${cardName(offer.cardId)} · ${fmt(offer.price)} 🪙 · ${offer.status === 'rejected' ? 'refusée' : offer.status === 'accepted' ? 'acceptée, achat à confirmer' : myTurn ? 'à toi de répondre' : 'en attente'}`; };
+      describe((friendProfiles.get(otherUid) || {}).pseudo || 'Joueur');
+      if (!friendProfiles.has(otherUid)) fetchFriendProfile(otherUid).then((profile) => describe(profile.pseudo || 'Joueur'));
+      row.append(text);
+      if (myTurn) {
+        const accept = el('button', 'mini-btn primary', 'Accepter'); accept.type = 'button';
+        on(accept, 'click', () => respondOffer(offer, 'accept'));
+        const reject = el('button', 'mini-btn', 'Refuser'); reject.type = 'button';
+        on(reject, 'click', () => respondOffer(offer, 'reject'));
+        const counter = el('button', 'mini-btn', 'Contre-offre'); counter.type = 'button';
+        on(counter, 'click', () => askOfferPrice('Faire une contre-offre', `Propose moins de ${fmt(offer.listingPrice)} 🪙 pour cette carte.`, offer.listingPrice, (price) => respondOffer(offer, 'counter', price)));
+        row.append(accept, reject, counter);
+      }
+      if (!isSeller && offer.status === 'accepted') {
+        const buy = el('button', 'mini-btn primary', 'Confirmer l’achat'); buy.type = 'button';
+        on(buy, 'click', () => askConfirm({ title: 'Confirmer cet achat ?', message: `Acheter « ${cardName(offer.cardId)} » pour ${fmt(offer.price)} 🪙 ?`, confirmLabel: 'Acheter', onConfirm: () => marketTransaction('buyOffer', offer.listingId, { offerId: offer.id }) }));
+        row.append(buy);
+      }
+      return row;
+    }) : [el('p', 'online-empty', 'Aucune négociation en cours.') ]));
   }
 
   async function marketTransaction(action, id, value, options = {}) {
@@ -7090,6 +7202,8 @@
       return db.runTransaction(async (tx) => {
         const saveSnap = await tx.get(saveRef);
         const itemSnap = singleId ? await tx.get(ref) : null;
+        const offerRef = singleAction === 'buyOffer' ? db.collection('marketOffers').doc(singleValue.offerId) : null;
+        const offerSnap = offerRef ? await tx.get(offerRef) : null;
         if (!saveSnap.exists) throw new Error('Sauvegarde introuvable.');
         const saveData = saveSnap.data();
         const coins = Number(saveData.coins) || 0;
@@ -7129,21 +7243,25 @@
             cards.push(item.cardId);
           }
           patch = { status: 'cancelled' };
-        } else if (singleAction === 'buy') {
+        } else if (singleAction === 'buy' || singleAction === 'buyOffer') {
+          const negotiated = offerSnap && offerSnap.exists ? offerSnap.data() : null;
+          if (singleAction === 'buyOffer' && (!negotiated || negotiated.status !== 'accepted' || negotiated.buyerUid !== uid || negotiated.listingId !== singleId || !item || negotiated.sellerUid !== item.sellerUid)) throw new Error('Cette offre n’est plus disponible.');
+          const buyPrice = negotiated ? negotiated.price : item && item.price;
           if (!item || item.status !== 'open' || item.sellerUid === uid) {
             throw new Error(isPackItem ? 'Ce pack n’est plus en vente.' : 'Cette carte n’est plus en vente.');
           }
           /* Le marché global autorise l'achat chez n'importe qui ; l'ancien
              marché « entre amis » ne proposait que des amis. Les règles
              Firestore restent seules juge (voir firestore.rules). */
-          if (coins < item.price) throw new Error('Tu n’as pas assez de pièces.');
+          if (coins < buyPrice) throw new Error('Tu n’as pas assez de pièces.');
           if (isPackItem) {
             packStock[item.packType] = Math.min(100000, packStock[item.packType] + 1);
           } else {
             if (cards.length >= 10000) throw new Error('Ta collection est pleine.');
             cards.push(item.cardId);
           }
-          nextCoins -= item.price; patch = { status: 'sold', buyerUid: uid };
+          nextCoins -= buyPrice; patch = { status: 'sold', buyerUid: uid };
+          if (negotiated) { patch.price = buyPrice; patch.offerId = singleValue.offerId; tx.update(offerRef, { status: 'completed' }); }
         } else if (singleAction === 'claimSale') {
           if (!item || item.sellerUid !== uid || item.status !== 'sold') throw new Error('Cette vente a déjà été récupérée.');
           nextCoins += item.price; patch = { status: 'completed' };
@@ -7249,6 +7367,7 @@
           cancelGift: 'Cadeau annulé : tes pièces sont rendues.',
           cancel: 'Annonce retirée : rendu à ton inventaire.',
           buy: 'Achat réussi !',
+          buyOffer: 'Achat au prix négocié réussi !',
           claimSale: 'Pièces de la vente récupérées !',
           claimGift: 'Cadeau récupéré !'
         }[action]);
@@ -7259,10 +7378,10 @@
         const sold = marketListings.find((l) => l.id === id);
         state.marketSales = (state.marketSales || 0) + 1;
         state.marketEarned = (state.marketEarned || 0) + Math.max(0, Number(sold && sold.price) || 0);
-      } else if (action === 'buy') {
+      } else if (action === 'buy' || action === 'buyOffer') {
         state.marketBuys = (state.marketBuys || 0) + doneCount;
       }
-      if (action === 'claimSale' || action === 'buy') {
+      if (action === 'claimSale' || action === 'buy' || action === 'buyOffer') {
         trackProgress();
         save();
       }
