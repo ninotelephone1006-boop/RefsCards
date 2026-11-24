@@ -353,9 +353,9 @@ const RefsQuests = (() => {
       metric: 'epicPlus', target: 5, reward: { coins: 0, xp: 450, packs: { legend: 1 } }
     },
     {
-      id: 'q52', icon: '🛍️', title: 'Dix achats',
-      desc: 'Achète 10 packs dans le Shop.',
-      metric: 'packsBought', target: 10, reward: { coins: 500, xp: 400, packs: { classic: 3 } }
+      id: 'q52', icon: '🛍️', title: 'Quinze achats',
+      desc: 'Achète 15 packs dans le Shop.',
+      metric: 'packsBought', target: 15, reward: { coins: 500, xp: 400, packs: { classic: 3 } }
     },
     {
       id: 'q53', icon: '🏷️', title: 'Six ventes',
@@ -523,18 +523,55 @@ const RefsQuests = (() => {
     return { value, target, done: value >= target };
   }
 
-  /* Fenêtre de quêtes actives : les `windowSize` premières quêtes (dans
-     l'ordre de QUESTS) dont l'id n'est pas dans `completedIds`. Les quêtes
-     réclamées hors d'ordre sont simplement sautées : la suivante pop pour
-     garder la fenêtre pleine. Fonction pure (testable sans DOM). */
-  function activeQuests(completedIds, quests, windowSize) {
+  /* Catégories : chaque catégorie regroupe des « chaînes ». Une chaîne = toutes
+     les quêtes d'une même métrique, triées par objectif croissant (étape 1, 2,
+     3…). Seule l'étape en cours de chaque chaîne est active, et l'étape
+     suivante est annoncée : rien n'est débloqué en cachette. */
+  const CATEGORIES = [
+    { id: 'boosters', icon: '📦', label: 'Boosters', metrics: ['packsOpened', 'packsBought', 'freePacks'] },
+    { id: 'collection', icon: '📚', label: 'Collection', metrics: ['unique', 'total'] },
+    { id: 'rarity', icon: '💎', label: 'Raretés', metrics: ['rarePlus', 'epicPlus', 'legendaryPlus', 'shiny'] },
+    { id: 'trade', icon: '⚗️', label: 'Fusion & marché', metrics: ['fusions', 'marketSales', 'marketEarned', 'marketBuys'] },
+    { id: 'social', icon: '👥', label: 'Amis & niveau', metrics: ['friends', 'level', 'questsDone'] }
+  ];
+
+  function categoryOf(quest) {
+    const cat = CATEGORIES.find((c) => c.metrics.indexOf(quest && quest.metric) >= 0);
+    return cat ? cat.id : CATEGORIES[0].id;
+  }
+
+  function chainOf(quest) {
+    return QUESTS.filter((q) => q.metric === quest.metric)
+      .sort((a, b) => a.target - b.target || a.id.localeCompare(b.id));
+  }
+
+  /* { step, total } d'une quête dans sa chaîne. */
+  function chainInfo(quest) {
+    const chain = chainOf(quest);
+    return { step: chain.findIndex((q) => q.id === quest.id) + 1, total: chain.length };
+  }
+
+  /* Étape suivante de la chaîne (annoncée, jamais cachée), ou null. */
+  function nextInChain(quest, completedIds) {
     const done = new Set(Array.isArray(completedIds) ? completedIds : []);
-    const list = Array.isArray(quests) ? quests : QUESTS;
-    const size = Math.max(1, Math.floor(Number(windowSize) || QUEST_WINDOW));
+    const chain = chainOf(quest);
+    const i = chain.findIndex((q) => q.id === quest.id);
+    return chain.slice(i + 1).find((q) => !done.has(q.id)) || null;
+  }
+
+  /* Quêtes actives : la première étape non réclamée de chaque chaîne, rangées
+     par catégorie. Les paramètres `quests` / `windowSize` sont ignorés (gardés
+     pour compatibilité). */
+  function activeQuests(completedIds) {
+    const done = new Set(Array.isArray(completedIds) ? completedIds : []);
     const active = [];
-    for (const quest of list) {
-      if (active.length >= size) break;
-      if (quest && !done.has(quest.id)) active.push(quest);
+    for (const cat of CATEGORIES) {
+      for (const metric of cat.metrics) {
+        const first = QUESTS.filter((q) => q.metric === metric)
+          .sort((a, b) => a.target - b.target || a.id.localeCompare(b.id))
+          .find((q) => !done.has(q.id));
+        if (first) active.push(first);
+      }
     }
     return active;
   }
@@ -582,6 +619,10 @@ const RefsQuests = (() => {
     QUESTS,
     QUEST_WINDOW,
     activeQuests,
+    CATEGORIES,
+    categoryOf,
+    chainInfo,
+    nextInChain,
     ACHIEVEMENTS,
     xpForLevel,
     levelFromXp,
