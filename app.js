@@ -2685,6 +2685,8 @@
     if (!card) return;
     const oldCount = qs(inspectCard.parentElement, '.insp-count');
     if (oldCount) oldCount.remove();
+    const oldOdds = qs(inspectCard.parentElement, '.insp-odds');
+    if (oldOdds) oldOdds.remove();
     const info = RARITIES[card.rarity] || RARITIES.common;
     inspectCard.replaceChildren(cardFrame(card, { eager: true, alt: `${card.name} — ${info.label}` }));
     inspectCard.style.setProperty('--r-color', info.color);
@@ -2723,6 +2725,13 @@
       );
       inspectCard.parentElement.append(box);
     }
+    const shinyRate = CardMutations.definitions.find((mutation) => mutation.id === 'shiny')?.rates[card.rarity] || 0;
+    const odds = el('p', 'insp-odds');
+    odds.textContent = shinyRate > 0
+      ? `✦ Chance de Shiny : 1 sur ${fmt(Math.round(1 / shinyRate))} (sans boost)`
+      : '✦ Chance de Shiny indisponible';
+    odds.setAttribute('aria-label', odds.textContent);
+    inspectCard.parentElement.append(odds);
     inspectX.focus({ preventScroll: true });
   }
 
