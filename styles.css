@@ -4416,3 +4416,76 @@ body:has(.inspect.is-open) .update-banner{display:none}
   .flip-coin { transition-duration: .5s; }
   .flip-shadow { animation: none; }
 }
+
+/* ================================================================
+   NOTIFICATIONS HORS JEU (« vraies » notifications du téléphone)
+   ------------------------------------------------------------------
+   Deux endroits : la ligne d'accès dans la cloche (.notif-phone-row) et la
+   fenêtre de choix des catégories (.sheet-push), plus le rappel dans la page
+   Compte (.notif-settings). Le service worker sw.js affiche la notification
+   système ; rien de tout cela ne dépend du thème du pack.
+   ---------------------------------------------------------------- */
+
+/* --- accès depuis la cloche --- */
+.notif-phone-row{display:flex;align-items:center;gap:10px;margin:10px 0 2px;padding:9px 11px;
+  border:1px dashed #6b4fc4;border-radius:12px;background:#8b5cf60d;text-align:left}
+.notif-phone-row[hidden]{display:none!important}
+.notif-phone-icon{flex:0 0 auto;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;
+  font-size:15px;background:#ffffff0c;border:1px solid #ffffff14}
+.notif-phone-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+.notif-phone-text strong{font:800 11.5px 'Space Grotesk',sans-serif;color:#fff}
+.notif-phone-text small{font:700 10px 'Space Grotesk',sans-serif;letter-spacing:.05em;color:#a79fbd}
+.notif-phone-row[data-state='on']{border-style:solid;border-color:#6fe0a855;background:#6fe0a80f}
+.notif-phone-row[data-state='on'] .notif-phone-text small{color:#8ff0bd}
+.notif-phone-row[data-state='warn']{border-color:#fbbf2466;background:#fbbf240f}
+.notif-phone-row[data-state='warn'] .notif-phone-text small{color:#ffd98a}
+.notif-phone-row .mini-btn{flex:0 0 auto}
+
+/* --- fenêtre de choix --- */
+.sheet-push .sheet-dialog{width:min(100%,480px);max-height:min(88vh,700px);overflow-y:auto;
+  text-align:left;scrollbar-width:thin;scrollbar-color:#3b2f5e transparent}
+.sheet-push h3{font-size:clamp(22px,6vw,28px);line-height:1.1;letter-spacing:-.8px}
+.sheet-push h3 em{font-style:normal;color:#c084fc}
+.push-kinds{display:flex;flex-direction:column;gap:7px;margin:4px 0 10px}
+.push-kinds[data-inactive='1']{opacity:.62}
+.push-kind{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;cursor:pointer;
+  border:1px solid #ffffff10;border-radius:12px;background:#ffffff05;
+  transition:border-color .18s,background .18s,transform .15s}
+.push-kind:hover{border-color:#6b4fc4;background:#ffffff09}
+.push-kind:active{transform:scale(.995)}
+.push-kind:has(.push-kind-input:checked){border-color:#a855f766;background:linear-gradient(100deg,#8b5cf614,#c026d310)}
+.push-kind-input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.push-kind-box{flex:0 0 auto;position:relative;width:20px;height:20px;margin-top:1px;border-radius:6px;
+  border:1.5px solid #4b3a70;background:#0a0710;transition:border-color .18s,background .18s}
+.push-kind-box::after{content:'';position:absolute;left:5px;top:1px;width:6px;height:11px;
+  border-right:2.5px solid #fff;border-bottom:2.5px solid #fff;transform:rotate(42deg) scale(0);
+  transition:transform .18s var(--ease-spring)}
+.push-kind-input:checked+.push-kind-box{border-color:#c026d3;background:linear-gradient(140deg,#8b5cf6,#c026d3);
+  box-shadow:0 0 12px -3px #a855f7cc}
+.push-kind-input:checked+.push-kind-box::after{transform:rotate(42deg) scale(1)}
+.push-kind-input:focus-visible+.push-kind-box{outline:2px solid #c084fc;outline-offset:2px}
+.push-kind-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.push-kind-title{font:800 12.5px 'Space Grotesk',sans-serif;color:#fff;letter-spacing:.1px}
+.push-kind-desc{font-size:11px;line-height:1.4;color:#9c93b8}
+.push-system{margin:0 0 10px;font-size:11.5px;line-height:1.5;color:#ffd98a}
+.push-system:empty{display:none}
+.push-actions{flex-wrap:wrap;margin-top:2px}
+.push-actions .mini-btn{min-width:0}
+.push-actions .mini-btn[hidden]{display:none!important}
+.push-hint{margin:10px 0 0;font-size:11px;line-height:1.5;color:#8d84a8;text-align:center}
+.push-foot{display:flex;justify-content:center;margin-top:10px;padding-top:10px;border-top:1px solid #ffffff0d}
+.push-foot .mini-btn{border-color:transparent;background:transparent;color:#a79fbd}
+.push-foot .mini-btn:hover{color:#fff;background:#ffffff0a}
+
+/* --- rappel dans la page Compte --- */
+.notif-settings{margin-top:16px;padding:14px;border:1px solid #ffffff12;border-radius:14px;
+  background:linear-gradient(155deg,#17121ff2,#0f0b14f5);text-align:left}
+.notif-settings-head h3{margin:0;font:800 14px 'Space Grotesk',sans-serif;color:#fff;letter-spacing:-.2px}
+.push-summary{margin:6px 0 12px;font-size:12px;line-height:1.5;color:#a79fbd}
+.notif-settings .mini-btn{width:100%}
+
+@media(max-width:559px){
+  .push-kind-desc{font-size:10.5px}
+  .push-actions{flex-direction:column;align-items:stretch}
+  .push-actions .mini-btn{width:100%}
+}
