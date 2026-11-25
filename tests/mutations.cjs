@@ -32,7 +32,8 @@ vm.runInContext(`
 `, context);
 vm.runInContext(fs.readFileSync('app.js', 'utf8').replace(/\}\)\(\);\s*$/, `
   window.testMutations = { state, applySave, renderCollection, countMap, fusableEntries,
-    statsFor, cardFrame, drawPack, collectionIds };
+    statsFor, cardFrame, drawPack, collectionIds, openInspect,
+    shinyRate: card => CardMutations.definitions.find(m => m.id === 'shiny').rates[card.rarity] };
 })();`), context);
 const api = w.testMutations;
 api.applySave({ collection: ['chasseur-royer', 'chasseur-royer::shiny', 'chasseur-royer::shiny', 'unknown::shiny'] });
@@ -47,6 +48,12 @@ api.renderCollection();
 // normale avec une pastille ✦ (le détail shiny reste visible à l'inspection).
 assert.ok(w.document.querySelector('#coll-grid .coll-shiny-dot'), 'pastille shiny attendue sur la vignette');
 assert.equal(w.document.querySelector('#coll-grid .coll-pill').textContent, 'x3', 'les 3 exemplaires sont comptés');
+const inspectedCard = api.state.collection[0];
+api.openInspect(inspectedCard);
+const shinyRate = api.shinyRate(inspectedCard);
+assert.match(w.document.querySelector('.insp-odds').textContent,
+  new RegExp(`1 sur ${Math.round(1 / shinyRate)} \\(sans boost\\)`),
+  'l’inspection affiche la chance Shiny de base sans multiplicateur de booster');
 const shiny = api.state.collection[1];
 assert.ok(api.cardFrame(shiny).querySelector('.cf-mutation').textContent.includes('Shiny'));
 const stats = api.statsFor(api.collectionIds(), 0);
