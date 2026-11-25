@@ -58,7 +58,7 @@ const assert = require('node:assert/strict');
       assert.equal(w.document.querySelectorAll('.slot.is-filled').length, i + 1);
       assert.equal(w.document.querySelectorAll('#stack .card').length, 4 - i);
     }
-    assert.equal(w.document.getElementById('pile-label').textContent, '5 / 5 CARTES');
+    assert.equal(w.document.getElementById('pile-label').textContent, 'CARTE 5 / 5 · RÉVÉLÉE');
     dom.window.close();
     console.log(`PASS card flow and image paths at viewport width ${width} (DOM simulation)`);
   }
@@ -98,7 +98,10 @@ const assert = require('node:assert/strict');
     }
     const classicRate = chasseurCount / totalCards;
     assert.ok(classicRate < 0.17, `taux de Chasseur Royer trop élevé : ${(classicRate * 100).toFixed(1)} %`);
-    assert.ok(classicRate > 0.06, `Chasseur Royer doit rester tirable : ${(classicRate * 100).toFixed(1)} %`);
+    /* Le coup de pouce « pack rentable » remonte une partie des communes
+       vers des raretés plus élevées : la part du Chasseur Royer est donc
+       plus basse qu'avant (environ 4-5 %), mais la carte reste tirable. */
+    assert.ok(classicRate > 0.02, `Chasseur Royer doit rester tirable : ${(classicRate * 100).toFixed(1)} %`);
 
     for (let i = 0; i < 300; i++) {
       const pack = w.__testDraw('legend', false);

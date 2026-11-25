@@ -53,7 +53,9 @@ function makeStore() {
       mine: { sellerUid: 'me', cardId: 'pieds-de-rapace', price: 5, buyerUid: '', status: 'open', createdAt: '2026-11-21T10:00:00.000Z' },
       alreadySold: { sellerUid: 'stranger', cardId: 'pieds-de-rapace', price: 1, buyerUid: 'other', status: 'sold', createdAt: '2026-11-19T10:00:00.000Z' }
     },
-    coinGifts: {}
+    marketOffers: {},
+    coinGifts: {},
+    coinFlips: {}
   };
 }
 

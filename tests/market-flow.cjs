@@ -35,7 +35,7 @@ function makeStore(collection = ['pieds-de-rapace', 'chasseur-royer'], coins = 5
     },
     friendCodes: { 'REFS-ABC123': { uid: 'friend1' } },
     friendRequests: {},
-    trades: {}, marketListings: {}, coinGifts: {}
+    trades: {}, marketListings: {}, marketOffers: {}, coinGifts: {}, coinFlips: {}
   };
 }
 

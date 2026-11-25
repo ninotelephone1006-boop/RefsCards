@@ -269,8 +269,8 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   const stock = test.packStockFrom({ classic: 1, rare: 2, legend: 3, video: 4 });
   assert.deepEqual(
     JSON.parse(JSON.stringify(stock)),
-    { classic: 1, rare: 2, legend: 3, video: 4 },
-    'la normalisation conserve les quatre types de packs'
+    { classic: 1, rare: 2, doubleRare: 0, legend: 3, video: 4, ultra: 0 },
+    'la normalisation conserve les six types de packs (les nouveaux à zéro)'
   );
   assert.equal(test.packStockFrom({ classic: 1 }).video, 0, 'ancienne sauvegarde → 0 pack vidéo');
   test.state.packStock = stock;
@@ -317,7 +317,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   assert.equal(doc.querySelectorAll('.gap-cards i').length, 2, '2 cartes dans le booster vidéo');
 
   /* 5. Ouverture réelle : la pile contient des cartes vidéo jouables. */
-  test.showReveal();
+  test.showReveal('video');
   const stackCards = [...doc.querySelectorAll('#stack .card')];
   assert.equal(stackCards.length, 2, '2 cartes révélées');
   stackCards.forEach((node) => {
@@ -333,7 +333,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   assert.equal(demo.doc.getElementById('buy-video').disabled, true, 'sans pièces, l’achat reste désactivé en démo');
   assert.match(demo.doc.getElementById('pack-img-main').getAttribute('src'), /packetvideo\.png/);
   assert.equal(demo.doc.querySelectorAll('.gap-cards i').length, 2);
-  demo.w.__videoTest.showReveal();
+  demo.w.__videoTest.showReveal('video');
   const demoCards = [...demo.doc.querySelectorAll('#stack .card')];
   assert.equal(demoCards.length, 2, 'la démo affiche 2 cartes animées');
   demoCards.forEach((node) => {
@@ -352,7 +352,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   await wait(40);
   assert.equal(empty.w.__videoTest.packPool('video').length, 0, 'pool vidéo vide sans carte configurée');
   empty.w.__videoTest.selectPackType('video');
-  empty.w.__videoTest.showReveal();
+  empty.w.__videoTest.showReveal('video');
   assert.equal(empty.w.__videoTest.state.phase, 'pack', 'on reste sur l’écran du booster');
   assert.equal(empty.doc.getElementById('toast').textContent, 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).');
   empty.w.close();
