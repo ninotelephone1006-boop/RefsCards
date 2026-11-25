@@ -1483,13 +1483,16 @@
     const cardPool = pool && pool.length ? pool : packPool(packType);
     const drawn = [];
     const packCounts = new Map();
-    const record = (card) => {
-      drawn.push(CardMutations.roll(card, Math.random, packShinyFor(packType)));
-      packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
-    };
     const params = new URLSearchParams(window.location.search);
     const demoMode = params.get('demo') || sessionStorage.getItem('refs-demo');
     const wantsDemo = demoMode === '1' || demoMode === 'fusion' || demoMode === 'video';
+    const record = (card) => {
+      /* Les tirages de démo sont fixés d'avance (paires fusionnables, cartes
+         vidéo) : un Shiny aléatoire casserait la démonstration. */
+      const shinyMultiplier = wantsDemo ? 0 : packShinyFor(packType);
+      drawn.push(CardMutations.roll(card, Math.random, shinyMultiplier));
+      packCounts.set(card.id, (packCounts.get(card.id) || 0) + 1);
+    };
     if (wantsDemo) {
       sessionStorage.setItem('refs-demo', demoMode === 'fusion' ? 'fusion' : demoMode === 'video' ? 'video' : '1');
       /* Les identifiants de la démo vidéo sont calculés à la volée dans
@@ -5466,10 +5469,13 @@
      (sans attendre le bouton « Enregistrer »), pour ne pas perdre un
      changement oublié. */
   on(pseudoInput, 'input', () => {
+    /* On fige la valeur à la frappe : un rendu intervenu pendant le délai
+       (800 ms) peut réinitialiser le champ, et relire le DOM à ce moment-là
+       enregistrerait l'ancien pseudo au lieu de celui réellement tapé. */
+    const value = (pseudoInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 24);
     window.clearTimeout(pseudoTimer);
     pseudoTimer = window.setTimeout(async () => {
       pseudoTimer = 0;
-      const value = (pseudoInput.value || '').replace(/\s+/g, ' ').trim().slice(0, 24);
       if (!value) return;
       await savePseudo(value);
     }, 800);

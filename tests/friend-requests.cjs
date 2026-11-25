@@ -29,7 +29,7 @@ function makeStore() {
     },
     friendCodes: { 'REFS-ABC123': { uid: 'friend1' } },
     friendRequests: {},
-    trades: {}, marketListings: {}, coinGifts: {}
+    trades: {}, marketListings: {}, marketOffers: {}, coinGifts: {}, coinFlips: {}
   };
 }
 
