@@ -12,8 +12,11 @@
      vidéo ≈ 153 🪙 pour 2 cartes, ultra ≈ 1 964 🪙 — valeurs calculées depuis
      les tables de rareté et les slots garantis, voir PACK_TABLES) : à 100 🪙,
      chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
-     infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — il
-     faut jouer, fusionner et récupérer le cadeau du calendrier de connexion. */
+     infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — sauf
+     coup de pouce « pack rentable » (PACK_PROFIT_CHANCE, plus bas) : avec la
+     probabilité annoncée par pack (1/2 classique et légende, 2/5 rare et
+     double rare, 1/3 vidéo et ultra rare), la valeur brute des cartes du
+     pack est remontée au moins au prix payé. */
   const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1700, legend: 800, video: 1000, ultra: 10000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
 
@@ -268,6 +271,15 @@
     ultra: ['std', 'std', { minRank: 4 }, { minRank: 6 }, { minRank: 7 }]
   };
   const PACK_SHINY_MULTIPLIER = { classic: 1, rare: 2, doubleRare: 2, legend: 1, video: 1, ultra: 7 };
+  /* Coup de pouce « pack rentable » : probabilité qu'un pack dont la valeur
+     brute (somme des récompenses de rareté, hors réduction doublon) est sous
+     son prix soit remonté au moins au prix payé (voir boostPackProfit).
+     Classique / Légende : 1 sur 2, Rare / Double Rare : 2 sur 5,
+     Vidéo / Ultra Rare : 1 sur 3. Un pack déjà rentable ne change pas. */
+  const PACK_PROFIT_CHANCE = { classic: 1 / 2, rare: 2 / 5, doubleRare: 2 / 5, legend: 1 / 2, video: 1 / 3, ultra: 1 / 3 };
+  function packProfitChanceFor(packType) {
+    return PACK_PROFIT_CHANCE[packType] || 0;
+  }
   function packTableFor(packType) {
     return PACK_TABLES[packType] || PACK_TABLES.classic;
   }
@@ -1405,6 +1417,65 @@
     return fallback[Math.floor(Math.random() * fallback.length)];
   }
 
+  /* Valeur brute d'une carte tirée (récompense de sa rareté, mutations incluses). */
+  function packCardValue(card) {
+    const info = RARITIES[card && card.rarity] || RARITIES.common;
+    return CardMutations.multiply(card, info.reward, 'reward') || 0;
+  }
+
+  /* Coup de pouce « pack rentable » (PACK_PROFIT_CHANCE) : si le tirage vaut
+     moins que le prix réellement payé (promo incluse) et que le coup de pouce
+     se déclenche, on remonte les cartes les plus faibles, une par une, à la
+     plus petite rareté qui suffit à atteindre le prix — ou à la plus haute
+     disponible si même elle ne suffit pas (on continue alors sur la carte
+     suivante). Pool du pack et plafond de copies par pack sont respectés,
+     et le remplacement repasse par le tirage Shiny du pack. Si le pool ne
+     permet pas d'atteindre le prix, le pack est remonté au maximum possible. */
+  function boostPackProfit(drawn, packType, pool, maxSame) {
+    const price = promoUnitPrice(packType);
+    const chance = packProfitChanceFor(packType);
+    if (!drawn.length || !price || !chance || Math.random() >= chance) return;
+    let total = drawn.reduce((sum, card) => sum + packCardValue(card), 0);
+    if (total >= price) return;
+    const baseKey = (card) => card.baseId || String(card.id || '').split('::')[0];
+    const counts = new Map();
+    drawn.forEach((card) => counts.set(baseKey(card), (counts.get(baseKey(card)) || 0) + 1));
+    const raritiesByReward = Object.keys(RARITIES).sort((a, b) => RARITIES[a].reward - RARITIES[b].reward);
+    const upgraded = new Set();
+    while (total < price && upgraded.size < drawn.length) {
+      let idx = -1;
+      let lowest = Infinity;
+      drawn.forEach((card, i) => {
+        if (upgraded.has(i)) return;
+        const value = packCardValue(card);
+        if (value < lowest) { lowest = value; idx = i; }
+      });
+      if (idx < 0) break;
+      upgraded.add(idx);
+      const oldKey = baseKey(drawn[idx]);
+      counts.set(oldKey, (counts.get(oldKey) || 0) - 1);
+      const deficit = price - (total - lowest);
+      let chosen = null;
+      for (const rarity of raritiesByReward) {
+        if (RARITIES[rarity].reward < deficit) continue;
+        const candidates = availableCards(rarity, counts, pool, maxSame);
+        if (candidates.length) { chosen = candidates[Math.floor(Math.random() * candidates.length)]; break; }
+      }
+      if (!chosen) {
+        for (const rarity of [...raritiesByReward].reverse()) {
+          if (RARITIES[rarity].reward <= lowest) continue;
+          const candidates = availableCards(rarity, counts, pool, maxSame);
+          if (candidates.length) { chosen = candidates[Math.floor(Math.random() * candidates.length)]; break; }
+        }
+      }
+      if (!chosen) { counts.set(oldKey, (counts.get(oldKey) || 0) + 1); continue; }
+      const rolled = CardMutations.roll(chosen, Math.random, packShinyFor(packType));
+      drawn[idx] = rolled;
+      counts.set(baseKey(rolled), (counts.get(baseKey(rolled)) || 0) + 1);
+      total = total - lowest + packCardValue(rolled);
+    }
+  }
+
   /* `boosted` est conservé pour compatibilité (anciens appels) : le pack
      (et donc sa table + ses slots) est déduit de `type` ou du pack courant. */
   function drawPack(boosted, pool, type) {
@@ -1446,6 +1517,8 @@
       const card = pickCardForSlot(packType, slot, packCounts, cardPool, maxSame);
       if (card) record(card);
     });
+    /* Hors démo : coup de pouce rentabilité (1/2, 2/5 ou 1/3 selon le pack). */
+    if (!wantsDemo) boostPackProfit(drawn, packType, cardPool, maxSame);
     // Tri croissant : la carte la moins rare est révélée en premier, la plus
     // rare reste au fond de la pile pour faire monter la tension.
     return drawn.sort((a, b) => RARITIES[a.rarity].rank - RARITIES[b.rarity].rank);
