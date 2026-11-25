@@ -466,6 +466,20 @@
   const notifSheet = $('notif-sheet');
   const notifList = $('notif-list');
   const notifReadAll = $('notif-read-all');
+  const notifPhoneRow = $('notif-phone-row');
+  const notifPhoneState = $('notif-phone-state');
+  const notifPhoneBtn = $('notif-phone-btn');
+  /* Réglages « hors jeu » : panneau dédié (liste des notifications à recevoir). */
+  const pushSheet = $('push-sheet');
+  const pushKinds = $('push-kinds');
+  const pushMsg = $('push-msg');
+  const pushEnable = $('push-enable');
+  const pushDisable = $('push-disable');
+  const pushTest = $('push-test');
+  const pushSystemMsg = $('push-system-msg');
+  const pushHint = $('push-hint');
+  const pushSummary = $('push-summary');
+  const notifSettingsOpen = $('notif-settings-open');
 
   /* ----------------------------------------------------------------- state */
 
@@ -551,6 +565,22 @@
     };
   const NOTIF_ICONS = { quest: '🗺️', achievement: '🏆', level: '⭐', friend: '👥', market: '🪙', system: '✦' };
   const QUEST_NOTIFICATIONS_MAX = 50;
+
+  /* Notifications « hors jeu » (vraies notifications du téléphone) : module
+     push.js, chargé avant app.js. Tolérant : si le fichier manque (ancien
+     HTML en cache), le jeu fonctionne exactement comme avant, avec la seule
+     cloche interne. notifyOutOfGame() est appelé à chaque évènement qui
+     mérite une notification système (quête prête, demande d'ami, vente,
+     défi…). */
+  const Push = (typeof RefsPush !== 'undefined' && RefsPush && typeof RefsPush.notify === 'function')
+    ? RefsPush
+    : null;
+  /* Mémoire de la question « quelles notifications ? » et de la dernière
+     relance (7 jours). La question elle-même est mémorisée PAR COMPTE par
+     push.js (`asked`), si bien qu'un autre compte sur le même appareil aura
+     aussi droit à sa propre question. */
+  const PUSH_LAST_PROMPT_KEY = 'refs-cards:push-prompt-at';
+  const PUSH_ASK_COOLDOWN = 7 * 24 * 60 * 60 * 1000;
 
   /* --------------------------------------------------------------- comptes */
 
@@ -4303,6 +4333,12 @@
        différée pour laisser l'écran de chargement disparaître, et jamais
        par-dessus l'annonce des nouvelles cartes. */
     window.setTimeout(maybeShowUltraPromo, 900);
+    /* Notifications hors jeu : état des réglages (Compte / cloche) puis, si
+       la question « que veux-tu recevoir ? » n'a jamais été posée sur cet
+       appareil, elle s'ouvre une seule fois — après les annonces du jour. */
+    renderPush();
+    if (Push && Push.canNotify()) Push.ready().catch(() => { /* facultatif */ });
+    schedulePushAsk(6500);
   }
 
   function showAuth() {
@@ -4340,6 +4376,9 @@
     hadFlipSnapshot = false;
     flipAnimated.clear();
     flipActiveGameId = null;
+    flipPushKnown = null;
+    offersPushKnown = null;
+    hadOffersSnapshot = false;
     selectedFriendUid = null;
     rulesHelpShown = false;
     legacySaveKeys = false;
@@ -4392,6 +4431,10 @@
     showLoginPage();
     setAuthBusy(false);
     resetAuthFeedback();
+    /* Les préférences de notifications sont par compte : à la déconnexion, on
+       n'affiche plus celles du joueur qui vient de partir. */
+    window.clearTimeout(pushAskTimer);
+    renderPush();
   }
 
   /* La connexion doit toujours donner un retour visible : bouton occupé,
@@ -5625,6 +5668,14 @@
       pushNotification('friend', 'Demande d’ami reçue',
         `${name} veut t’ajouter en ami. Accepte-la dans « En ligne → Demandes reçues ».`);
     }
+    /* Demande reçue pendant que le jeu tournait (toast + cloche ci-dessus) :
+       la notification système suit, hors jeu et une seule fois par demande. */
+    if (fresh.length && hadRequests) {
+      fresh.forEach((r) => {
+        const name = (friendProfiles.get(r.fromUid) || {}).pseudo || 'Un joueur';
+        notifyKind('friends', 'Demande d’ami', `${name} veut t’ajouter en ami. Accepte-la dans « En ligne → Demandes reçues ».`, { tag: r.id });
+      });
+    }
     hadRequests = true;
     renderOnline();
   }
@@ -6192,6 +6243,14 @@
 
   /* --------------------------------------------- fenêtres d'achat / confirmation */
 
+  /* Fenêtres ouvertes hors du contrôle générique de openSheet() (annonces du
+     catalogue et promos) : utilisé par maybeAskPush() pour ne jamais empiler
+     la question des notifications par-dessus une annonce. */
+  function otherSheetOpen() {
+    return [newCardsSheet, promoSheet, $('double-promo-sheet'), $('flip-overlay')]
+      .some((sheet) => sheet && !sheet.hidden);
+  }
+
   function openSheet(sheet) {
     if (!sheet) return;
     sheet.hidden = false;
@@ -6680,8 +6739,15 @@
       hadGiftSnapshot = true;
     }
     if (sent) sentGifts = sent;
-    if (incomingOffers) receivedOffers = incomingOffers;
-    if (outgoingOffers) sentOffers = outgoingOffers;
+    if (incomingOffers) {
+      receivedOffers = incomingOffers;
+      announceOffersOutOfGame(receivedOffers, { seller: true, firstSnapshot: !hadOffersSnapshot });
+    }
+    if (outgoingOffers) {
+      sentOffers = outgoingOffers;
+      announceOffersOutOfGame(sentOffers, { seller: false, firstSnapshot: !hadOffersSnapshot });
+      hadOffersSnapshot = true;
+    }
     renderMarket();
     return Boolean(listings || gifts || sent);
   }
@@ -6699,6 +6765,13 @@
     showToast(fresh.length === 1
       ? `🪙 ${who} t’a envoyé ${fmt(total)} pièces — « En ligne → Pièces à récupérer ».`
       : `🪙 ${fresh.length} cadeaux reçus (${fmt(total)} pièces) — « En ligne → Pièces à récupérer ».`, 4800);
+    /* Hors jeu : les pièces envoyées par un ami sont une vraie nouvelle, même
+       si le joueur ne regarde pas l'onglet « En ligne ». */
+    notifyKind('market', 'Pièces reçues',
+      fresh.length === 1
+        ? `${who} t’a envoyé ${fmt(total)} 🪙 — récupère-les dans « En ligne ».`
+        : `${fresh.length} cadeaux de pièces (${fmt(total)} 🪙) à récupérer dans « En ligne ».`,
+      { tag: `gifts-${fresh.map((g) => g.id).join('-')}`.slice(0, 60) });
   }
 
   /* Temps réel : les pièces envoyées par un ami apparaissent sans devoir
@@ -6730,8 +6803,16 @@
     watch('marketListings', 'sellerUid', uid, (list) => { marketListings = list; }, 'Mes ventes illisibles (temps réel)');
     watch('coinGifts', 'toUid', uid, (list) => { marketGifts = list; }, 'Cadeaux reçus illisibles (temps réel)');
     watch('coinGifts', 'fromUid', uid, (list) => { sentGifts = list; }, 'Cadeaux envoyés illisibles (temps réel)');
-    watch('marketOffers', 'sellerUid', uid, (list) => { receivedOffers = list; }, 'Offres reçues illisibles');
-    watch('marketOffers', 'buyerUid', uid, (list) => { sentOffers = list; }, 'Offres envoyées illisibles');
+    watch('marketOffers', 'sellerUid', uid, (list) => {
+      receivedOffers = list;
+      announceOffersOutOfGame(receivedOffers, { seller: true, firstSnapshot: !hadOffersSnapshot });
+      hadOffersSnapshot = true;
+    }, 'Offres reçues illisibles');
+    watch('marketOffers', 'buyerUid', uid, (list) => {
+      sentOffers = list;
+      announceOffersOutOfGame(sentOffers, { seller: false, firstSnapshot: !hadOffersSnapshot });
+      hadOffersSnapshot = true;
+    }, 'Offres envoyées illisibles');
     if (!stops.length) return;
     marketUnsub = () => {
       marketUnsub = null;
@@ -6885,6 +6966,9 @@
       hadFlipSnapshot = true;
       flipGames.forEach((g) => { if (g.status === 'finished') flipAnimated.add(g.id); });
     }
+    /* Notification hors jeu : défi reçu, gagné / perdu, refusé — jamais au
+       premier chargement (le joueur ouvre la page, il voit l'onglet Jeux). */
+    announceFlipOutOfGame(flipGames, !flipPushKnown);
   }
 
   /* Transaction du jeu : réserve / rembourse les mises dans la sauvegarde de
@@ -8393,7 +8477,7 @@
      compte les non lues ; le badge de l'onglet Quêtes signale une récompense
      à réclamer. */
 
-  function pushNotification(type, title, message) {
+  function pushNotification(type, title, message, extra) {
     questState.notifications.unshift({
       id: `n-${Date.now()}-${++notifSeq}`,
       type: NOTIF_ICONS[type] ? type : 'system',
@@ -8405,6 +8489,328 @@
     questState.notifications = questState.notifications.slice(0, QUEST_NOTIFICATIONS_MAX);
     updateNotifBadge();
     save();
+    /* Même évènement, mais HORS JEU : notification du téléphone si le joueur
+       l'a demandée pour cette catégorie et si le jeu n'est pas sous ses yeux.
+       `extra` permet d'imposer une catégorie (le cadeau du jour n'est pas une
+       promo) ou un regroupement. */
+    notifyOutOfGame(type, title, message, extra);
+  }
+
+  /* ------------------------------------------------- notifications hors jeu
+     Vraies notifications du système (bandeau Android, bannière iOS 16.4+,
+     notification Windows/macOS), affichées par le service worker `sw.js`.
+     Le joueur choisit lui-même CE QU'IL VEUT recevoir : panneau « Notifications
+     du téléphone » (Compte → « Choisir mes notifications »), ligne « Choisir »
+     en haut de la cloche, ou la question posée une fois à sa première visite.
+     Voir push.js. */
+
+  /* Type de notification interne → catégorie choisie par l'utilisateur. */
+  const PUSH_KIND_OF_TYPE = {
+    quest: 'quests',
+    achievement: 'achievements',
+    level: 'levels',
+    friend: 'friends',
+    market: 'market',
+    system: 'news'
+  };
+  /* Textes affichés par la notification système : le titre y gagne un emoji
+     (le bandeau n'a pas d'icône de catégorie) et le corps reste court. */
+  const PUSH_KIND_EMOJI = {
+    quests: '🗺️', achievements: '🏆', levels: '⭐', friends: '👥',
+    market: '🪙', games: '🎲', gift: '🎁', news: '📣'
+  };
+
+  function pushUid() {
+    return (currentUser && currentUser.uid) || '';
+  }
+
+  function notifyOutOfGame(type, title, message, extra) {
+    if (!Push) return;
+    const kind = (extra && extra.kind) || PUSH_KIND_OF_TYPE[type] || 'news';
+    try {
+      Push.notify({
+        uid: pushUid(),
+        kind,
+        title: `${PUSH_KIND_EMOJI[kind] || '✦'} ${title || 'Refs Cards'}`,
+        body: message,
+        tag: (extra && extra.tag) || undefined,
+        url: (extra && extra.url) || './',
+        force: Boolean(extra && extra.force)
+      }).catch(() => { /* jamais bloquant pour le jeu */ });
+    } catch (error) { /* notifications indisponibles : le jeu continue */ }
+  }
+
+  /* Notification « libre » (pas d'entrée dans la cloche) : sert aux
+     évènements multi-joueurs instantanés (défi reçu, pièces envoyées…). */
+  function notifyKind(kind, title, message, extra) {
+    notifyOutOfGame(kind, title, message, Object.assign({ kind }, extra || {}));
+  }
+
+  function pushSystemNotice() {
+    if (!Push) return '';
+    const info = Push.support();
+    if (!info.api) return 'Ce navigateur ne sait pas afficher de notifications du système. La cloche du jeu reste disponible.';
+    if (!info.secure) return 'Les notifications du téléphone demandent une adresse sécurisée (https). Ici, la cloche du jeu reste disponible.';
+    if (info.needsInstall) return 'Sur iPhone / iPad, ajoute d’abord Refs Cards à l’écran d’accueil (Partager → « Sur l’écran d’accueil ») : iOS n’autorise les notifications que pour une application installée.';
+    if (info.permission === 'denied') return 'Les notifications sont bloquées pour ce site. Réautorise-les dans les réglages du navigateur (icône à gauche de l’adresse), puis reviens ici.';
+    if (!info.serviceWorker) return 'Ton navigateur affichera les notifications tant que le jeu reste ouvert dans un onglet.';
+    return '';
+  }
+
+  function pushPrefs() {
+    if (!Push) return { enabled: false, asked: false, kinds: {} };
+    return Push.prefs(pushUid());
+  }
+
+  /* Résumé en une phrase de ce que le joueur va recevoir. */
+  function pushSummaryText(prefs) {
+    if (!Push) return 'Notifications du téléphone indisponibles dans cette version.';
+    const state = prefs || pushPrefs();
+    if (!state.enabled) return 'Désactivées. Choisis ci-dessous les notifications que tu veux recevoir sur ton téléphone.';
+    const on = Push.KINDS.filter((kind) => state.kinds[kind.id] !== false);
+    if (!on.length) return 'Activées, mais aucune catégorie n’est cochée : rien ne sera envoyé.';
+    return `Activées : ${on.map((kind) => kind.label).join(' · ')}.`;
+  }
+
+  /* Construit la liste des interrupteurs (panneau « hors jeu »). */
+  function renderPushKinds() {
+    if (!pushKinds || !Push) return;
+    const state = pushPrefs();
+    pushKinds.replaceChildren(...Push.KINDS.map((kind) => {
+      const row = el('label', 'push-kind');
+      const input = el('input');
+      input.type = 'checkbox';
+      input.className = 'push-kind-input';
+      input.dataset.pushKind = kind.id;
+      input.checked = state.kinds[kind.id] !== false;
+      const box = el('span', 'push-kind-box');
+      box.setAttribute('aria-hidden', 'true');
+      const text = el('span', 'push-kind-text');
+      text.append(
+        el('strong', 'push-kind-title', `${kind.icon} ${kind.label}`),
+        el('span', 'push-kind-desc', kind.desc)
+      );
+      row.append(input, box, text);
+      return row;
+    }));
+  }
+
+  /* Met à jour l'état affiché (panneau + accès depuis la cloche + Compte). */
+  function renderPush() {
+    const info = Push ? Push.support() : null;
+    const state = pushPrefs();
+    const active = Boolean(info && info.permission === 'granted' && state.enabled);
+    if (pushSheet) {
+      renderPushKinds();
+      if (pushMsg) pushMsg.textContent = pushSummaryText(state);
+      if (pushSystemMsg) pushSystemMsg.textContent = pushSystemNotice();
+      const granted = Boolean(info && info.permission === 'granted');
+      if (pushEnable) {
+        /* La permission du navigateur est acquise mais la préférence est
+           coupée : le bouton sert à tout réactiver sans redemander. */
+        pushEnable.hidden = active;
+        pushEnable.disabled = Boolean(info && (info.needsInstall || !info.api || !info.secure));
+        pushEnable.textContent = info && info.permission === 'denied'
+          ? 'Notifications bloquées'
+          : granted ? 'Réactiver les notifications' : 'Activer les notifications';
+      }
+      if (pushDisable) pushDisable.hidden = !active;
+      if (pushTest) {
+        pushTest.disabled = !granted;
+        pushTest.hidden = !active;
+      }
+      if (pushHint) {
+        pushHint.textContent = active
+          ? 'Elles s’affichent quand le jeu n’est pas au premier plan. Le bouton « Tester » en envoie une tout de suite, même jeu ouvert.'
+          : 'Aucune demande n’est faite sans ton accord : la permission du navigateur n’est demandée qu’en cliquant sur « Activer les notifications ».';
+      }
+      if (pushKinds) pushKinds.dataset.inactive = active ? '0' : '1';
+    }
+    if (pushSummary) pushSummary.textContent = pushSummaryText(state);
+    if (notifPhoneRow && notifPhoneState) {
+      notifPhoneRow.hidden = !Push;
+      notifPhoneState.textContent = !Push
+        ? ''
+        : active
+          ? 'Activées'
+          : state.enabled
+            ? 'À réautoriser'
+            : 'Désactivées';
+      notifPhoneRow.dataset.state = active ? 'on' : state.enabled ? 'warn' : 'off';
+    }
+  }
+
+  function setPushMsg(message) {
+    if (pushMsg) pushMsg.textContent = message || pushSummaryText();
+    if (message) showToast(message, 3600);
+  }
+
+  /* Active tout : permission du navigateur puis préférence « activées ». */
+  async function enablePush({ force = false } = {}) {
+    if (!Push) return false;
+    const info = Push.support();
+    if (info.needsInstall) {
+      Push.markAsked(pushUid());
+      setPushMsg('Ajoute Refs Cards à l’écran d’accueil (Partager → « Sur l’écran d’accueil »), rouvre le jeu depuis cette icône, puis reviens activer les notifications.');
+      return false;
+    }
+    if (!info.api || !info.secure) {
+      setPushMsg(pushSystemNotice());
+      return false;
+    }
+    let permission = info.permission;
+    if (permission !== 'granted') permission = await Push.askPermission();
+    Push.markAsked(pushUid());
+    if (permission !== 'granted') {
+      setPushMsg(permission === 'denied'
+        ? 'Le navigateur a refusé les notifications. Réautorise-les dans ses réglages pour ce site, puis réessaie.'
+        : 'Autorisation non accordée : tu peux réessayer quand tu veux.');
+      renderPush();
+      return false;
+    }
+    Push.setEnabled(pushUid(), true);
+    /* Un service worker est nécessaire pour les notifications Android : on
+       l'enregistre tout de suite (sans bloquer si l'activation traîne). */
+    Push.ready().catch(() => {});
+    renderPush();
+    {
+      /* Message de bienvenue immédiat : il confirme au joueur que ça marche,
+         même jeu ouvert (seul le bouton « Tester » force ainsi l'affichage). */
+      const sent = await Push.notify({
+        uid: pushUid(),
+        kind: 'news',
+        title: '🔔 Notifications activées',
+        body: 'Refs Cards te préviendra hors du jeu : quêtes prêtes, amis, ventes. Tu peux régler chaque catégorie ici.',
+        tag: 'welcome',
+        force: true
+      });
+      setPushMsg(sent
+        ? 'Notifications activées. Une notification de bienvenue vient de partir.'
+        : 'Notifications activées, mais le navigateur n’a pas pu les afficher. Vérifie les réglages du système (mode silencieux / notifications du navigateur).');
+    }
+    return true;
+  }
+
+  function disablePush() {
+    if (!Push) return;
+    Push.setEnabled(pushUid(), false);
+    Push.markAsked(pushUid());
+    renderPush();
+    setPushMsg('Notifications du téléphone désactivées. La cloche du jeu continue de tout enregistrer.');
+  }
+
+  async function testPush() {
+    if (!Push) return;
+    const prefs = pushPrefs();
+    if (!prefs.enabled) {
+      setPushMsg('Active d’abord les notifications du téléphone avec le bouton ci-dessus.');
+      return;
+    }
+    const sent = await Push.notify({
+      uid: pushUid(),
+      kind: 'news',
+      title: '🔔 Ceci est un test',
+      body: 'Si tu vois ce message hors du jeu, tout fonctionne. Désactive les catégories inutiles dans « Notifications ».',
+      tag: 'test',
+      force: true
+    });
+    setPushMsg(sent
+      ? 'Test envoyé ! Il apparaît même si le jeu est ouvert — c’est le bouton de test qui force l’envoi.'
+      : 'Impossible d’afficher la notification : vérifie l’autorisation du navigateur et, sur iPhone, que le jeu est bien installé sur l’écran d’accueil.');
+  }
+
+  function openPushSheet() {
+    if (!pushSheet) return;
+    renderPush();
+    openSheet(pushSheet);
+    const first = pushEnable && !pushEnable.hidden ? pushEnable : (pushKinds && pushKinds.querySelector('input'));
+    if (first && typeof first.focus === 'function') {
+      window.setTimeout(() => { if (!pushSheet.hidden) first.focus({ preventScroll: true }); }, 80);
+    }
+  }
+
+  function closePushSheet() {
+    closeSheet(pushSheet);
+    renderPush();
+  }
+
+  /* Question posée UNE fois, à la première visite (après une petite attente,
+     pour ne pas surgir par-dessus la connexion ou une annonce). Elle demande
+     simplement quelles notifications le joueur veut : refuser ou fermer ne
+     redemande rien avant 7 jours — et jamais pendant une ouverture de pack. */
+  function readFlag(key) {
+    try { return window.localStorage.getItem(key) || ''; } catch (error) { return ''; }
+  }
+
+  function writeFlag(key, value) {
+    try { window.localStorage.setItem(key, value); } catch (error) { /* stockage bloqué */ }
+  }
+
+  function maybeAskPush() {
+    if (!Push || !pushSheet) return;
+    const info = Push.support();
+    if (!info.api || !info.secure || info.needsInstall || info.permission === 'denied') return;
+    const prefs = pushPrefs();
+    if (prefs.asked || prefs.enabled) return;
+    const last = Number(readFlag(PUSH_LAST_PROMPT_KEY)) || 0;
+    if (last && Date.now() - last < PUSH_ASK_COOLDOWN) return;
+    /* Ne jamais interrompre le joueur : ni pendant une ouverture/révélation
+       (`state` = état du jeu), ni par-dessus une autre fenêtre (catalogue,
+       promo, panneau, défi). */
+    if (state.phase !== 'pack' || app.dataset.tab !== 'pack') return;
+    if (document.querySelector('.sheet:not([hidden])') || otherSheetOpen()) return;
+    Push.markAsked(pushUid());
+    writeFlag(PUSH_LAST_PROMPT_KEY, String(Date.now()));
+    openPushSheet();
+  }
+
+  /* Déclencheurs automatiques des notifications hors jeu, en plus de celles
+     émises par pushNotification() (quête prête, succès, niveau, ami, vente,
+     cadeau du jour) : les évènements multi-joueurs instantanés. */
+  /* Étapes déjà connues, pour n'annoncer QUE ce qui vient d'arriver pendant la
+     session (comme les ventes et les cadeaux). Remplis par les écoutes temps
+     réel Firestore, déclenchés dans ingestFlipDocs / loadMarket. */
+  let flipPushKnown = null;       // `${id}:${status}` des défis déjà vus
+  let offersPushKnown = null;     // `${id}:${status}:${turn}` des offres déjà vues
+  let hadOffersSnapshot = false;  // premier chargement des offres : pas de rafale
+
+  function announceFlipOutOfGame(list, firstSnapshot) {
+    if (!Push || !currentUser) return;
+    const me = currentUser.uid;
+    const known = flipPushKnown || new Set();
+    const fresh = (list || []).filter((game) => !known.has(`${game.id}:${game.status}`));
+    flipPushKnown = new Set((list || []).map((game) => `${game.id}:${game.status}`));
+    if (firstSnapshot) return; // premier chargement : pas de rafale
+    fresh.forEach((game) => {
+      const pot = flipPot(game);
+      if (game.status === 'pending' && game.toUid === me) {
+        notifyKind('games', 'Défi pile ou face reçu', `${flipPseudo(game.fromUid)} parie ${fmt(game.amount || 0)} 🪙 : à toi de relever le défi.`, { tag: game.id });
+      } else if (game.status === 'finished' && game.toUid === me && game.winnerUid) {
+        notifyKind('games', game.winnerUid === me ? 'Défi gagné !' : 'Défi perdu',
+          game.winnerUid === me
+            ? `${fmt(pot)} 🪙 à récupérer : ton côté est tombé.`
+            : `${flipPseudo(game.winnerUid)} remporte ${fmt(pot)} 🪙.`, { tag: game.id });
+      } else if (game.status === 'declined' && game.fromUid === me) {
+        notifyKind('games', 'Défi refusé', `${flipPseudo(game.toUid)} a refusé ton défi : ta mise de ${fmt(game.amount || 0)} 🪙 est à récupérer.`, { tag: game.id });
+      }
+    });
+  }
+
+  function announceOffersOutOfGame(list, { seller = true, firstSnapshot = false } = {}) {
+    if (!Push || !currentUser) return;
+    const me = currentUser.uid;
+    const known = offersPushKnown || new Set();
+    const fresh = (list || []).filter((offer) => !known.has(`${offer.id}:${offer.status}:${offer.turn}`));
+    offersPushKnown = new Set((list || []).map((offer) => `${offer.id}:${offer.status}:${offer.turn}`));
+    if (firstSnapshot) return;
+    fresh.forEach((offer) => {
+      const mine = seller ? offer.sellerUid === me : offer.buyerUid === me;
+      if (!mine || offer.status !== 'pending' || offer.turn !== (seller ? 'seller' : 'buyer')) return;
+      const pseudo = (friendProfiles.get(seller ? offer.buyerUid : offer.sellerUid) || {}).pseudo || 'Un joueur';
+      notifyKind('market', seller ? 'Offre reçue' : 'Réponse à ton offre',
+        `${pseudo} · ${cardName(offer.cardId)} · ${fmt(offer.price)} 🪙 : à toi de répondre dans « Récupérer ».`,
+        { tag: offer.id });
+    });
   }
 
   function unreadNotificationCount() {
@@ -8689,13 +9095,58 @@
     }
     if (newDay) {
       pushNotification('system', 'Cadeau de connexion disponible',
-        'Un nouveau jour du calendrier t’attend dans le Shop : récupère ton cadeau gratuit.');
+        'Un nouveau jour du calendrier t’attend dans le Shop : récupère ton cadeau gratuit.',
+        { kind: 'gift' });
     }
   }
 
   /* Écouteurs du panneau de notifications et des onglets Quêtes / Succès. */
   on(notifBtn, 'click', () => { SFX.unlock(); openNotifSheet(); });
   on(notifReadAll, 'click', markAllNotificationsRead);
+
+  /* --------- réglages des notifications hors jeu (push.js + sw.js) --------- */
+  on(notifPhoneBtn, 'click', () => { closeNotifSheet(); openPushSheet(); });
+  on(notifSettingsOpen, 'click', () => openPushSheet());
+  on(pushEnable, 'click', () => { enablePush().catch(() => {}); });
+  on(pushDisable, 'click', disablePush);
+  on(pushTest, 'click', () => { testPush().catch(() => {}); });
+  on(pushKinds, 'change', (event) => {
+    const input = event.target && event.target.closest ? event.target.closest('[data-push-kind]') : null;
+    if (!input || !Push) return;
+    Push.setKind(pushUid(), input.dataset.pushKind, input.checked);
+    /* renderPush() reconstruit la liste : on relit l'absence de choix dans les
+       préférences (jamais depuis le DOM, reconstruit justement). */
+    renderPush();
+    if (pushMsg) pushMsg.textContent = pushSummaryText();
+  });
+  if (pushSheet) {
+    pushSheet.querySelectorAll('[data-close-push]').forEach((button) => {
+      on(button, 'click', closePushSheet);
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pushSheet && !pushSheet.hidden) closePushSheet();
+  });
+  /* Le navigateur peut changer d'avis (autorisation accordée depuis ses
+     réglages) : on rafraîchit l'affichage à chaque retour sur l'onglet, et on
+     redemande la question si elle n'a jamais été posée. */
+  let pushAskTimer = 0;
+  function schedulePushAsk(delay = 4000) {
+    window.clearTimeout(pushAskTimer);
+    if (!Push) return;
+    pushAskTimer = window.setTimeout(() => {
+      try {
+        maybeAskPush();
+        /* La question a été REPOUSSÉE (le joueur est dans une annonce, une
+           ouverture de pack…) : on retente plus tard au lieu de la perdre. */
+        if (!pushPrefs().asked) schedulePushAsk(Math.max(delay, 20000));
+      } catch (error) { /* jamais bloquant */ }
+    }, delay);
+  }
+  on(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'visible' && currentUser) renderPush();
+  });
+
   if (notifSheet) {
     notifSheet.querySelectorAll('[data-close-notif]').forEach((button) => {
       on(button, 'click', closeNotifSheet);

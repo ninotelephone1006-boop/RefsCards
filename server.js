@@ -23,7 +23,11 @@ const server = http.createServer(async (req, res) => {
   try {
     const stat = await fs.promises.stat(file);
     if (!stat.isFile()) throw new Error('Not a file');
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Content-Length': stat.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': path.extname(file) === '.html' ? 'no-cache' : 'public, max-age=3600' });
+    /* sw.js : jamais mis en cache (le navigateur doit voir tout de suite une
+       nouvelle version du service worker des notifications). */
+    const ext = path.extname(file).toLowerCase();
+    const cache = ext === '.html' ? 'no-cache' : path.basename(file) === 'sw.js' ? 'no-cache' : 'public, max-age=3600';
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': stat.size, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': cache });
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(file).pipe(res);
   } catch {
