@@ -4286,6 +4286,9 @@
        Les anciennes propositions trades/ ne sont plus chargées ni proposées. */
     loadMarket();
     subscribeMarket();
+    /* Jeux (pile ou face) : défis entre amis en temps réel. */
+    loadFlipGames();
+    subscribeFlipGames();
     if (authScreen) authScreen.hidden = true;
     hideLoading();
     gameRegions.forEach((region) => region.removeAttribute('inert'));
@@ -4332,6 +4335,11 @@
     knownGiftIds = new Set();
     hadGiftSnapshot = false;
     unsubscribeMarket();
+    unsubscribeFlipGames();
+    flipGames = [];
+    hadFlipSnapshot = false;
+    flipAnimated.clear();
+    flipActiveGameId = null;
     selectedFriendUid = null;
     rulesHelpShown = false;
     legacySaveKeys = false;
@@ -4584,6 +4592,7 @@
       loadMarket();
       loadGlobalMarket();
       loadFriendRequests();
+      loadFlipGames();
       if (selectedFriendUid) loadFriendListings(selectedFriendUid);
     } else if (tab === 'pack') {
       renderPackInventory();
@@ -5828,7 +5837,8 @@
     market: $('online-tab-count-market'),
     sell: $('online-tab-count-sell'),
     inbox: $('online-tab-count-inbox'),
-    friends: $('online-tab-count-friends')
+    friends: $('online-tab-count-friends'),
+    games: $('online-tab-count-games')
   };
 
   function setOnlineTab(panel, { scroll = false } = {}) {
@@ -5876,6 +5886,13 @@
     setTabCount(onlineTabCounts.sell, myOpen);
     setTabCount(onlineTabCounts.inbox, income);
     setTabCount(onlineTabCounts.friends, requests);
+    /* Onglet Jeux : défis à relever + gains à récupérer. */
+    const me = currentUser && currentUser.uid;
+    const gameAlerts = me ? flipGames.filter((g) =>
+      (g.status === 'pending' && g.toUid === me)
+      || (g.status === 'finished' && g.winnerUid === me)
+      || (g.status === 'declined' && g.fromUid === me)).length : 0;
+    setTabCount(onlineTabCounts.games, gameAlerts);
     setTabCount($('my-listings-count'), myOpen);
   }
 
@@ -5941,6 +5958,7 @@
     }
     renderFriendRequests();
     if (selectedFriendUid) renderFriendDetail(selectedFriendUid);
+    renderFlipGames();
     updateOnlineTabCounts();
   }
 
@@ -6725,6 +6743,520 @@
     if (marketUnsub) marketUnsub();
     marketUnsub = null;
   }
+
+  /* ========================== JEUX : PILE OU FACE ==========================
+     Défi 1v1 entre amis sur la pièce : chaque joueur choisit sa mise (la
+     somme qu'il veut) et son côté (pile = P, face = F, textures pixel art).
+     Le défi est un document coinFlips/{id} ; les mises sont réservées dans
+     la sauvegarde de chaque joueur par transactions atomiques (voir
+     firestore.rules, collection coinFlips). Quand l'ami relève le défi, le
+     résultat est figé pile/face, la pièce tourne en animation et celui qui a
+     choisi le côté qui tombe remporte la somme des deux mises. */
+  let flipGames = [];              // défi coinFlips où je suis fromUid ou toUid
+  let flipUnsub = null;
+  let hadFlipSnapshot = false;     // premier aperçu reçu : sert de base aux animations
+  let flipChoice = 'pile';         // côté choisi dans le formulaire de défi
+  let flipActiveGameId = null;     // partie affichée dans l'animation de la pièce
+  const flipAnimated = new Set();  // parties déjà animées (une animation par résultat)
+
+  const flipFriend = $('flip-friend');
+  const flipAmountInput = $('flip-amount');
+  const flipMessage = $('flip-message');
+  const flipReceived = $('flip-received');
+  const flipSent = $('flip-sent');
+  const flipHistory = $('flip-history');
+
+  const FLIP_LABELS = { pile: 'PILE', face: 'FACE' };
+  const FLIP_MESSAGES = {
+    create: 'Défi envoyé ! Ta mise est réservée en attendant que ton ami relève le défi.',
+    accept: 'Défi relevé ! La pièce tourne…',
+    cancel: 'Défi annulé : ta mise est remboursée.',
+    decline: 'Défi refusé.',
+    claim: 'Gains récupérés !'
+  };
+
+  function flipInfo(message) {
+    if (flipMessage) flipMessage.textContent = message || '';
+    if (message) showToast(message);
+  }
+
+  function flipPseudo(uid) {
+    return (friendProfiles.get(uid) || {}).pseudo || 'Ami';
+  }
+
+  function flipPot(game) {
+    return Math.max(0, Number(game.amount) || 0) + Math.max(0, Number(game.toBet) || 0);
+  }
+
+  function flipStamp(game) {
+    const t = game && game.createdAt;
+    if (!t) return 0;
+    if (typeof t.toMillis === 'function') return t.toMillis();
+    if (typeof t.seconds === 'number') return t.seconds * 1000;
+    if (t instanceof Date) return t.getTime();
+    return 0;
+  }
+
+  /* Texture de la pièce en pixel art : grille 13×13, anneau doré, damier
+     doré subtil, et la lettre P (pile) ou F (face) dessinée pixel par pixel
+     (chaque « pixel » est un carré du SVG, net à toutes les tailles). */
+  const FLIP_LETTER_PIXELS = {
+    pile: ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+    face: ['11111', '10000', '10000', '11110', '10000', '10000', '10000']
+  };
+
+  function flipFaceSvg(kind) {
+    const rows = FLIP_LETTER_PIXELS[kind] || FLIP_LETTER_PIXELS.pile;
+    const N = 13;
+    let rects = '';
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const ring = x === 0 || y === 0 || x === N - 1 || y === N - 1;
+        const inner = x === 1 || y === 1 || x === N - 2 || y === N - 2;
+        const letter = Boolean(rows[y - 3]) && rows[y - 3][x - 4] === '1';
+        let fill;
+        if (letter) fill = '#7a4a00';
+        else if (ring) fill = '#a8720c';
+        else if (inner) fill = '#e0a92a';
+        else fill = (x + y) % 2 === 0 ? '#f6c445' : '#efb634';
+        rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="${fill}"/>`;
+      }
+    }
+    return `<svg viewBox="0 0 ${N} ${N}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-hidden="true">${rects}</svg>`;
+  }
+
+  /* Animation de la pièce : rotation 3D (rotateX) sur plusieurs tours puis
+     repos sur le côté gagnant (PILE = 0°, FACE = 180°). */
+  function playFlipAnimation(game) {
+    const overlay = $('flip-overlay');
+    const coin = $('flip-coin');
+    if (!overlay || !coin || !game) return;
+    const me = currentUser && currentUser.uid;
+    const opponentUid = me === game.fromUid ? game.toUid : game.fromUid;
+    const iAmWinner = Boolean(me) && game.winnerUid === me;
+    const pot = flipPot(game);
+    flipActiveGameId = game.id;
+    $('flip-kicker').textContent = `DÉFI VS ${flipPseudo(opponentUid).toUpperCase()}`;
+    $('flip-bets').textContent =
+      `Mises : ${fmt(Number(game.amount) || 0)} 🪙 vs ${fmt(Number(game.toBet) || 0)} 🪙 — le gagnant remporte ${fmt(pot)} 🪙`;
+    const resultEl = $('flip-result');
+    const subEl = $('flip-result-sub');
+    const closeBtn = $('flip-close');
+    resultEl.hidden = true;
+    subEl.hidden = true;
+    closeBtn.hidden = true;
+    coin.style.transition = 'none';
+    coin.style.transform = 'rotateX(0deg)';
+    overlay.hidden = false;
+    overlay.setAttribute('aria-hidden', 'false');
+    void coin.offsetWidth; // reflow : la rotation repart bien de 0
+    const turns = 6 + Math.floor(Math.random() * 3);
+    const target = turns * 360 + (game.result === 'face' ? 180 : 0);
+    coin.style.transition = '';
+    coin.style.transform = `rotateX(${target}deg)`;
+    window.setTimeout(() => {
+      resultEl.textContent = game.result === 'face' ? 'FACE !' : 'PILE !';
+      resultEl.hidden = false;
+      subEl.textContent = iAmWinner
+        ? `Tu remportes ${fmt(pot)} 🪙 (les deux mises réunies) !`
+        : `${flipPseudo(game.winnerUid)} remporte ${fmt(pot)} 🪙.`;
+      subEl.hidden = false;
+      closeBtn.hidden = false;
+      closeBtn.focus();
+    }, reduceMotion.matches ? 650 : 3350);
+  }
+
+  /* Une seule animation par résultat : les parties finies vues au premier
+     chargement restent dans l'historique sans rejouer leur lancer. */
+  function maybeAnimateNewFlip() {
+    const overlay = $('flip-overlay');
+    if (overlay && !overlay.hidden) return;
+    const game = flipGames.find((g) => g.status === 'finished' && !flipAnimated.has(g.id));
+    if (!game) return;
+    flipAnimated.add(game.id);
+    playFlipAnimation(game);
+  }
+
+  function ingestFlipDocs(list) {
+    const map = new Map(flipGames.map((g) => [g.id, g]));
+    list.forEach((g) => map.set(g.id, g));
+    flipGames = [...map.values()];
+    if (!hadFlipSnapshot) {
+      hadFlipSnapshot = true;
+      flipGames.forEach((g) => { if (g.status === 'finished') flipAnimated.add(g.id); });
+    }
+  }
+
+  /* Transaction du jeu : réserve / rembourse les mises dans la sauvegarde de
+     l'auteur de l'action et fait vivre le document coinFlips. Réutilise le
+     verrou des transactions du marché (marketBusy) pour ne jamais écraser un
+     solde pendant une opération en cours. */
+  async function flipTransaction(action, game, value) {
+    if (!cloudReady()) { flipInfo('Connecte-toi pour jouer.'); return null; }
+    if (marketBusy) { flipInfo('Une autre opération est en cours, réessaie dans un instant.'); return null; }
+    if (typeof cloudDb.runTransaction !== 'function') { flipInfo('Transactions indisponibles. Réessaie plus tard.'); return null; }
+    const uid = currentUser.uid;
+    const db = cloudDb;
+    marketBusy = true;
+    marketDone = new Promise((resolve) => { finishMarket = resolve; });
+    const overlay = el('div', 'market-busy', 'Transaction en cours…');
+    overlay.setAttribute('role', 'status');
+    document.body.append(overlay);
+    gameRegions.forEach((region) => region.setAttribute('inert', ''));
+    try {
+      if (!await saveNow(true)) throw new Error('Sauvegarde impossible : action annulée.');
+      if (!currentUser || currentUser.uid !== uid) return null;
+      const saveRef = db.collection('playerSaves').doc(uid);
+      const result = await db.runTransaction(async (tx) => {
+        const saveSnap = await tx.get(saveRef);
+        if (!saveSnap.exists) throw new Error('Sauvegarde introuvable.');
+        const coins = Number(saveSnap.data().coins) || 0;
+        let nextCoins = coins;
+        let gameRef = null;
+        let gamePatch = null;
+        if (action === 'create') {
+          if (coins < value.amount) throw new Error('Tu n’as pas assez de pièces.');
+          nextCoins -= value.amount;
+          gameRef = db.collection('coinFlips').doc();
+          tx.set(gameRef, {
+            fromUid: uid,
+            toUid: value.toUid,
+            fromChoice: value.choice,
+            amount: value.amount,
+            status: 'pending',
+            createdAt: serverTimestamp()
+          });
+        } else if (action === 'accept') {
+          gameRef = db.collection('coinFlips').doc(game.id);
+          const snap = await tx.get(gameRef);
+          const data = snap.exists ? snap.data() : null;
+          if (!data || data.status !== 'pending' || data.toUid !== uid) throw new Error('Ce défi n’est plus disponible.');
+          if (coins < value.amount) throw new Error('Tu n’as pas assez de pièces.');
+          nextCoins -= value.amount;
+          const resultSide = Math.random() < 0.5 ? 'pile' : 'face';
+          const winnerUid = resultSide === data.fromChoice ? data.fromUid : uid;
+          gamePatch = { toBet: value.amount, toChoice: value.choice, result: resultSide, winnerUid, status: 'finished' };
+        } else if (action === 'cancel') {
+          gameRef = db.collection('coinFlips').doc(game.id);
+          const snap = await tx.get(gameRef);
+          const data = snap.exists ? snap.data() : null;
+          if (!data || data.status !== 'pending' || data.fromUid !== uid) throw new Error('Ce défi n’est plus annulable.');
+          nextCoins += Number(data.amount) || 0;
+          gamePatch = { status: 'cancelled' };
+        } else if (action === 'decline') {
+          gameRef = db.collection('coinFlips').doc(game.id);
+          const snap = await tx.get(gameRef);
+          const data = snap.exists ? snap.data() : null;
+          if (!data || data.status !== 'pending' || data.toUid !== uid) throw new Error('Ce défi n’est plus disponible.');
+          gamePatch = { status: 'declined' };
+        } else if (action === 'claim') {
+          gameRef = db.collection('coinFlips').doc(game.id);
+          const snap = await tx.get(gameRef);
+          const data = snap.exists ? snap.data() : null;
+          if (data && data.status === 'finished' && data.winnerUid === uid) {
+            nextCoins += (Number(data.amount) || 0) + (Number(data.toBet) || 0);
+          } else if (data && data.status === 'declined' && data.fromUid === uid) {
+            nextCoins += Number(data.amount) || 0;
+          } else {
+            throw new Error('Aucun gain à récupérer ici.');
+          }
+          gamePatch = { status: 'claimed' };
+        } else throw new Error('Action inconnue.');
+        if (nextCoins < 0) throw new Error('Tu n’as pas assez de pièces.');
+        if (nextCoins > MAX_COINS) throw new Error('Ton solde dépasserait la limite de pièces. Dépense-en avant de récupérer ce montant.');
+        if (gamePatch) tx.update(gameRef, gamePatch);
+        tx.update(saveRef, { coins: nextCoins, updatedAt: serverTimestamp() });
+        return { coins: nextCoins, gameId: gameRef.id, gamePatch };
+      });
+      if (!currentUser || currentUser.uid !== uid) return null;
+      const delta = result.coins - state.coins;
+      state.coins = result.coins;
+      updateCoins(delta);
+      flipInfo(FLIP_MESSAGES[action] || '');
+      return result;
+    } catch (error) {
+      flipInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Action impossible. Réessaie.'));
+      return null;
+    } finally {
+      overlay.remove();
+      if (currentUser && currentUser.uid === uid) gameRegions.forEach((region) => region.removeAttribute('inert'));
+      marketBusy = false;
+      finishMarket();
+      finishMarket = null;
+      loadFlipGames();
+    }
+  }
+
+  async function acceptFlip(game, amount, choice) {
+    const result = await flipTransaction('accept', game, { amount, choice });
+    if (!result || !result.gamePatch) return;
+    flipAnimated.add(result.gameId);
+    playFlipAnimation({ ...game, ...result.gamePatch, id: result.gameId });
+  }
+
+  function flipRow(game, mode) {
+    const me = currentUser && currentUser.uid;
+    const row = el('div', 'flip-row');
+    row.dataset.status = game.status;
+    const head = el('div', 'flip-row-head');
+    const amount = Math.max(0, Number(game.amount) || 0);
+    const toBet = Math.max(0, Number(game.toBet) || 0);
+    const pot = flipPot(game);
+    const opponentUid = me === game.fromUid ? game.toUid : game.fromUid;
+
+    if (mode === 'received') {
+      head.append(
+        el('strong', 'flip-row-pseudo', `${flipPseudo(game.fromUid)} te défie`),
+        el('span', 'flip-bet-pill', `Mise adverse : ${fmt(amount)} 🪙`)
+      );
+      row.append(head);
+      row.append(el('p', 'flip-row-sub', `Sa mise est déjà réservée. Choisis ta mise et ton côté : le gagnant remporte la somme des deux mises.`));
+      const form = el('div', 'flip-accept-row');
+      const input = el('input', 'flip-accept-input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = '1000000000';
+      input.step = '1';
+      input.inputMode = 'numeric';
+      input.value = String(amount);
+      input.setAttribute('aria-label', 'Ta mise en pièces');
+      form.append(el('span', 'flip-row-sub', 'Ta mise :'), input);
+      ['pile', 'face'].forEach((choice) => {
+        const btn = el('button', 'flip-side flip-side-mini');
+        btn.type = 'button';
+        const icon = el('span', 'flip-side-icon');
+        icon.innerHTML = flipFaceSvg(choice);
+        btn.append(icon, el('span', '', FLIP_LABELS[choice]));
+        btn.setAttribute('aria-label', `Relever le défi sur ${FLIP_LABELS[choice]}`);
+        on(btn, 'click', () => {
+          let bet = 0;
+          try { bet = marketNumber(input, 0); } catch (error) { flipInfo(error.message); return; }
+          askConfirm({
+            title: 'Relever ce défi ?',
+            message: `${flipPseudo(game.fromUid)} parie ${fmt(amount)} 🪙. Tu paries ${fmt(bet)} 🪙 sur ${FLIP_LABELS[choice]} et la pièce tourne : le gagnant remporte ${fmt(amount + bet)} 🪙.`,
+            confirmLabel: 'Relever',
+            onConfirm: () => acceptFlip(game, bet, choice)
+          });
+        });
+        form.append(btn);
+      });
+      const decline = el('button', 'mini-btn danger', 'Refuser');
+      decline.type = 'button';
+      on(decline, 'click', () => flipTransaction('decline', game));
+      form.append(decline);
+      row.append(form);
+      return row;
+    }
+
+    if (mode === 'sent') {
+      head.append(
+        el('strong', 'flip-row-pseudo', `Défi à ${flipPseudo(game.toUid)}`),
+        el('span', 'flip-bet-pill', `Ta mise : ${fmt(amount)} 🪙 (${FLIP_LABELS[game.fromChoice] || '—'})`)
+      );
+      row.append(head);
+      row.append(el('p', 'flip-row-sub', 'En attente que ton ami relève le défi… (ta mise est réservée)'));
+      const cancel = el('button', 'mini-btn danger', 'Annuler (remboursé)');
+      cancel.type = 'button';
+      on(cancel, 'click', () => askConfirm({
+        title: 'Annuler ce défi ?',
+        message: `Ta mise de ${fmt(amount)} 🪙 te sera remboursée.`,
+        confirmLabel: 'Annuler le défi',
+        onConfirm: () => flipTransaction('cancel', game)
+      }));
+      row.append(cancel);
+      return row;
+    }
+
+    /* Historique : parties finies, annulées, refusées ou encaissées. */
+    const decided = game.status === 'finished' || game.status === 'claimed';
+    head.append(el('strong', 'flip-row-pseudo', `vs ${flipPseudo(opponentUid)}`));
+    if (decided && game.result) {
+      head.append(el('span', 'flip-bet-pill', `Résultat : ${FLIP_LABELS[game.result] || game.result}`));
+    }
+    row.append(head);
+    if (game.toChoice) {
+      row.append(el('p', 'flip-row-sub',
+        `${flipPseudo(game.fromUid)} : ${fmt(amount)} 🪙 (${FLIP_LABELS[game.fromChoice] || '—'}) · ` +
+        `${flipPseudo(game.toUid)} : ${fmt(toBet)} 🪙 (${FLIP_LABELS[game.toChoice] || '—'})`));
+    }
+    if (decided && game.winnerUid) {
+      row.append(el('p', 'flip-row-sub', `🏆 ${flipPseudo(game.winnerUid)} remporte ${fmt(pot)} 🪙 (les deux mises).`));
+    } else if (game.status === 'cancelled') {
+      row.append(el('p', 'flip-row-sub', 'Défi annulé : la mise du créateur a été remboursée.'));
+    } else if (game.status === 'declined') {
+      row.append(el('p', 'flip-row-sub', `${flipPseudo(game.toUid)} a refusé le défi.`));
+    }
+    if (game.status === 'finished' && game.winnerUid === me) {
+      const claim = el('button', 'mini-btn primary', `Récupérer ${fmt(pot)} 🪙`);
+      claim.type = 'button';
+      on(claim, 'click', () => flipTransaction('claim', game));
+      row.append(claim);
+    } else if (game.status === 'declined' && game.fromUid === me) {
+      const claim = el('button', 'mini-btn primary', `Récupérer ma mise (${fmt(amount)} 🪙)`);
+      claim.type = 'button';
+      on(claim, 'click', () => flipTransaction('claim', game));
+      row.append(claim);
+    } else if (game.status === 'claimed') {
+      row.append(el('p', 'flip-row-sub', game.winnerUid
+        ? (game.winnerUid === me ? 'Gains récupérés ✓' : 'Gains versés au gagnant ✓')
+        : 'Mise récupérée ✓'));
+    }
+    return row;
+  }
+
+  function renderFlipGames() {
+    if (!onlineView || !$('online-games')) return;
+    const me = currentUser && currentUser.uid;
+    if (!me) return;
+
+    /* Sélecteur d'ami pour le nouveau défi. */
+    if (flipFriend) {
+      const current = flipFriend.value;
+      const frag = document.createDocumentFragment();
+      if (!friends.length) {
+        const opt = el('option', '', 'Aucun ami — ajoute des amis dans l’onglet Amis');
+        opt.value = '';
+        frag.append(opt);
+      }
+      friends.forEach((uid) => {
+        const opt = el('option', '', flipPseudo(uid));
+        opt.value = uid;
+        frag.append(opt);
+      });
+      flipFriend.replaceChildren(frag);
+      if (current && friends.includes(current)) flipFriend.value = current;
+    }
+
+    const received = flipGames
+      .filter((g) => g.toUid === me && g.status === 'pending')
+      .sort((a, b) => flipStamp(b) - flipStamp(a));
+    const sent = flipGames
+      .filter((g) => g.fromUid === me && g.status === 'pending')
+      .sort((a, b) => flipStamp(b) - flipStamp(a));
+    const history = flipGames
+      .filter((g) => g.status !== 'pending')
+      .sort((a, b) => flipStamp(b) - flipStamp(a));
+
+    flipReceived.replaceChildren(...received.map((g) => flipRow(g, 'received')));
+    $('flip-received-empty').hidden = received.length > 0;
+    flipSent.replaceChildren(...sent.map((g) => flipRow(g, 'sent')));
+    $('flip-sent-empty').hidden = sent.length > 0;
+    flipHistory.replaceChildren(...history.map((g) => flipRow(g, 'history')));
+    $('flip-history-empty').hidden = history.length > 0;
+    setTabCount($('flip-received-count'), received.length);
+    setTabCount($('flip-sent-count'), sent.length);
+    setTabCount($('flip-open-count'), received.length);
+    updateOnlineTabCounts();
+  }
+
+  async function loadFlipGames() {
+    if (!cloudReady()) return;
+    const uid = currentUser.uid;
+    const coll = cloudDb.collection('coinFlips');
+    if (!coll || typeof coll.where !== 'function') return;
+    try {
+      const [incoming, outgoing] = await Promise.all([
+        coll.where('toUid', '==', uid).get(),
+        coll.where('fromUid', '==', uid).get()
+      ]);
+      if (!currentUser || currentUser.uid !== uid) return;
+      ingestFlipDocs([...snapshotDocs(incoming), ...snapshotDocs(outgoing)]
+        .map((d) => ({ id: d.id, ...d.data })));
+      renderFlipGames();
+      maybeAnimateNewFlip();
+    } catch (error) {
+      noteCloudError('Défis illisibles', error);
+    }
+  }
+
+  /* Temps réel : un défi relevé, refusé ou annulé par un ami apparaît sans
+     rechargement — la pièce tourne dès que le résultat tombe. */
+  function subscribeFlipGames() {
+    if (!cloudReady() || flipUnsub) return;
+    const uid = currentUser.uid;
+    const stops = [];
+    const watch = (field) => {
+      const coll = cloudDb.collection('coinFlips');
+      if (!coll || typeof coll.where !== 'function') return;
+      const query = coll.where(field, '==', uid);
+      if (typeof query.onSnapshot !== 'function') return;
+      try {
+        const stop = query.onSnapshot((snap) => {
+          try {
+            if (!currentUser || currentUser.uid !== uid) return;
+            ingestFlipDocs(snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })));
+            renderFlipGames();
+            maybeAnimateNewFlip();
+          } catch (error) { noteCloudError('Défis illisibles (temps réel)', error); }
+        }, (error) => noteCloudError('Défis illisibles (temps réel)', error));
+        if (typeof stop === 'function') stops.push(stop);
+      } catch (error) { /* temps réel indisponible : « Actualiser » via rechargement */ }
+    };
+    watch('toUid');
+    watch('fromUid');
+    if (!stops.length) return;
+    flipUnsub = () => {
+      flipUnsub = null;
+      stops.forEach((stop) => { try { stop(); } catch (error) { /* déjà fermé */ } });
+    };
+  }
+
+  function unsubscribeFlipGames() {
+    if (flipUnsub) flipUnsub();
+    flipUnsub = null;
+  }
+
+  /* Formulaire « Défier un ami » : choix du côté pile / face. */
+  document.querySelectorAll('[data-flip-choice]').forEach((btn) => {
+    on(btn, 'click', () => {
+      flipChoice = btn.dataset.flipChoice === 'face' ? 'face' : 'pile';
+      document.querySelectorAll('[data-flip-choice]').forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle('is-active', active);
+        b.setAttribute('aria-pressed', String(active));
+      });
+      SFX.tick();
+    });
+  });
+
+  /* Textures pixel art dans les boutons et les deux faces de la pièce. */
+  document.querySelectorAll('[data-flip-icon]').forEach((icon) => {
+    icon.innerHTML = flipFaceSvg(icon.dataset.flipIcon);
+  });
+  const flipCoinPile = $('flip-coin-pile');
+  const flipCoinFace = $('flip-coin-face');
+  if (flipCoinPile) flipCoinPile.innerHTML = flipFaceSvg('pile');
+  if (flipCoinFace) flipCoinFace.innerHTML = flipFaceSvg('face');
+
+  on($('flip-create-form'), 'submit', (e) => {
+    e.preventDefault();
+    if (!cloudReady()) { flipInfo('Connecte-toi pour jouer.'); return; }
+    const toUid = flipFriend && flipFriend.value;
+    if (!toUid || !friends.includes(toUid)) { flipInfo('Choisis un ami à défier.'); return; }
+    let amount = 0;
+    try { amount = marketNumber(flipAmountInput, 0); } catch (error) { flipInfo(error.message); return; }
+    askConfirm({
+      title: 'Lancer ce défi ?',
+      message: `Défier ${flipPseudo(toUid)} avec une mise de ${fmt(amount)} 🪙 sur ${FLIP_LABELS[flipChoice]} ? Ta mise est réservée jusqu’au résultat.`,
+      confirmLabel: 'Défier',
+      onConfirm: () => flipTransaction('create', null, { toUid, amount, choice: flipChoice })
+    });
+  });
+
+  on($('flip-close'), 'click', () => {
+    const overlay = $('flip-overlay');
+    if (overlay) {
+      overlay.hidden = true;
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    /* Le gagnant récupère la cagnotte dès la fin de l'animation (sinon le
+       bouton « Récupérer » de l'historique reste disponible). */
+    const me = currentUser && currentUser.uid;
+    const game = flipGames.find((g) => g.id === flipActiveGameId
+      && g.status === 'finished' && g.winnerUid === me);
+    flipActiveGameId = null;
+    if (game) flipTransaction('claim', game);
+  });
 
   function globalMarketInfo(message) {
     if (globalMarketMessage) globalMarketMessage.textContent = message || '';

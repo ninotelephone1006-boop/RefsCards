@@ -375,6 +375,83 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Jeux : pile ou face 1v1 entre amis. coinFlips/{id} porte le défi :
+    // le créateur choisit sa mise et son côté (mise réservée à la création),
+    // l'ami qui relève choisit la sienne (mise réservée à l'acceptation) et
+    // le résultat fige le côté gagnant pile/face. Le gagnant récupère la
+    // somme des deux mises ; un défi annulé ou refusé rembourse son auteur.
+    // Comme pour coinGifts, chaque écriture ne modifie que la sauvegarde de
+    // son propre auteur, et les règles vérifient le débit / le crédit.
+    match /coinFlips/{flipId} {
+      function signedIn() { return request.auth != null; }
+      function beforeSave() { return get(/databases/$(database)/documents/playerSaves/$(request.auth.uid)).data; }
+      function afterSave() { return getAfter(/databases/$(database)/documents/playerSaves/$(request.auth.uid)).data; }
+      function stockUnchanged() {
+        return (!('packStock' in beforeSave()) && !('packStock' in afterSave()))
+          || (afterSave().packStock == beforeSave().packStock);
+      }
+      /* La sauvegarde de l'auteur de l'écriture ne bouge que de `delta`
+         pièces (positif = gain, négatif = mise) : collection et stock
+         intacts. */
+      function coinsOnly(delta) {
+        return afterSave().coins == beforeSave().coins + delta
+          && afterSave().collection == beforeSave().collection
+          && stockUnchanged();
+      }
+      allow read: if signedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      // Création du défi : la mise du créateur est réservée dans sa sauvegarde.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['fromUid', 'toUid', 'fromChoice', 'amount', 'status', 'createdAt'])
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.toUid is string && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.toUid in beforeSave().friends
+        && request.resource.data.fromChoice in ['pile', 'face']
+        && request.resource.data.amount is int
+        && request.resource.data.amount >= 0 && request.resource.data.amount <= 1000000000
+        && request.resource.data.status == 'pending' && request.resource.data.createdAt is timestamp
+        && coinsOnly(-request.resource.data.amount);
+      allow update: if signedIn() && (
+        // L'ami relève le défi : sa mise est réservée et le résultat fige
+        // pile ou face — le gagnant est celui dont le côté est tombé.
+        (resource.data.toUid == request.auth.uid
+          && resource.data.status == 'pending' && request.resource.data.status == 'finished'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['toBet', 'toChoice', 'result', 'winnerUid', 'status'])
+          && request.resource.data.toBet is int
+          && request.resource.data.toBet >= 0 && request.resource.data.toBet <= 1000000000
+          && request.resource.data.toChoice in ['pile', 'face']
+          && request.resource.data.result in ['pile', 'face']
+          && ((request.resource.data.result == resource.data.fromChoice && request.resource.data.winnerUid == resource.data.fromUid)
+            || (request.resource.data.result != resource.data.fromChoice && request.resource.data.winnerUid == resource.data.toUid))
+          && coinsOnly(-request.resource.data.toBet))
+        ||
+        // Le créateur annule un défi pas encore relevé : il est remboursé.
+        (resource.data.fromUid == request.auth.uid
+          && resource.data.status == 'pending' && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && coinsOnly(resource.data.amount))
+        ||
+        // L'ami refuse le défi sans miser : aucune pièce ne bouge.
+        (resource.data.toUid == request.auth.uid
+          && resource.data.status == 'pending' && request.resource.data.status == 'declined'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && coinsOnly(0))
+        ||
+        // Le gagnant encaisse la cagnotte (les deux mises) une seule fois.
+        (resource.data.status == 'finished' && request.resource.data.status == 'claimed'
+          && resource.data.winnerUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && coinsOnly(resource.data.amount + resource.data.toBet))
+        ||
+        // Après un refus, l'auteur du défi récupère sa mise.
+        (resource.data.status == 'declined' && request.resource.data.status == 'claimed'
+          && resource.data.fromUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && coinsOnly(resource.data.amount))
+      );
+      allow delete: if false;
+    }
+
     // Les anciennes propositions d'échange (trades/) sont désactivées :
     // le marché (cartes/packs en vente) est le seul moyen d'obtenir les
     // cartes d'un ami. Aucune correspondance trades n'est exposée.
