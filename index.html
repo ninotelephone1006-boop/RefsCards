@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.24-21">
+  <meta name="app-version" content="2026.11.25-2">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.24-19">
+  <link rel="stylesheet" href="styles.css?v=2026.11.25-2">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -47,7 +47,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.24-18" defer></script>
+  <script src="app.js?v=2026.11.25-2" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -539,6 +539,9 @@
             <button class="online-tab" type="button" role="tab" data-online-tab="friends" aria-selected="false" aria-controls="online-friends">
               👥 Amis <span class="online-tab-count" id="online-tab-count-friends" hidden></span>
             </button>
+            <button class="online-tab" type="button" role="tab" data-online-tab="games" aria-selected="false" aria-controls="online-games">
+              🎲 Jeux <span class="online-tab-count" id="online-tab-count-games" hidden></span>
+            </button>
           </nav>
         </div>
 
@@ -706,6 +709,41 @@
               <div id="friend-requests-out" class="requests-list"></div>
             </section>
           </section>
+
+          <!-- ----------------------------- JEUX ----------------------------- -->
+          <section class="online-panel" id="online-games" role="tabpanel" aria-label="Jeux" data-online-panel="games" hidden>
+            <section class="market-block" aria-label="Pile ou face">
+              <div class="block-head">
+                <h3>🪙 Pile ou face <span class="friends-count" id="flip-open-count" hidden>0</span></h3>
+                <p class="block-sub">Défie un ami en 1v1 : chacun choisit sa mise (la somme qu'il veut) et son côté. La pièce tourne — P pour pile, F pour face, en pixel art — et celui qui a choisi le côté qui tombe remporte la somme des deux mises.</p>
+              </div>
+              <form id="flip-create-form" class="market-form flip-form">
+                <label for="flip-friend">Défier un ami</label>
+                <select id="flip-friend" required></select>
+                <label for="flip-amount">Ta mise (en pièces, libre)</label>
+                <input id="flip-amount" type="number" min="0" max="1000000000" step="1" required inputmode="numeric" placeholder="Mise libre">
+                <label>Ton côté</label>
+                <div class="flip-side-row" role="group" aria-label="Choisir pile ou face">
+                  <button class="flip-side is-active" type="button" data-flip-choice="pile" aria-pressed="true"><span class="flip-side-icon" data-flip-icon="pile" aria-hidden="true"></span><span>PILE</span></button>
+                  <button class="flip-side" type="button" data-flip-choice="face" aria-pressed="false"><span class="flip-side-icon" data-flip-icon="face" aria-hidden="true"></span><span>FACE</span></button>
+                </div>
+                <button class="mini-btn primary" id="flip-submit" type="submit">Envoyer le défi</button>
+              </form>
+              <p class="online-msg" id="flip-message" role="status"></p>
+
+              <h4 class="market-sub">📨 Défis reçus <span class="friends-count" id="flip-received-count" hidden>0</span></h4>
+              <div id="flip-received" class="trades-list"></div>
+              <p class="online-empty" id="flip-received-empty">Aucun défi reçu pour l'instant. Quand un ami te défie, sa mise s'affiche ici : relève le défi avec ta propre mise et ton côté.</p>
+
+              <h4 class="market-sub">📤 Défis envoyés <span class="friends-count" id="flip-sent-count" hidden>0</span></h4>
+              <div id="flip-sent" class="trades-list"></div>
+              <p class="online-empty" id="flip-sent-empty">Aucun défi envoyé pour l'instant.</p>
+
+              <h4 class="market-sub">🗂️ Parties jouées</h4>
+              <div id="flip-history" class="trades-list"></div>
+              <p class="online-empty" id="flip-history-empty">Aucune partie jouée pour l'instant.</p>
+            </section>
+          </section>
         </div>
       </section>
 
@@ -723,6 +761,27 @@
           <p class="pack-kicker" id="pack-opening-kicker"></p>
           <h2 class="pack-title" id="pack-opening-title"></h2>
           <p class="pack-sub" id="pack-opening-sub"></p>
+        </div>
+      </div>
+
+      <!-- ==================== PILE OU FACE : LA PIÈCE ====================
+           Animation du lancer de pièce (En ligne → Jeux). Les deux faces
+           portent une texture pixel art : P (pile) et F (face), générées en
+           SVG par flipFaceSvg() dans app.js. -->
+      <div class="flip-overlay" id="flip-overlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="Lancer de pièce">
+        <div class="flip-stage">
+          <p class="flip-kicker" id="flip-kicker">PILE OU FACE</p>
+          <div class="flip-coin-wrap">
+            <div class="flip-coin" id="flip-coin">
+              <div class="flip-face flip-head" id="flip-coin-pile"></div>
+              <div class="flip-face flip-tail" id="flip-coin-face"></div>
+            </div>
+            <div class="flip-shadow" id="flip-shadow" aria-hidden="true"></div>
+          </div>
+          <p class="flip-bets" id="flip-bets"></p>
+          <h2 class="flip-result" id="flip-result" hidden></h2>
+          <p class="flip-result-sub" id="flip-result-sub" hidden></p>
+          <button class="mini-btn primary flip-close" id="flip-close" type="button" hidden>Continuer</button>
         </div>
       </div>
 
