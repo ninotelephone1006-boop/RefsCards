@@ -107,7 +107,13 @@ service cloud.firestore {
         // les amis en commun.
         && (!('friends' in request.resource.data)
             || (request.resource.data.friends is list
-                && request.resource.data.friends.size() <= 500));
+                && request.resource.data.friends.size() <= 500))
+        // Drapeau « créateur » : seul le compte propriétaire du jeu peut se
+        // l'attribuer. Les autres comptes peuvent l'omettre ou le mettre à false.
+        && (!('creator' in request.resource.data)
+            || request.resource.data.creator == false
+            || (request.resource.data.creator == true
+                && request.auth.token.email == 'ninotelephone1006@gmail.com'));
       allow delete: if false;
     }
 
