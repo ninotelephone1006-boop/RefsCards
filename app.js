@@ -4579,6 +4579,9 @@
     shopQty.video = 1;
     renderShop();
     renderPackInventory();
+    /* Le panneau d'administration ne doit jamais rester affiché pour un
+       autre compte sur le même appareil : on le masque à la déconnexion. */
+    renderAdminPanel();
     if (friendRequestsUnsub) {
       try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
       friendRequestsUnsub = null;
@@ -4807,6 +4810,12 @@
     } else if (tab === 'pack') {
       renderPackInventory();
       // Les vues Pack étaient masquées : on remesure tout.
+      if (!recap.classList.contains('is-idle')) setRecapCollapsed(recap.classList.contains('is-collapsed'));
+      scheduleSizing(8);
+    } else if (tab === 'account') {
+      /* Stats à jour à l'ouverture (et panneau admin synchronisé pour le
+         compte propriétaire — renderAccount appelle renderAdminPanel). */
+      renderAccount();
       if (!recap.classList.contains('is-idle')) setRecapCollapsed(recap.classList.contains('is-collapsed'));
       scheduleSizing(8);
     } else {
@@ -5467,6 +5476,7 @@
   function renderAccount() {
     if (!accountView) return;
     syncHudAvatar();
+    renderAdminPanel();
     const stats = myStats();
     const googlePhoto = (currentUser && currentUser.photoURL) || '';
     const avatarSrc = profile.avatar || googlePhoto;
@@ -5667,6 +5677,120 @@
       return;
     }
     setProfileMsg('Ta photo Google est de nouveau utilisée.');
+  });
+
+  /* -------------------------- administration --------------------------
+     Panneau réservé au compte propriétaire du jeu (ADMIN_EMAIL). Il reste
+     masqué pour tous les autres joueurs et les actions passent par la
+     sauvegarde habituelle (save()) : aucune notification, aucune annonce,
+     aucune écriture visible par les autres joueurs — rien ne distingue ces
+     modifications d'une progression normale. Les limites respectent les
+     règles Firestore publiées (coins ≤ 1 Md, stock ≤ 100 000 par type,
+     collection ≤ 10 000 cartes) pour que la sauvegarde soit acceptée. */
+  const ADMIN_EMAIL = 'ninotelephone1006@gmail.com';
+  const adminPanel = $('admin-panel');
+  const adminCoins = $('admin-coins');
+  const adminCoinsSet = $('admin-coins-set');
+  const adminPacksOpened = $('admin-packs-opened');
+  const adminPacksOpenedSet = $('admin-packs-opened-set');
+  const adminPackType = $('admin-pack-type');
+  const adminPackQty = $('admin-pack-qty');
+  const adminPackGive = $('admin-pack-give');
+  const adminCard = $('admin-card');
+  const adminCardQty = $('admin-card-qty');
+  const adminCardShiny = $('admin-card-shiny');
+  const adminCardGive = $('admin-card-give');
+  const adminMsg = $('admin-msg');
+
+  function isAdmin() {
+    return (currentEmail || '').trim().toLowerCase() === ADMIN_EMAIL;
+  }
+
+  function setAdminMsg(message) {
+    if (adminMsg) adminMsg.textContent = message || '';
+  }
+
+  /* Affiche/masque le panneau et le synchronise avec l'état courant. Appelé
+     à chaque rendu du compte, à la connexion et à la déconnexion : impossible
+     qu'il reste visible pour un autre compte sur le même appareil. */
+  function renderAdminPanel() {
+    if (!adminPanel) return;
+    const allowed = isAdmin();
+    adminPanel.hidden = !allowed;
+    if (!allowed) {
+      setAdminMsg('');
+      return;
+    }
+    /* Les champs reflètent l'état actuel, sauf pendant la saisie (un rendu
+       ne doit jamais écraser ce que l'admin est en train de taper). */
+    if (adminCoins && document.activeElement !== adminCoins) {
+      adminCoins.value = String(Math.max(0, Math.round(Number(state.coins) || 0)));
+    }
+    if (adminPacksOpened && document.activeElement !== adminPacksOpened) {
+      adminPacksOpened.value = String(Math.max(0, Math.floor(Number(state.packsOpened) || 0)));
+    }
+    /* La liste des cartes ne change jamais en cours de session : on la
+       remplit une seule fois, triée par rareté puis par nom. */
+    if (adminCard && !adminCard.options.length) {
+      const sorted = cardsDatabase.slice().sort((a, b) =>
+        ((RARITIES[a.rarity] || RARITIES.common).rank - (RARITIES[b.rarity] || RARITIES.common).rank)
+        || a.name.localeCompare(b.name, 'fr'));
+      adminCard.replaceChildren(...sorted.map((card) => {
+        const option = document.createElement('option');
+        option.value = card.id;
+        option.textContent = `${card.name} (${(RARITIES[card.rarity] || RARITIES.common).label})`;
+        return option;
+      }));
+    }
+  }
+
+  on(adminCoinsSet, 'click', () => {
+    if (!isAdmin()) return;
+    const value = clamp(Math.round(Number(adminCoins && adminCoins.value) || 0), 0, 1000000000);
+    state.coins = value;
+    updateCoins();
+    renderAccount();
+    save();
+    setAdminMsg(`Solde défini à ${fmt(value)} 🪙.`);
+  });
+
+  on(adminPacksOpenedSet, 'click', () => {
+    if (!isAdmin()) return;
+    const value = Math.max(0, Math.floor(Number(adminPacksOpened && adminPacksOpened.value) || 0));
+    state.packsOpened = value;
+    renderAccount();
+    save();
+    setAdminMsg(`Compteur de boosters ouverts défini à ${fmt(value)}.`);
+  });
+
+  on(adminPackGive, 'click', () => {
+    if (!isAdmin()) return;
+    const type = adminPackType && isPackType(adminPackType.value) ? adminPackType.value : 'classic';
+    const qty = clamp(Math.floor(Number(adminPackQty && adminPackQty.value) || 0), 1, 100000);
+    state.packStock[type] = clamp((Number(state.packStock[type]) || 0) + qty, 0, 100000);
+    renderShop();
+    renderPackInventory();
+    renderAccount();
+    save();
+    setAdminMsg(`${fmt(qty)} pack${qty > 1 ? 's' : ''} ${packLabelFr(type)} ajouté${qty > 1 ? 's' : ''} à ton inventaire.`);
+  });
+
+  on(adminCardGive, 'click', () => {
+    if (!isAdmin()) return;
+    const id = adminCard && adminCard.value;
+    const cardId = adminCardShiny && adminCardShiny.checked ? `${id}::shiny` : id;
+    const card = CardMutations.resolve(cardId);
+    if (!card) { setAdminMsg('Carte introuvable.'); return; }
+    const qty = clamp(Math.floor(Number(adminCardQty && adminCardQty.value) || 0), 1, 100);
+    /* La règle Firestore plafonne la collection à 10 000 entrées : on ne
+       dépasse jamais, sinon toute la sauvegarde serait refusée. */
+    const n = Math.min(qty, Math.max(0, 10000 - state.collection.length));
+    if (n <= 0) { setAdminMsg('Collection pleine (10 000 cartes max).'); return; }
+    for (let i = 0; i < n; i++) state.collection.push(card);
+    renderCollection();
+    renderAccount();
+    save();
+    setAdminMsg(`${fmt(n)} × ${CardMutations.label(card)} ajoutée${n > 1 ? 's' : ''} à ta collection.`);
   });
 
   /* ------------------------------------------------------------------ amis */

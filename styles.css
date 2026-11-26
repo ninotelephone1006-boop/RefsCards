@@ -4484,6 +4484,22 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .push-summary{margin:6px 0 12px;font-size:12px;line-height:1.5;color:#a79fbd}
 .notif-settings .mini-btn{width:100%}
 
+/* --- panneau d'administration (compte propriétaire uniquement) --- */
+.admin-panel{margin-top:16px;padding:14px;border:1px solid #fbbf2426;border-radius:14px;
+  background:linear-gradient(155deg,#17121ff2,#0f0b14f5);text-align:left}
+.admin-panel-head h3{margin:0;font:800 14px 'Space Grotesk',sans-serif;color:#fde68a;letter-spacing:-.2px}
+.admin-panel-sub{margin:6px 0 12px;font-size:12px;line-height:1.5;color:#a79fbd}
+.admin-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.admin-row>label{flex:0 0 100%;font-size:11.5px;font-weight:700;color:#cdc3e4}
+.admin-row select,.admin-row input[type="number"]{flex:1 1 auto;min-width:0;padding:9px 10px;border-radius:10px;
+  border:1px solid #ffffff1a;background:#0d0912;color:#fff;font:600 13px 'Space Grotesk',sans-serif}
+.admin-row select:focus,.admin-row input[type="number"]:focus{outline:none;border-color:#fbbf2480}
+.admin-row .mini-btn{flex:0 0 auto;width:auto}
+.admin-row .admin-shiny{display:flex;align-items:center;gap:5px;font-size:12px;color:#e9dcff;cursor:pointer}
+.admin-row .admin-shiny input{accent-color:#fbbf24}
+.admin-msg{margin:12px 0 0;font-size:12px;min-height:15px;color:#86efac}
+.admin-msg:empty{display:none}
+
 @media(max-width:559px){
   .push-kind-desc{font-size:10.5px}
   .push-actions{flex-direction:column;align-items:stretch}
