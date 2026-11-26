@@ -2354,7 +2354,7 @@ html,body{background:var(--bg)}
 .mini-btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 
 /* ---- Compte : héros profil ---- */
-.profile-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:22px 16px 18px;
+.profile-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:36px 16px 18px;
   border:1px solid #ffffff14;border-radius:20px;background:linear-gradient(155deg,#181220f2,#0f0b14f5);
   box-shadow:0 18px 60px #0008,0 0 40px #a855f712}
 .avatar-wrap{position:relative;width:124px;height:124px;margin-bottom:14px}
@@ -2464,7 +2464,7 @@ html,body{background:var(--bg)}
 .friend-row-id{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
 .friend-row-pseudo{font-size:14px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .friend-row-sub{font-size:11px;color:#8d84a8}
-.friend-detail{margin-top:22px;padding:16px 14px;border:1px solid #6b4fc455;border-radius:18px;
+.friend-detail{margin-top:22px;padding:28px 14px 16px;border:1px solid #6b4fc455;border-radius:18px;
   background:linear-gradient(155deg,#1a1228f5,#0f0b14f5);box-shadow:0 14px 44px #0008;
   /* Contenu de la fiche toujours dans la carte, jamais par-dessus la barre
      d'onglets : les cartes en position absolue débordaient avant. */
@@ -4586,8 +4586,9 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
    marché global, classements) grâce à `.avatar-deco-slot`, posé par app.js
    (syncAvatarDeco / avatarWithDeco). Tailles et décalages par contexte. */
 /* Le socle : le parent de l'avatar est le repère. `em` suit la taille de
-   l'avatar (1.5em = 150 %) ; `bottom:15%` fait arriver le bas du chapeau à
-   85 % de la hauteur de la photo, bien calé sur le crâne. */
+   l'avatar (.88em = 88 %) ; `bottom:54%` place le bas du chapeau à 46 %
+   depuis le haut, de sorte que le bord blanc du bonnet se pose sur le haut
+   de la tête sans recouvrir le visage. */
 .avatar-deco-slot{position:relative}
 /* Socles créés par le HTML / les listes : ils se comportent comme une
    pastille (pas de retour à la ligne, taille figée). */
@@ -4595,20 +4596,20 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 .request-id>.avatar-deco-slot,.friend-row>.avatar-deco-slot,
 .leaderboard-row>.avatar-deco-slot,
 .add-friend-preview .avatar-deco-slot{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center}
-/* La taille du chapeau suit celle de l'avatar (1.5em). */
+/* La taille du chapeau suit celle de l'avatar (.88em). */
 .friend-row>.avatar-deco-slot,.request-id>.avatar-deco-slot{font-size:42px}
 .add-friend-preview .avatar-deco-slot{font-size:48px}
 .global-market-offer .avatar-deco-slot{font-size:34px}
-.avatar-deco{position:absolute;left:50%;bottom:15%;transform:translateX(-50%) rotate(6deg);
-  width:1.5em;height:1.5em;object-fit:contain;pointer-events:none;z-index:4;
+.avatar-deco{position:absolute;left:54%;bottom:54%;transform:translateX(-50%) rotate(-11deg);
+  width:.88em;height:auto;object-fit:contain;pointer-events:none;z-index:4;
   filter:drop-shadow(0 3px 5px #000a)}
 /* HUD (avatar 24 px, socle dédié dans .account-control) */
 .account-avatar-slot{font-size:24px;align-items:center;justify-content:center}
-.account-avatar-slot .avatar-deco{width:1.4em;height:1.4em}
-/* Page Compte (photo 124 px dans .avatar-wrap) : le chapeau épouse toute la
-   largeur de la photo et se pose comme un bonnet sur le haut du visage. */
+.account-avatar-slot .avatar-deco{width:.96em;height:auto}
+/* Page Compte (photo 124 px dans .avatar-wrap) : le chapeau se pose sur
+   le haut de la photo sans masquer le visage. */
 .avatar-wrap{position:relative}
-.avatar-wrap .avatar-deco{width:100%;height:auto;bottom:15%;z-index:4}
+.avatar-wrap .avatar-deco{width:88%;height:auto;bottom:54%;z-index:4}
 /* Fiche d'un ami (avatar 64 px, socle dédié) */
 .friend-avatar-slot{font-size:64px}
 /* Pastilles des listes : le chapeau suit la photo ET sa pastille de repli */
@@ -4618,7 +4619,7 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
   border:2px solid #8b5cf6;background:#241c2e}
 .leaderboard-avatar[hidden]{display:none}
 .leaderboard-row .avatar-deco-slot{font-size:28px}
-.leaderboard-row>.avatar-deco-slot .avatar-deco{width:1.5em;height:1.4em}
+.leaderboard-row>.avatar-deco-slot .avatar-deco{width:.92em;height:auto}
 @media(max-width:559px){
   .deco-card{flex-direction:column;align-items:center;text-align:center}
   .deco-img-wrap{flex:none;width:100%}
