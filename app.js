@@ -130,6 +130,39 @@
   };
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
 
+  /* ------------------------------------------- photo de profil par défaut
+     Un joueur sans photo (aucune image choisie, ou photo Google « initiale »
+     — souvent un simple rond bleu avec une lettre) affiche l'image de base du
+     jeu, PARTOUT où une photo apparaît : HUD, page Compte, listes d'amis et de
+     demandes, fiche d'un ami, marché global et classements. La photo Google
+     n'est plus utilisée comme repli : elle ne s'affichait pas de la même façon
+     d'un appareil à l'autre et dépendait du compte Google. Le fichier est
+     aussi le socle de l'aperçu dans l'éditeur de chapeaux de l'admin. */
+  const DEFAULT_AVATAR = 'assets/default-avatar.png';
+
+  /* Photo à afficher pour un profil : la photo personnalisée si elle existe,
+     sinon l'image de base du jeu. Ne renvoie jamais une chaîne vide, donc
+     aucun avatar ne retombe sur une pastille « ✦ » ou une initiale. */
+  function avatarSrcFor(data) {
+    const custom = data && typeof data === 'object' ? data.avatar : '';
+    return typeof custom === 'string' && custom ? custom : DEFAULT_AVATAR;
+  }
+
+  /* Renseigne une balise <img> d'avatar : source de repli comprise (et
+     `onerror`, pour qu'une photo Google cassée ou supprimée retombe elle
+     aussi sur l'image de base au lieu d'un carré vide). */
+  function setAvatarSrc(img, data) {
+    if (!img) return '';
+    const src = avatarSrcFor(data);
+    if (img.getAttribute('src') !== src) img.src = src;
+    img.onerror = () => {
+      img.onerror = null;
+      if (img.getAttribute('src') !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR;
+    };
+    img.hidden = false;
+    return src;
+  }
+
   /* --------------------------------------------- réglage global des chapeaux
      Position (x / y, en % du socle de l'avatar), taille (multiplicateur de la
      largeur de chaque contexte) et rotation (degrés) de CHAQUE chapeau sur la
@@ -502,14 +535,14 @@
     slot.append(layer);
   };
 
-  /* Pastille photo + décor pour les listes construites en JS (amis,
-     demandes, vendeurs du marché, classements). L'image (et sa pastille de
-     repli) sont enveloppées dans `avatar-deco-slot` (position: relative) :
-     le chapeau se place au-dessus de la photo, comme sur la page Compte. */
-  const avatarWithDeco = (img, data, fallback) => {
+  /* Socle photo + décor pour les listes construites en JS (amis, demandes,
+     vendeurs du marché, classements). L'image est enveloppée dans
+     `avatar-deco-slot` (position: relative) : le chapeau se place au-dessus de
+     la photo, comme sur la page Compte. Plus de pastille de repli : un joueur
+     sans photo affiche l'image de base du jeu (`DEFAULT_AVATAR`). */
+  const avatarWithDeco = (img, data) => {
     const wrap = el('span', 'avatar-deco-slot');
     wrap.append(img);
-    if (fallback) wrap.append(fallback);
     const layer = decoLayer(data);
     if (layer) wrap.append(layer);
     return wrap;
@@ -595,7 +628,6 @@
   const authHintText = $('auth-hint-text');
   const authOpenTab = $('auth-open-tab');
   const accountAvatar = $('account-avatar');
-  const accountAvatarFallback = $('account-avatar-fallback');
   const accountEmail = $('account-email');
   const logoutBtn = $('logout-btn');
   const gameRegions = document.querySelectorAll('.hud, #stage, #tabbar, .toast');
@@ -4871,11 +4903,9 @@
       accountEmail.textContent = '';
       accountEmail.removeAttribute('title');
     }
-    if (accountAvatar) {
-      accountAvatar.removeAttribute('src');
-      accountAvatar.hidden = true;
-    }
-    if (accountAvatarFallback) accountAvatarFallback.hidden = true;
+    /* Déconnecté : l'avatar du HUD reste sur l'image de base du jeu (plus de
+       pastille « ✦ », plus de photo Google d'un ancien compte). */
+    setAvatarSrc(accountAvatar, null);
     syncAvatarDeco(accountAvatar);
     if (app) app.classList.remove('is-authenticated');
     gameRegions.forEach((region) => region.setAttribute('inert', ''));
@@ -5428,10 +5458,8 @@
   const accountView = $('account-view');
   const onlineView = $('online-view');
   const profileAvatar = $('profile-avatar');
-  const profileAvatarFallback = $('profile-avatar-fallback');
   const avatarUploadBtn = $('avatar-upload-btn');
   const avatarInput = $('avatar-input');
-  const avatarGoogleBtn = $('avatar-google-btn');
   const profilePseudo = $('profile-pseudo');
   const profileEmail = $('profile-email');
   const friendCodeEl = $('friend-code');
@@ -5454,7 +5482,6 @@
   const friendsCount = $('friends-count');
   const friendDetail = $('friend-detail');
   const friendAvatar = $('friend-avatar');
-  const friendAvatarFallback = $('friend-avatar-fallback');
   const friendPseudo = $('friend-pseudo');
   const friendCodeLabel = $('friend-code-label');
   const friendStats = $('friend-stats');
@@ -5782,23 +5809,14 @@
   }
 
   /* L'avatar du HUD (en haut de l'écran) suit la photo personnalisée, avec
-     repli sur la photo Google. Sans ça, changer de photo ne se voyait pas
-     hors de la page Compte et semblait « non sauvegardé ». */
+     repli sur l'IMAGE DE BASE du jeu (jamais sur la photo Google). Sans ça,
+     changer de photo ne se voyait pas hors de la page Compte et semblait
+     « non sauvegardé ». */
   function syncHudAvatar() {
     if (!accountAvatar) return;
-    const googlePhoto = (currentUser && currentUser.photoURL) || '';
-    const src = profile.avatar || googlePhoto;
-    if (src) {
-      accountAvatar.src = src;
-      accountAvatar.alt = `Photo de profil de ${profile.pseudo || currentEmail || 'Joueur'}`;
-      accountAvatar.hidden = false;
-    } else {
-      accountAvatar.removeAttribute('src');
-      accountAvatar.hidden = true;
-    }
-    /* Sans photo, une pastille prend sa place dans le HUD : le décor équipé
-       reste visible partout, comme sur la page Compte. */
-    if (accountAvatarFallback) accountAvatarFallback.hidden = Boolean(src);
+    setAvatarSrc(accountAvatar, profile);
+    accountAvatar.alt = `Photo de profil de ${profile.pseudo || currentEmail || 'Joueur'}`;
+    /* Le décor équipé reste visible même sur l'image de base. */
     syncAvatarDeco(accountAvatar);
   }
 
@@ -5819,19 +5837,7 @@
     syncHudAvatar();
     renderAdminPanel();
     const stats = myStats();
-    const googlePhoto = (currentUser && currentUser.photoURL) || '';
-    const avatarSrc = profile.avatar || googlePhoto;
-    if (profileAvatar) {
-      if (avatarSrc) {
-        profileAvatar.src = avatarSrc;
-        profileAvatar.hidden = false;
-        if (profileAvatarFallback) profileAvatarFallback.hidden = true;
-      } else {
-        profileAvatar.removeAttribute('src');
-        profileAvatar.hidden = true;
-        if (profileAvatarFallback) profileAvatarFallback.hidden = false;
-      }
-    }
+    setAvatarSrc(profileAvatar, profile);
     /* Décor équipé au-dessus de la photo de profil (Shop → Déco). */
     syncAvatarDeco(profileAvatar);
     if (profilePseudo) {
@@ -6010,20 +6016,6 @@
       reader.readAsDataURL(file);
     });
   }
-
-  on(avatarGoogleBtn, 'click', async () => {
-    const previous = profile.avatar;
-    profile.avatar = '';
-    renderAccount();
-    const ok = await saveProfile();
-    if (!ok) {
-      profile.avatar = previous;
-      renderAccount();
-      setProfileMsg('Sauvegarde impossible pour le moment. Ta photo n’a pas été enregistrée — réessaie.');
-      return;
-    }
-    setProfileMsg('Ta photo Google est de nouveau utilisée.');
-  });
 
   /* -------------------------- administration --------------------------
      Panneau réservé au compte propriétaire du jeu (ADMIN_EMAIL). Il reste
@@ -6790,8 +6782,7 @@
              classement, comme sur la page Compte et les listes d'amis. */
           const img = el('img', 'leaderboard-avatar');
           img.alt = '';
-          if (data.avatar) img.src = data.avatar;
-          else img.hidden = true;
+          setAvatarSrc(img, data);
           const name = el('strong', 'leaderboard-name', typeof data.pseudo === 'string' && data.pseudo.trim() ? data.pseudo : 'Joueur');
           withCreatorBadge(name, data);
           if (id === uid) name.append(el('span', 'leaderboard-you', ' · Toi'));
@@ -6921,10 +6912,7 @@
         const row = el('div', 'friend-row');
         const img = el('img', 'friend-row-avatar');
         img.alt = '';
-        if (data.avatar) img.src = data.avatar;
-        else img.hidden = true;
-        const fb = el('span', 'friend-row-fallback', (data.pseudo || '?').slice(0, 1).toUpperCase());
-        if (data.avatar) fb.hidden = true;
+        setAvatarSrc(img, data);
         const idBox = el('div', 'friend-row-id');
         idBox.append(
           withCreatorBadge(el('strong', 'friend-row-pseudo', data.pseudo || 'Joueur'), data),
@@ -6936,7 +6924,7 @@
         const remove = el('button', 'mini-btn danger', 'Retirer');
         remove.type = 'button';
         on(remove, 'click', () => removeFriend(uid));
-        row.append(avatarWithDeco(img, data, fb), idBox, view, remove);
+        row.append(avatarWithDeco(img, data), idBox, view, remove);
         frag.append(row);
       });
       friendsList.replaceChildren(frag);
@@ -7035,16 +7023,13 @@
     const box = el('div', 'friend-row-id');
     const img = el('img', 'friend-row-avatar');
     img.alt = '';
-    if (data && data.avatar) img.src = data.avatar;
-    else img.hidden = true;
-    const fb = el('span', 'friend-row-fallback', ((data && data.pseudo) || '?').slice(0, 1).toUpperCase());
-    if (data && data.avatar) fb.hidden = true;
+    setAvatarSrc(img, data);
     box.append(
       withCreatorBadge(el('strong', 'friend-row-pseudo', (data && data.pseudo) || 'Joueur'), data),
       el('span', 'friend-row-sub', `${(data && data.uniqueCards) || 0} uniques · ${(data && data.totalCards) || 0} cartes`)
     );
     const wrap = el('div', 'request-id');
-    wrap.append(avatarWithDeco(img, data, fb), box);
+    wrap.append(avatarWithDeco(img, data), box);
     return wrap;
   }
 
@@ -7120,15 +7105,8 @@
     const data = friendProfiles.get(uid);
     if (!data || !friendDetail) return;
     if (friendAvatar) {
-      if (data.avatar) {
-        friendAvatar.src = data.avatar;
-        friendAvatar.hidden = false;
-        if (friendAvatarFallback) friendAvatarFallback.hidden = true;
-      } else {
-        friendAvatar.removeAttribute('src');
-        friendAvatar.hidden = true;
-        if (friendAvatarFallback) friendAvatarFallback.hidden = false;
-      }
+      /* Photo de l'ami, ou image de base du jeu s'il n'en a pas. */
+      setAvatarSrc(friendAvatar, data);
       /* Le décor équipé par cet ami s'affiche aussi sur sa fiche. */
       syncAvatarDeco(friendAvatar, data);
     }

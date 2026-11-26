@@ -154,7 +154,15 @@ function buttonByText(root, text) {
   assert.equal(preview.hidden, false, 'aperçu du joueur ajouté visible');
   assert.match(preview.textContent, /AmiJoueur/);
   assert.match(preview.textContent, /Demande envoyée/);
-  console.log('PASS ajout par code = aperçu pseudo/photo du joueur ajouté');
+  /* 1 quater. Sans photo de profil, c'est l'IMAGE DE BASE du jeu qui
+     s'affiche : plus de pastille avec l'initiale du pseudo. */
+  const previewImg = preview.querySelector('img.friend-row-avatar');
+  assert.ok(previewImg, 'l’aperçu affiche toujours une image d’avatar');
+  assert.match(previewImg.getAttribute('src'), /assets\/default-avatar\.png$/,
+    'sans photo, l’image de base du jeu est utilisée');
+  assert.equal(previewImg.hidden, false, 'l’image de base est visible (photo personnalisée ou non)');
+  assert.equal(doc.querySelector('.friend-row-fallback'), null, 'plus de pastille d’initiale');
+  console.log('PASS sans photo = image de base du jeu dans les listes (pas d’initiale)');
 
   /* 1 bis. Redemander la même personne ne duplique pas la demande. */
   doc.getElementById('friend-code-input').value = 'REFS-ABC123';
