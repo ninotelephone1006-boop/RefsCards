@@ -148,6 +148,7 @@ node tests/shop-flow.cjs             # boutique : achats multiples, inventaire, 
 node tests/video-pack.cjs            # Pack Vidéo : config fps/son/boucle, tirage, lecteur <video>
 node tests/fusion-flow.cjs           # demande de fusion : Collection, auto-ouverture, ?demo=fusion
 node tests/quest-flow.cjs            # 260 quêtes (récompenses en packs), une par chaîne, succès, niveaux, notifications
+node tests/sounds-github.cjs         # bruitages GitHub : banque mp3, provenance, API Sound, cache-busting
 ```
 
 ## Tri de la collection
@@ -235,7 +236,9 @@ Les annonces (`marketListings`, une annonce porte soit `cardId`, soit `packType`
 
 ## Son
 
-Tout est synthétisé en direct avec la Web Audio API (aucun fichier audio) : déchirement continu modulé par la vitesse, étincelles, *pop* d'ouverture, *whoosh*, *tick* au survol, `cha-ching` à l'achat, et un jingle propre à chaque rareté (accord simple, carillon cristallin, impact dramatique, fanfare épique). Le bouton haut-parleur coupe/rétablit le son.
+Tous les bruitages sont de **vrais fichiers audio téléchargés depuis GitHub** : les signaux sonores de Visual Studio Code (dépôt public [`microsoft/vscode`](https://github.com/microsoft/vscode), licence MIT), rangés dans `assets/sounds/` avec leur provenance complète (`CREDITS.md` : fichier, usage, lien au commit figé ; `LICENSE-vscode.txt` : la licence). Déchirement continu du booster (boucle modulée par la vitesse du geste, craquements tirés des blips de diff), *pop* d'ouverture, *whoosh* de rangement, *tick* au survol, `cha-ching` à l'achat, et un jingle propre à chaque rareté (du simple « commande réussie » jusqu'à « tâche terminée + confettis + carillons »). Le moteur `audio.js` décode les mp3 en Web Audio API, cale chaque couche à l'heure près, applique les fenêtres de lecture utiles (les fichiers d'origine ont du silence en tête et une longue traîne muette) et égalise les volumes entre eux. Si un fichier manque ou si le navigateur n'a pas d'AudioContext, le jeu continue simplement sans bruitage. Le bouton haut-parleur coupe/rétablit le son.
+
+Pour changer un son : déposer le mp3 dans `assets/sounds/`, re-mesurer sa fenêtre utile et sa crête (voir `CREDITS.md`), mettre à jour la table `CUES` et `SOUND_VERSION` dans `audio.js`, puis incrémenter le `?v=` d'`audio.js` dans `index.html` — `node tests/sounds-github.cjs` (dans `npm test`) vérifie la cohérence de tout ça.
 
 ## Paramètres utiles
 
