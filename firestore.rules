@@ -11,7 +11,7 @@ service cloud.firestore {
       }
       allow read: if ownsSave();
       allow create, update: if ownsSave()
-        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'streakDate', 'streak', 'claimedDays', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'updatedAt', 'freeDate', 'freeUsed'])
+        && request.resource.data.keys().hasOnly(['coins', 'firstPack', 'collection', 'friends', 'packsOpened', 'packStock', 'streakDate', 'streak', 'claimedDays', 'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned', 'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements', 'notifications', 'leaderboardAnnounced', 'updatedAt', 'freeDate', 'freeUsed'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
         && request.resource.data.coins <= 1000000000
@@ -50,6 +50,7 @@ service cloud.firestore {
             || (request.resource.data.freeUsed is number
                 && request.resource.data.freeUsed >= 0
                 && request.resource.data.freeUsed <= 10000))
+        && (!('leaderboardAnnounced' in request.resource.data) || request.resource.data.leaderboardAnnounced is bool)
         && (!('notifications' in request.resource.data) || (request.resource.data.notifications is list && request.resource.data.notifications.size() <= 50))
         && (!('packStock' in request.resource.data)
             || (request.resource.data.packStock is map
@@ -100,6 +101,8 @@ service cloud.firestore {
         && request.resource.data.avatar.size() <= 300000
         && request.resource.data.friendCode is string
         && request.resource.data.friendCode.matches('^REFS-[A-Z0-9]{6}$')
+        && (!('packsOpened' in request.resource.data)
+            || (request.resource.data.packsOpened is int && request.resource.data.packsOpened >= 0))
         // Liste publique d'amis (uids), pour afficher les amis d'un profil et
         // les amis en commun.
         && (!('friends' in request.resource.data)
