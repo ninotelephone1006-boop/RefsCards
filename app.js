@@ -106,11 +106,22 @@
      PUBLIC (profil `playerProfiles.deco`), donc il s'affiche partout où ta
      photo apparaît : page Compte, HUD en haut de l'écran, listes d'amis et
      de demandes, fiche d'un ami, vendeurs du marché global et classements.
-     Pour ajouter un décor : une entrée ici + une carte dans index.html
-     (`.deco-card`) + une image. */
-  const DECO_IMAGES = { 'chapeau-noel': 'assets/deco/chapeau-noel.png' };
-  const DECO_PRICES = { 'chapeau-noel': 1500 };
-  const DECO_TYPES = ['chapeau-noel'];
+     Pour ajouter un décor : une entrée dans `DECO_IMAGES` + une carte dans
+     index.html (`.deco-card[data-deco]`) + une image dans assets/deco/.
+     `DECO_TYPES` (l'ordre du registre) pilote le Shop et les boutons. */
+  const DECO_IMAGES = {
+    'chapeau-noel': 'assets/deco/chapeau-noel.png',
+    'chapeau-cowboy': 'assets/deco/chapeau-cowboy.png',
+    'chapeau-sombrero': 'assets/deco/chapeau-sombrero.png',
+    'chapeau-beret': 'assets/deco/chapeau-beret.png'
+  };
+  const DECO_PRICES = {
+    'chapeau-noel': 1500,
+    'chapeau-cowboy': 1500,
+    'chapeau-sombrero': 1500,
+    'chapeau-beret': 1500
+  };
+  const DECO_TYPES = Object.keys(DECO_IMAGES);
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
   /* Décor équipé à afficher pour un profil donné : le mien (state local) ou
      celui d'un autre joueur (champ public `deco` de son profil). */
@@ -371,7 +382,7 @@
     return node;
   };
 
-  /* Image du décor équipé (chapeau de Noël, Shop → Déco). `data` absent =
+  /* Image du décor équipé (un chapeau du Shop → Déco). `data` absent =
      mon propre profil (state.decoEquipped) ; sinon champ public `deco` du
      profil de l'autre joueur. Renvoie null quand aucun décor n'est équipé. */
   const decoLayer = (data) => {
@@ -1239,25 +1250,27 @@
 
     if ($('shop-stock-doubleRare')) $('shop-stock-doubleRare').textContent = stockText(state.packStock.doubleRare || 0);
 
-    /* Déco : la carte est toujours visible (achat si non possédé, équiper/retirer si possédé). */
-    const decoCard = $('deco-owned-card');
-    const decoToggle = $('deco-toggle-chapeau-noel');
-    const decoStock = $('deco-stock-chapeau-noel');
-    if (decoCard || decoToggle) {
-      const owned = (state.decoOwned || []).indexOf('chapeau-noel') >= 0;
-      const equipped = state.decoEquipped === 'chapeau-noel';
-      const price = DECO_PRICES['chapeau-noel'] || 1500;
-      if (decoCard) decoCard.hidden = false;
-      if (decoStock) decoStock.textContent = owned ? (equipped ? 'Équipé ✓' : 'Possédé — non équipé') : 'Non possédé';
-      if (decoToggle) {
-        decoToggle.classList.toggle('is-owned', owned && !equipped);
-        decoToggle.classList.toggle('is-equipped', equipped);
-        decoToggle.textContent = owned
+    /* Déco : une carte par chapeau du registre, toujours visible (achat si
+       non possédé, équiper / retirer si possédé). Un seul décor équipé à la
+       fois : en équiper un nouveau retire automatiquement le précédent. */
+    DECO_TYPES.forEach((id) => {
+      const card = document.querySelector(`.deco-card[data-deco="${id}"]`);
+      const toggle = $(`deco-toggle-${id}`);
+      const stock = $(`deco-stock-${id}`);
+      const owned = (state.decoOwned || []).indexOf(id) >= 0;
+      const equipped = state.decoEquipped === id;
+      const price = DECO_PRICES[id] || 1500;
+      if (card) card.hidden = false;
+      if (stock) stock.textContent = owned ? (equipped ? 'Équipé ✓' : 'Possédé — non équipé') : 'Non possédé';
+      if (toggle) {
+        toggle.classList.toggle('is-owned', owned && !equipped);
+        toggle.classList.toggle('is-equipped', equipped);
+        toggle.textContent = owned
           ? (equipped ? 'ÉQUIPÉ ✓ · CLIQUER POUR RETIRER' : 'ÉQUIPER')
           : `ACHETER · ${fmt(price)} 🪙`;
-        decoToggle.disabled = false;
+        toggle.disabled = false;
       }
-    }
+    });
 
     const updateBuy = (type, qtyEl, btn) => {
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
@@ -5254,7 +5267,7 @@
     renderShop();
     saveProfileSoon();
   }
-  on($('deco-toggle-chapeau-noel'), 'click', () => toggleDeco('chapeau-noel'));
+  DECO_TYPES.forEach((id) => on($(`deco-toggle-${id}`), 'click', () => toggleDeco(id)));
   function openFromInventory(type) {
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
@@ -6054,8 +6067,8 @@
         const data = {
           pseudo: d.pseudo || 'Joueur',
           avatar: d.avatar || '',
-          /* Décor équipé (public) : le chapeau de Noël s'affiche aussi sur
-             la photo de cet ami, dans les listes et sur sa fiche. */
+          /* Décor équipé (public) : le chapeau de cet ami s'affiche aussi
+             sur sa photo, dans les listes et sur sa fiche. */
           deco: typeof d.deco === 'string' && isDecoType(d.deco) ? d.deco : '',
           friendCode: d.friendCode || '',
           coins: Number(d.coins) || 0,
@@ -6486,7 +6499,7 @@
         entries.forEach(({ id, data }, index) => {
           const row = el('li', 'leaderboard-row');
           const rank = el('span', 'leaderboard-rank', `#${index + 1}`);
-          /* Photo + décor équipé : le chapeau de Noël se voit aussi au
+          /* Photo + décor équipé : le chapeau se voit aussi au
              classement, comme sur la page Compte et les listes d'amis. */
           const img = el('img', 'leaderboard-avatar');
           img.alt = '';
