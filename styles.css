@@ -4556,3 +4556,27 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
   .creator-badge{animation:none;filter:drop-shadow(0 0 4px #ffd45e88)}
   .creator-badge:hover{transform:none}
 }
+
+/* ==========================================================================
+   DÉCO (Shop) : décorations au-dessus de la photo de profil
+   ========================================================================== */
+.deco-head{margin-top:28px;text-align:center}
+.deco-title{margin:6px 0 8px;font-size:clamp(22px,4vw,30px);font-weight:900;letter-spacing:-.5px;color:#fff}
+.deco-grid{display:grid;gap:14px;margin-top:16px}
+@media(min-width:640px){.deco-grid{grid-template-columns:1fr 1fr}}
+.deco-card{border-color:#ef444455}
+.deco-img-wrap{flex:0 0 110px;display:grid;place-items:center;background:radial-gradient(120% 100% at 50% 0%,#2a0f14,#120a10 70%);border-radius:12px;min-height:110px}
+.deco-img{width:104px;height:104px;object-fit:contain;filter:drop-shadow(0 8px 16px #000a)}
+.shop-buy-deco{background:linear-gradient(100deg,#b91c1c,#dc2626);box-shadow:0 8px 24px -8px #dc2626cc}
+.shop-buy-deco.is-owned{background:linear-gradient(100deg,#166534,#22c55e);box-shadow:0 8px 24px -8px #22c55ecc}
+.shop-buy-deco.is-equipped{background:linear-gradient(100deg,#7f1d1d,#991b1b);box-shadow:none}
+.deco-soon{overflow:hidden}
+.deco-blur{filter:blur(10px) brightness(.7);transform:scale(1.05)}
+.deco-blur-info{filter:blur(6px);opacity:.55;pointer-events:none}
+.deco-soon-badge{position:absolute;top:12px;right:12px;padding:6px 12px;border-radius:99px;background:#ffffff14;border:1px solid #ffffff33;color:#fff;font-size:10px;font-weight:800;letter-spacing:1px;backdrop-filter:blur(4px)}
+.profile-deco{position:absolute;top:-42px;left:50%;transform:translateX(-50%);width:112px;height:105px;object-fit:contain;pointer-events:none;z-index:3;filter:drop-shadow(0 4px 8px #000a)}
+.profile-deco[hidden]{display:none}
+@media(max-width:559px){
+  .deco-card{flex-direction:column;align-items:center;text-align:center}
+  .deco-img-wrap{flex:none;width:100%}
+}

@@ -101,6 +101,13 @@
      sauvegardes et les écrans d'ouverture. */
   const PACK_TYPES = ['classic', 'rare', 'doubleRare', 'legend', 'video', 'ultra'];
   function isPackType(type) { return PACK_TYPES.indexOf(type) >= 0; }
+  /* Décorations (Shop → Déco) : se placent au-dessus de la photo de profil.
+     Un seul décor équipé à la fois (`decoEquipped`). Pour ajouter un décor :
+     une entrée ici + une carte dans index.html (`.deco-card`) + une image. */
+  const DECO_PRICES = { 'chapeau-noel': 500 };
+  const DECO_IMAGES = { 'chapeau-noel': 'assets/deco/chapeau-noel.png' };
+  const DECO_TYPES = ['chapeau-noel'];
+  function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
   function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
   function packLabelFr(type) {
     return type === 'doubleRare' ? 'double rare' : type === 'rare' ? 'rare'
@@ -538,6 +545,9 @@
        `claimedDays` = dates du mois déjà cochées (affichage du calendrier). */
     packStock: emptyPackStock(),
     currentPackType: 'classic',
+    /* Décorations possédées + décor équipé au-dessus de la photo de profil. */
+    decoOwned: [],
+    decoEquipped: '',
     streakDate: '',
     streak: 0,
     claimedDays: [],
@@ -1146,6 +1156,7 @@
     updateBuy('ultra', qtyUltra, buyUltra);
     refreshPromoShop();
     refreshDoublePromo();
+    renderDecoShop();
 
     const total = packTotal();
     if (shopInventoryLabel) {
@@ -1360,6 +1371,57 @@
     renderPackInventory();
     /* Quête « Premier achat », « Grossiste » + succès « Client », « Accro… » */
     trackProgress();
+  }
+
+  /* ------------------------------------------------------------- DÉCO (Shop)
+     Achat unique (pas de quantité) : 500 🪙 pour le chapeau de Noël.
+     Acheté → équipé automatiquement au-dessus de la photo de profil.
+     Le bouton du Shop sert ensuite à équiper / retirer. */
+  function renderDecoShop() {
+    const btn = $('buy-chapeau-noel');
+    const stock = $('deco-stock-chapeau-noel');
+    if (!btn && !stock) return;
+    const owned = (state.decoOwned || []).indexOf('chapeau-noel') >= 0;
+    const equipped = state.decoEquipped === 'chapeau-noel';
+    if (stock) stock.textContent = equipped ? 'Équipé ✓' : owned ? 'Possédé — clique pour équiper' : 'Non possédé';
+    if (btn) {
+      btn.classList.toggle('is-owned', owned && !equipped);
+      btn.classList.toggle('is-equipped', equipped);
+      btn.textContent = equipped ? 'ÉQUIPÉ ✓ · CLIQUER POUR RETIRER'
+        : owned ? 'ÉQUIPER'
+          : `ACHETER · ${fmt(DECO_PRICES['chapeau-noel'])} 🪙`;
+      btn.disabled = !owned && state.coins < DECO_PRICES['chapeau-noel'];
+    }
+  }
+
+  function buyOrToggleDeco(id) {
+    if (!isDecoType(id)) return;
+    SFX.unlock();
+    const owned = (state.decoOwned || []).indexOf(id) >= 0;
+    if (!owned) {
+      const price = DECO_PRICES[id] || 0;
+      if (state.coins < price) {
+        SFX.snap();
+        setShopMsg(`Pas assez de pièces : il te manque ${fmt(price - state.coins)} 🪙 pour ce décor.`);
+        return;
+      }
+      SFX.chaChing();
+      state.decoOwned = [...(state.decoOwned || []), id];
+      state.decoEquipped = id;
+      addCoins(-price);
+      setShopMsg('Décor acheté et équipé au-dessus de ta photo de profil !');
+      showToast('Chapeau de Noël équipé ! 🎅');
+    } else if (state.decoEquipped === id) {
+      state.decoEquipped = '';
+      setShopMsg('Décor retiré de ta photo de profil.');
+    } else {
+      state.decoEquipped = id;
+      SFX.tick();
+      setShopMsg('Décor équipé au-dessus de ta photo de profil !');
+    }
+    save();
+    renderShop();
+    renderAccount();
   }
 
   /* --------------------------------------------------------------- tirage */
@@ -4374,6 +4436,11 @@
        devient 1 pack classique en inventaire, une seule fois. */
     const stock = (d && d.packStock) || {};
     state.packStock = packStockFrom(stock);
+    /* Décorations (anciennes sauvegardes → rien). */
+    state.decoOwned = (Array.isArray(d && d.decoOwned) ? d.decoOwned : [])
+      .filter((id) => typeof id === 'string' && isDecoType(id));
+    state.decoEquipped = (typeof (d && d.decoEquipped) === 'string' && isDecoType(d.decoEquipped)
+      && state.decoOwned.indexOf(d.decoEquipped) >= 0) ? d.decoEquipped : '';
     if (state.firstPack) {
       state.packStock.classic += 1;
       state.firstPack = false;
@@ -4436,6 +4503,8 @@
         friends: friends.slice(0, 500),
         packsOpened: Math.max(0, Math.floor(Number(state.packsOpened) || 0)),
         packStock: cloudPackStock(state.packStock, cloudHasUltra, cloudHasDouble),
+        decoOwned: (state.decoOwned || []).filter((id) => isDecoType(id)).slice(0, 50),
+        decoEquipped: isDecoType(state.decoEquipped) ? state.decoEquipped : '',
         streakDate: String(state.streakDate || '').slice(0, 10),
         streak: clamp(Math.floor(Number(state.streak) || 0), 0, 999),
         claimedDays: (state.claimedDays || []).slice(-31),
@@ -4594,6 +4663,8 @@
     state.marketEarned = 0;
     state.marketBuys = 0;
     state.packStock = emptyPackStock();
+    state.decoOwned = [];
+    state.decoEquipped = '';
     state.streakDate = '';
     state.streak = 0;
     state.claimedDays = [];
@@ -5062,6 +5133,7 @@
   on($('buy-doubleRare'), 'click', () => buyPacks('doubleRare'));
   on($('open-doubleRare'), 'click', () => openFromInventory('doubleRare'));
   on(buyUltra, 'click', () => buyPacks('ultra'));
+  on($('buy-chapeau-noel'), 'click', () => buyOrToggleDeco('chapeau-noel'));
   function openFromInventory(type) {
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
@@ -5522,6 +5594,17 @@
         profileAvatar.removeAttribute('src');
         profileAvatar.hidden = true;
         if (profileAvatarFallback) profileAvatarFallback.hidden = false;
+      }
+    }
+    /* Décor équipé au-dessus de la photo de profil (Shop → Déco). */
+    const profileDeco = $('profile-deco');
+    if (profileDeco) {
+      const equipped = state.decoEquipped;
+      if (equipped && isDecoType(equipped) && DECO_IMAGES[equipped]) {
+        profileDeco.src = DECO_IMAGES[equipped];
+        profileDeco.hidden = false;
+      } else {
+        profileDeco.hidden = true;
       }
     }
     if (profilePseudo) {
