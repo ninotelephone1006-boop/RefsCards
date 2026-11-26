@@ -2,3 +2,6 @@
 # Dépendances locales éventuelles
 node_modules/
 package-lock.json
+
+# Dossier de travail de l'agent (scripts de vérification hors repo)
+.arena-tmp/

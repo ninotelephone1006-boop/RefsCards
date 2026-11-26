@@ -41,7 +41,7 @@ function makeFirestore(store) {
 function makeStore() {
   return {
     playerSaves: {
-      me: { coins: 100, firstPack: false, collection: ['chasseur-royer'], friends: [], packsOpened: 1 }
+      me: { coins: 100, firstPack: false, decoReleaseClaimed: true, collection: ['chasseur-royer'], friends: [], packsOpened: 1 }
     },
     playerProfiles: {},
     friendCodes: {},

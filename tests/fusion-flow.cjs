@@ -99,7 +99,7 @@ async function collectPack(doc) {
         doublons, ouverture manuelle, puis fusion qui consomme 2 exemplaires. */
   {
     const save = {
-      coins: 0, firstPack: false, packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, freeDate: null, freeUsed: 0,
       /* Aucune carte de rareté « supérieure » (uncommon) n'est possédée : le
          résultat aléatoire de la fusion ne peut donc pas recréer un doublon
@@ -141,7 +141,7 @@ async function collectPack(doc) {
   {
     const { w, doc } = await boot({
       save: {
-        coins: 0, firstPack: false, packsOpened: 0,
+        coins: 0, firstPack: false, decoReleaseClaimed: true, packsOpened: 0,
         packStock: { classic: 0, rare: 0 }, freeDate: null, freeUsed: 0,
         collection: ['chasseur-royer', 'toilet-call'], friends: []
       }

@@ -20,7 +20,7 @@ const DELETE = Object.freeze({ __refsDelete: true });
    finir par respecter en supprimant les champs hérités, sans attendre la
    republication des règles. */
 const STRICT_SAVE_KEYS = ['coins', 'firstPack', 'collection', 'friends',
-  'packsOpened', 'packStock', 'decoOwned', 'decoEquipped', 'streakDate', 'streak', 'claimedDays',
+  'packsOpened', 'packStock', 'decoOwned', 'decoEquipped', 'decoReleaseClaimed', 'streakDate', 'streak', 'claimedDays',
   'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned',
   'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements',
   'notifications', 'leaderboardAnnounced', 'updatedAt'];
@@ -34,7 +34,7 @@ function makeStore() {
     playerSaves: {
       me: {
         coins: 1234,
-        firstPack: false,
+        firstPack: false, decoReleaseClaimed: true,
         collection: ['chasseur-royer'],
         friends: [],
         packsOpened: 5,

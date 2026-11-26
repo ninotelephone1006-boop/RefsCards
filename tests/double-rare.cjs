@@ -96,7 +96,7 @@ function yesterdayKey() {
 }
 
 (async () => {
-  const save = { coins: 5000, firstPack: false, collection: [], friends: [], packsOpened: 0, packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: [] };
+  const save = { coins: 5000, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0, packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: [] };
   const { w, doc, store } = await boot(save);
   const t = w.__test;
   assert.equal(t.promoUnitPrice('doubleRare'), 1445);

@@ -151,7 +151,7 @@ async function boot({ makeFirebase = null, embedded = false, fastWatchdog = fals
     // Firestore minimal : la sauvegarde du joueur.
     const save = {
       exists: true,
-      data: () => ({ coins: 420, firstPack: false, collection: [] })
+      data: () => ({ coins: 420, firstPack: false, decoReleaseClaimed: true, collection: [] })
     };
     const firestore = {
       collection: () => ({ doc: () => ({ get: () => Promise.resolve(save), set: () => Promise.resolve() }) })

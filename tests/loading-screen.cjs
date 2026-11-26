@@ -77,7 +77,7 @@ const saveWith = (data) => ({ collection: () => ({ doc: () => ({ get: () => Prom
 
   /* 1. Session déjà active : le jeu s'ouvre, la page de connexion n'apparaît jamais. */
   {
-    const ui = await boot({ firebase: saveWith({ coins: 420, firstPack: false, collection: [] }) });
+    const ui = await boot({ firebase: saveWith({ coins: 420, firstPack: false, decoReleaseClaimed: true, collection: [] }) });
     assert.equal(ui.loadingShown(), true, 'le chargement reste visible tant que Firebase ne répond pas');
     assert.equal(ui.loginShown(), false, 'la connexion reste cachée pendant la vérification');
     assert.equal(ui.gameShown(), false);
