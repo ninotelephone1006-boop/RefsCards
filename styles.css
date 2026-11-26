@@ -4623,3 +4623,94 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
   .deco-card{flex-direction:column;align-items:center;text-align:center}
   .deco-img-wrap{flex:none;width:100%}
 }
+
+/* =========================== SORTIE DES DÉCOS · CÉLÉBRATION =========================== */
+.deco-release-dialog{overflow:hidden}
+.deco-release-aurora{
+  background:radial-gradient(circle at 20% 15%,rgba(255,215,0,.28),transparent 55%),
+             radial-gradient(circle at 80% 25%,rgba(236,72,153,.28),transparent 55%),
+             radial-gradient(circle at 50% 85%,rgba(139,92,246,.28),transparent 60%);
+}
+.deco-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.deco-confetti i{
+  position:absolute;top:-14px;width:9px;height:14px;border-radius:3px;opacity:0;
+  animation:decoConfettiFall 3.2s cubic-bezier(.22,.61,.36,1) infinite;
+}
+.deco-confetti i:nth-child(1){left:6%;background:#ffd700;animation-delay:.0s;animation-duration:2.9s}
+.deco-confetti i:nth-child(2){left:14%;background:#ec4899;animation-delay:.3s;animation-duration:3.3s}
+.deco-confetti i:nth-child(3){left:23%;background:#38bdf8;animation-delay:.6s;animation-duration:2.8s}
+.deco-confetti i:nth-child(4){left:32%;background:#a855f7;animation-delay:.15s;animation-duration:3.5s}
+.deco-confetti i:nth-child(5){left:41%;background:#4ade80;animation-delay:.45s;animation-duration:3.0s}
+.deco-confetti i:nth-child(6){left:50%;background:#fbbf24;animation-delay:.8s;animation-duration:2.7s}
+.deco-confetti i:nth-child(7){left:59%;background:#f43f5e;animation-delay:.25s;animation-duration:3.4s}
+.deco-confetti i:nth-child(8){left:68%;background:#22d3ee;animation-delay:.55s;animation-duration:3.1s}
+.deco-confetti i:nth-child(9){left:76%;background:#facc15;animation-delay:.9s;animation-duration:2.9s}
+.deco-confetti i:nth-child(10){left:84%;background:#c084fc;animation-delay:.35s;animation-duration:3.6s}
+.deco-confetti i:nth-child(11){left:91%;background:#fb7185;animation-delay:.7s;animation-duration:3.0s}
+.deco-confetti i:nth-child(12){left:96%;background:#34d399;animation-delay:.1s;animation-duration:3.2s}
+@keyframes decoConfettiFall{
+  0%{transform:translateY(-10px) rotate(0deg) scale(.85);opacity:0}
+  12%{opacity:.95}
+  85%{opacity:.9}
+  100%{transform:translateY(420px) rotate(540deg) scale(1);opacity:0}
+}
+.deco-gift-showcase{
+  position:relative;z-index:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  margin:14px 0 12px;
+}
+.deco-gift-item{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:12px 8px;border-radius:16px;
+  background:linear-gradient(160deg,rgba(255,255,255,.1),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 8px 24px rgba(0,0,0,.25);
+  animation:decoGiftPop .65s cubic-bezier(.18,1.25,.35,1) both;
+}
+.deco-gift-coins{animation-delay:.12s;border-color:rgba(250,204,21,.45)}
+.deco-gift-ultra{animation-delay:.26s;border-color:rgba(192,132,252,.5)}
+.deco-gift-double{animation-delay:.40s;border-color:rgba(56,189,248,.5)}
+@keyframes decoGiftPop{
+  0%{opacity:0;transform:translateY(18px) scale(.78)}
+  100%{opacity:1;transform:translateY(0) scale(1)}
+}
+.deco-gift-visual{
+  height:68px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;
+}
+.deco-gift-visual img{
+  max-height:66px;width:auto;object-fit:contain;
+  filter:drop-shadow(0 6px 14px rgba(0,0,0,.45));
+  animation:decoGiftFloat 2.8s ease-in-out infinite;
+}
+.deco-gift-coin-orb{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:54px;height:54px;border-radius:50%;font-size:30px;
+  background:radial-gradient(circle at 30% 30%,rgba(254,240,138,.45),rgba(234,179,8,.18));
+  border:1px solid rgba(250,204,21,.55);
+  box-shadow:0 0 22px rgba(250,204,21,.35);
+  animation:decoGiftFloat 2.4s ease-in-out infinite;
+}
+@keyframes decoGiftFloat{
+  0%,100%{transform:translateY(0) rotate(-1deg)}
+  50%{transform:translateY(-5px) rotate(1.5deg)}
+}
+.deco-gift-amount{font-size:13px;font-weight:900;color:#fff;letter-spacing:.2px;line-height:1.2}
+.deco-gift-label{font-size:10px;color:rgba(255,255,255,.72);margin-top:3px;line-height:1.2}
+.deco-release-preview{
+  position:relative;z-index:1;display:flex;align-items:center;gap:10px;
+  padding:9px 12px;border-radius:14px;margin:4px 0 14px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  text-align:left;font-size:12px;color:rgba(255,255,255,.88);
+}
+.deco-release-preview img{
+  width:42px;height:42px;object-fit:contain;flex:0 0 auto;
+  filter:drop-shadow(0 4px 10px rgba(0,0,0,.35));
+}
+.deco-release-preview p{margin:0;line-height:1.35}
+@media(max-width:460px){
+  .deco-gift-showcase{grid-template-columns:1fr;gap:8px}
+  .deco-gift-item{flex-direction:row;text-align:left;gap:12px;padding:10px 12px}
+  .deco-gift-visual{height:48px;width:52px;margin-bottom:0}
+  .deco-gift-visual img{max-height:48px}
+  .deco-gift-coin-orb{width:44px;height:44px;font-size:24px}
+}
+

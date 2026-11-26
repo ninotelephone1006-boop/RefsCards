@@ -441,31 +441,16 @@
           </div>
 
           <div class="deco-grid">
-            <!-- Décor possédé (acheté avant que la vente soit retirée) :
-                 bouton pour l'équiper / le retirer. Masqué si non possédé. -->
-            <article class="shop-card deco-card" id="deco-owned-card" data-deco="chapeau-noel" hidden>
+            <article class="shop-card deco-card" id="deco-owned-card" data-deco="chapeau-noel">
               <div class="shop-img-wrap deco-img-wrap">
                 <img class="deco-img" src="assets/deco/chapeau-noel.png" alt="Chapeau de Noël" draggable="false">
               </div>
               <div class="shop-info">
                 <h3>Chapeau de Noël</h3>
                 <p class="shop-desc">Visible au-dessus de ta photo partout où les joueurs la voient.</p>
-                <p class="shop-stock" id="deco-stock-chapeau-noel">Possédé</p>
-                <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-noel" type="button">ÉQUIPER</button>
+                <p class="shop-stock" id="deco-stock-chapeau-noel">Non possédé</p>
+                <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-noel" type="button">ACHETER · 1 500 🪙</button>
               </div>
-            </article>
-
-            <article class="shop-card deco-card deco-soon" aria-label="Décoration bientôt disponible">
-              <div class="shop-img-wrap deco-img-wrap deco-blur-wrap" aria-hidden="true">
-                <img class="deco-img deco-blur" src="assets/deco/chapeau-noel.png" alt="" draggable="false">
-              </div>
-              <div class="shop-info deco-blur-info" aria-hidden="true">
-                <h3>???</h3>
-                <p class="shop-desc">???</p>
-                <p class="shop-stock">???</p>
-                <button class="shop-buy" type="button" disabled>???</button>
-              </div>
-              <span class="deco-soon-badge">BIENTÔT DISPONIBLE</span>
             </article>
           </div>
           </section>
@@ -1093,6 +1078,57 @@
            Pack Ultra Rare sort et reste à −20 % pendant 24 h. La remise est
            réelle (voir PACK_PRICES / promoPrice dans app.js) ; la fenêtre est
            fermée automatiquement quand le compte à rebours atteint zéro. -->
+      <!-- Annonce de sortie des Décos + cadeau célébration (2 000 🪙 + 1 Pack Ultra + 1 Pack Double Rare) -->
+      <div class="sheet sheet-promo deco-release-sheet" id="deco-release-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="deco-release-title" aria-describedby="deco-release-desc">
+        <div class="sheet-backdrop" data-close-deco-release></div>
+        <div class="sheet-dialog sheet-promo-dialog deco-release-dialog">
+          <button class="sheet-x" id="deco-release-x" type="button" aria-label="Fermer l'annonce des décos">✕</button>
+          <div class="promo-aurora deco-release-aurora" aria-hidden="true"></div>
+          <div class="promo-rays" aria-hidden="true"></div>
+          <div class="deco-confetti" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <p class="kicker promo-kicker"><span>✦</span> NOUVEAUTÉ DISPONIBLE <span>✦</span></p>
+          <h3 class="promo-title deco-release-title" id="deco-release-title">Les Décos arrivent<em> !</em></h3>
+          <p class="promo-sub" id="deco-release-desc">Les décorations de profil sont officiellement disponibles dans le Shop ! Pour fêter ça, voici ton cadeau offert :</p>
+
+          <div class="deco-gift-showcase" aria-label="Récompenses offertes">
+            <div class="deco-gift-item deco-gift-coins">
+              <div class="deco-gift-visual" aria-hidden="true">
+                <span class="deco-gift-coin-orb">🪙</span>
+              </div>
+              <strong class="deco-gift-amount">+2 000 🪙</strong>
+              <span class="deco-gift-label">Pièces</span>
+            </div>
+            <div class="deco-gift-item deco-gift-ultra">
+              <div class="deco-gift-visual">
+                <img src="assets/packetultra.png" alt="Pack Ultra Rare" draggable="false">
+              </div>
+              <strong class="deco-gift-amount">1× Pack Ultra</strong>
+              <span class="deco-gift-label">Ajouté à l'inventaire</span>
+            </div>
+            <div class="deco-gift-item deco-gift-double">
+              <div class="deco-gift-visual">
+                <img src="assets/Packraredouble.png" alt="Pack Double Rare" draggable="false">
+              </div>
+              <strong class="deco-gift-amount">1× Double Rare</strong>
+              <span class="deco-gift-label">Ajouté à l'inventaire</span>
+            </div>
+          </div>
+
+          <div class="deco-release-preview">
+            <img src="assets/deco/chapeau-noel.png" alt="Chapeau de Noël" draggable="false">
+            <p><strong>Chapeau de Noël</strong> disponible dès maintenant dans <em>Shop → ✨ Déco</em> !</p>
+          </div>
+
+          <div class="sheet-actions promo-actions">
+            <button class="mini-btn" id="deco-release-ok" type="button">Génial, merci !</button>
+            <button class="mini-btn primary promo-cta" id="deco-release-see" type="button">VOIR LES DÉCOS →</button>
+          </div>
+          <p class="promo-hint">Cadeau crédité automatiquement sur ton compte · Bonne ouverture !</p>
+        </div>
+      </div>
+
       <div class="sheet sheet-promo double-promo" id="double-promo-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="double-promo-title" aria-describedby="double-promo-desc">
         <div class="sheet-backdrop" data-close-double></div>
         <div class="sheet-dialog sheet-promo-dialog">

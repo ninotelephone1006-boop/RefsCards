@@ -109,6 +109,7 @@
      Pour ajouter un décor : une entrée ici + une carte dans index.html
      (`.deco-card`) + une image. */
   const DECO_IMAGES = { 'chapeau-noel': 'assets/deco/chapeau-noel.png' };
+  const DECO_PRICES = { 'chapeau-noel': 1500 };
   const DECO_TYPES = ['chapeau-noel'];
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
   /* Décor équipé à afficher pour un profil donné : le mien (state local) ou
@@ -612,6 +613,7 @@
     /* Décorations possédées + décor équipé au-dessus de la photo de profil. */
     decoOwned: [],
     decoEquipped: '',
+    decoReleaseClaimed: false,
     streakDate: '',
     streak: 0,
     claimedDays: [],
@@ -1001,6 +1003,49 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDoublePromo(); });
   }
 
+  /* Annonce de sortie des Décos + cadeau célébration (2 000 🪙 + 1 Pack Ultra + 1 Pack Double Rare) */
+  const decoReleaseSheet = $('deco-release-sheet');
+  function closeDecoRelease(goDeco = false) {
+    if (!decoReleaseSheet || decoReleaseSheet.hidden) return;
+    closeSheet(decoReleaseSheet);
+    if (goDeco) {
+      setTab('shop');
+      const decoTabBtn = document.querySelector('[data-shop-tab="deco"]');
+      if (decoTabBtn) decoTabBtn.click();
+    }
+  }
+  if (decoReleaseSheet) {
+    decoReleaseSheet.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close-deco-release]')) closeDecoRelease();
+    });
+    on($('deco-release-x'), 'click', () => closeDecoRelease());
+    on($('deco-release-ok'), 'click', () => closeDecoRelease());
+    on($('deco-release-see'), 'click', () => closeDecoRelease(true));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDecoRelease(); });
+  }
+  function maybeShowDecoRelease() {
+    if (state.decoReleaseClaimed) return;
+    state.decoReleaseClaimed = true;
+    state.coins += 2000;
+    state.packStock.ultra = (state.packStock.ultra || 0) + 1;
+    state.packStock.doubleRare = (state.packStock.doubleRare || 0) + 1;
+    pushNotification(
+      'system',
+      '✨ Les Décos sont disponibles !',
+      'Les décorations de profil débarquent dans le Shop ! Cadeau offert : +2 000 🪙, 1 Pack Ultra Rare et 1 Pack Double Rare 🎉'
+    );
+    updateCoins();
+    renderShop();
+    renderPackInventory();
+    save();
+    if (decoReleaseSheet) {
+      SFX.chaChing();
+      openSheet(decoReleaseSheet);
+      const btn = $('deco-release-see');
+      if (btn) btn.focus({ preventScroll: true });
+    }
+  }
+
   /* ====================================================== SHOP · INVENTAIRE
      Les packs ne s'achètent plus en un clic depuis le récap : ils vont dans
      l'inventaire (state.packStock) et s'ouvrent depuis l'onglet Pack.
@@ -1194,21 +1239,23 @@
 
     if ($('shop-stock-doubleRare')) $('shop-stock-doubleRare').textContent = stockText(state.packStock.doubleRare || 0);
 
-    /* Déco : la carte du décor possédé n'apparaît que s'il est possédé, avec
-       le bouton Équiper / Retirer (le même état que sur la page Compte). */
+    /* Déco : la carte est toujours visible (achat si non possédé, équiper/retirer si possédé). */
     const decoCard = $('deco-owned-card');
     const decoToggle = $('deco-toggle-chapeau-noel');
     const decoStock = $('deco-stock-chapeau-noel');
     if (decoCard || decoToggle) {
       const owned = (state.decoOwned || []).indexOf('chapeau-noel') >= 0;
       const equipped = state.decoEquipped === 'chapeau-noel';
-      if (decoCard) decoCard.hidden = !owned;
-      if (decoStock) decoStock.textContent = equipped ? 'Équipé ✓' : 'Possédé — non équipé';
+      const price = DECO_PRICES['chapeau-noel'] || 1500;
+      if (decoCard) decoCard.hidden = false;
+      if (decoStock) decoStock.textContent = owned ? (equipped ? 'Équipé ✓' : 'Possédé — non équipé') : 'Non possédé';
       if (decoToggle) {
         decoToggle.classList.toggle('is-owned', owned && !equipped);
         decoToggle.classList.toggle('is-equipped', equipped);
-        decoToggle.textContent = equipped ? 'ÉQUIPÉ ✓ · CLIQUER POUR RETIRER' : 'ÉQUIPER';
-        decoToggle.disabled = !owned;
+        decoToggle.textContent = owned
+          ? (equipped ? 'ÉQUIPÉ ✓ · CLIQUER POUR RETIRER' : 'ÉQUIPER')
+          : `ACHETER · ${fmt(price)} 🪙`;
+        decoToggle.disabled = false;
       }
     }
 
@@ -4471,6 +4518,7 @@
       .filter((id) => typeof id === 'string' && isDecoType(id));
     state.decoEquipped = (typeof (d && d.decoEquipped) === 'string' && isDecoType(d.decoEquipped)
       && state.decoOwned.indexOf(d.decoEquipped) >= 0) ? d.decoEquipped : '';
+    state.decoReleaseClaimed = Boolean(d && d.decoReleaseClaimed);
     if (state.firstPack) {
       state.packStock.classic += 1;
       state.firstPack = false;
@@ -4535,6 +4583,7 @@
         packStock: cloudPackStock(state.packStock, cloudHasUltra, cloudHasDouble),
         decoOwned: (state.decoOwned || []).filter((id) => isDecoType(id)).slice(0, 50),
         decoEquipped: isDecoType(state.decoEquipped) ? state.decoEquipped : '',
+        decoReleaseClaimed: Boolean(state.decoReleaseClaimed),
         streakDate: String(state.streakDate || '').slice(0, 10),
         streak: clamp(Math.floor(Number(state.streak) || 0), 0, 999),
         claimedDays: (state.claimedDays || []).slice(-31),
@@ -4621,6 +4670,7 @@
     /* Annonce de sortie du Pack Ultra Rare (−20 % / 24 h). Légèrement
        différée pour laisser l'écran de chargement disparaître, et jamais
        par-dessus l'annonce des nouvelles cartes. */
+    window.setTimeout(maybeShowDecoRelease, 650);
     window.setTimeout(maybeShowUltraPromo, 900);
     /* Notifications hors jeu : état des réglages (Compte / cloche) puis, si
        la question « que veux-tu recevoir ? » n'a jamais été posée sur cet
@@ -4696,6 +4746,7 @@
     state.packStock = emptyPackStock();
     state.decoOwned = [];
     state.decoEquipped = '';
+    state.decoReleaseClaimed = false;
     state.streakDate = '';
     state.streak = 0;
     state.claimedDays = [];
@@ -5167,12 +5218,31 @@
   on($('open-doubleRare'), 'click', () => openFromInventory('doubleRare'));
   on(buyUltra, 'click', () => buyPacks('ultra'));
 
-  /* Déco : équiper / retirer un décor possédé. Le décor équipé s'affiche
-     immédiatement partout (HUD, Compte, listes) et est publié dans le
-     profil public pour que les autres joueurs le voient aussi. */
+  /* Déco : acheter si non possédé, sinon équiper / retirer un décor possédé.
+     Le décor équipé s'affiche immédiatement partout (HUD, Compte, listes) et
+     est publié dans le profil public pour que les autres joueurs le voient aussi. */
   function toggleDeco(id) {
     if (!isDecoType(id)) return;
-    if ((state.decoOwned || []).indexOf(id) < 0) return;
+    if ((state.decoOwned || []).indexOf(id) < 0) {
+      const price = DECO_PRICES[id] || 1500;
+      if (state.coins < price) {
+        SFX.snap();
+        setShopMsg(`Il te manque ${fmt(price - state.coins)} 🪙 pour acheter ce décor.`);
+        return;
+      }
+      state.coins -= price;
+      state.decoOwned = (state.decoOwned || []).concat([id]);
+      state.decoEquipped = id;
+      SFX.chaChing();
+      setShopMsg('Décor acheté et équipé ! Il apparaît au-dessus de ta photo partout dans le jeu.');
+      updateCoins();
+      save();
+      renderAccount();
+      renderOnline();
+      renderShop();
+      saveProfileSoon();
+      return;
+    }
     SFX.tick();
     state.decoEquipped = state.decoEquipped === id ? '' : id;
     setShopMsg(state.decoEquipped
