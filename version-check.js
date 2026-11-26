@@ -150,12 +150,39 @@
     hideBanner();
   }
 
-  function reloadPage() {
+  let reloadTimer = 0;
+  let reloadDeferrals = 0;
+
+  function reloadNow() {
     try {
       window.location.reload();
     } catch (error) {
       window.location.href = window.location.href;
     }
+  }
+
+  /* Un appui sur « Recharger » pendant une déchirure ou la cinématique
+     d'ouverture ferait perdre le booster en cours. app.js signale cette phase
+     avec `body.refs-pack-opening` : on attend la fin de l'animation plutôt
+     que de couper court, sans jamais recharger tout seul. */
+  function reloadPage() {
+    const busy = document.body && document.body.classList.contains('refs-pack-opening');
+    if (busy && reloadDeferrals < 2) {
+      reloadDeferrals += 1;
+      if (!reloadTimer) {
+        reloadTimer = window.setTimeout(() => {
+          reloadTimer = 0;
+          reloadPage();
+        }, 2000);
+      }
+      return;
+    }
+    if (reloadTimer) {
+      window.clearTimeout(reloadTimer);
+      reloadTimer = 0;
+    }
+    reloadDeferrals = 0;
+    reloadNow();
   }
 
   /* -------------------------------------------------------------- détection */
