@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.26-2">
+  <meta name="app-version" content="2026.11.26-3">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.26-1">
+  <link rel="stylesheet" href="styles.css?v=2026.11.26-3">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -50,7 +50,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.26-2" defer></script>
+  <script src="app.js?v=2026.11.26-3" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -526,6 +526,48 @@
               <p class="push-summary" id="push-summary">Chargement des réglages…</p>
             </div>
             <button class="mini-btn primary" id="notif-settings-open" type="button">Choisir mes notifications</button>
+          </section>
+
+          <!-- Panneau d'administration : réservé au compte propriétaire
+               (voir ADMIN_EMAIL dans app.js). Toujours masqué dans le HTML ;
+               seul ce compte précis le dévoile après connexion. Aucune action
+               n'émet de notification ou d'annonce : personne d'autre ne les voit. -->
+          <section class="admin-panel" id="admin-panel" hidden aria-labelledby="admin-panel-title">
+            <div class="admin-panel-head">
+              <h3 id="admin-panel-title">🛠️ Administration</h3>
+              <p class="admin-panel-sub">Visible uniquement par le compte propriétaire.</p>
+            </div>
+            <div class="admin-row">
+              <label for="admin-coins">🪙 Pièces</label>
+              <input id="admin-coins" type="number" min="0" max="1000000000" step="1" inputmode="numeric" autocomplete="off">
+              <button class="mini-btn" id="admin-coins-set" type="button">Définir</button>
+            </div>
+            <div class="admin-row">
+              <label for="admin-packs-opened">📦 Boosters ouverts</label>
+              <input id="admin-packs-opened" type="number" min="0" max="1000000000" step="1" inputmode="numeric" autocomplete="off">
+              <button class="mini-btn" id="admin-packs-opened-set" type="button">Définir</button>
+            </div>
+            <div class="admin-row">
+              <label for="admin-pack-type">🎁 Donner des packs</label>
+              <select id="admin-pack-type">
+                <option value="classic">Classique</option>
+                <option value="rare">Rare</option>
+                <option value="doubleRare">Double Rare</option>
+                <option value="legend">Légende</option>
+                <option value="video">Vidéo</option>
+                <option value="ultra">Ultra Rare</option>
+              </select>
+              <input id="admin-pack-qty" type="number" min="1" max="100000" step="1" value="1" inputmode="numeric" autocomplete="off" aria-label="Quantité de packs">
+              <button class="mini-btn" id="admin-pack-give" type="button">Ajouter</button>
+            </div>
+            <div class="admin-row admin-row-card">
+              <label for="admin-card">🃏 Donner une carte</label>
+              <select id="admin-card"></select>
+              <input id="admin-card-qty" type="number" min="1" max="100" step="1" value="1" inputmode="numeric" autocomplete="off" aria-label="Nombre d'exemplaires">
+              <label class="admin-shiny" for="admin-card-shiny"><input id="admin-card-shiny" type="checkbox"> ✦ Shiny</label>
+              <button class="mini-btn" id="admin-card-give" type="button">Donner</button>
+            </div>
+            <p class="admin-msg" id="admin-msg" role="status"></p>
           </section>
         </div>
       </section>
