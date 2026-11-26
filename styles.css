@@ -4517,3 +4517,42 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .leaderboard-you{color:#b9a0ee;font-size:11px}
 .leaderboard-value{flex:0 0 auto;color:#f5d884;font-weight:700;font-size:12px;white-space:nowrap}
 @media(max-width:600px){.leaderboard-grid{grid-template-columns:1fr}}
+
+/* ---------- Badge « Créateur » ----------
+   Marteau pixel-art affiché à côté du pseudo du compte propriétaire
+   (voir assets/creator-hammer.png + withCreatorBadge() dans app.js).
+   Le halo doré pulse en boucle pour signaler le compte créateur. */
+.creator-badge{
+  display:inline-block;
+  width:1.15em;
+  height:1.15em;
+  margin-left:.35em;
+  vertical-align:-.18em;
+  object-fit:contain;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  border-radius:3px;
+  user-select:none;
+  -webkit-user-drag:none;
+  filter:drop-shadow(0 0 3px #ffd45e99) drop-shadow(0 0 7px #ffb70355);
+  animation:creator-badge-pulse 2.4s ease-in-out infinite;
+}
+.creator-badge:hover{transform:scale(1.18);transition:transform .18s ease}
+@keyframes creator-badge-pulse{
+  0%,100%{
+    filter:drop-shadow(0 0 2px #ffd45e88) drop-shadow(0 0 6px #ffb70344) brightness(1);
+    transform:translateY(0);
+  }
+  50%{
+    filter:drop-shadow(0 0 6px #ffe78a) drop-shadow(0 0 14px #ffc93c) drop-shadow(0 0 22px #ff9d0a66) brightness(1.35) saturate(1.2);
+    transform:translateY(-1px) scale(1.08);
+  }
+}
+/* Éclat renforcé pour le pseudo grand format de la fiche compte / ami. */
+.profile-id .creator-badge,
+.friend-detail-id .creator-badge{width:.95em;height:.95em}
+h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
+@media (prefers-reduced-motion:reduce){
+  .creator-badge{animation:none;filter:drop-shadow(0 0 4px #ffd45e88)}
+  .creator-badge:hover{transform:none}
+}

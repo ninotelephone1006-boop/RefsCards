@@ -328,6 +328,32 @@
     return n;
   };
 
+  /* Badge « Créateur » : le marteau pixel-art affiché à côté du pseudo du
+     compte propriétaire (ninotelephone1006@gmail.com). Le drapeau `creator`
+     voyage dans le profil public (playerProfiles), donc TOUT le monde voit
+     le badge, pas seulement l'admin sur son propre écran. Les règles
+     Firestore n'autorisent creator: true que pour le compte propriétaire. */
+  const creatorBadge = () => {
+    const img = el('img', 'creator-badge');
+    img.src = 'assets/creator-hammer.png';
+    img.alt = 'Créateur';
+    img.title = 'Créateur du jeu';
+    img.width = 20;
+    img.height = 20;
+    img.decoding = 'async';
+    img.draggable = false;
+    return img;
+  };
+  /* Accroche le badge au pseudo déjà rendu dans `node` si le profil le
+     permet (donnée publique `creator` pour les autres joueurs, isAdmin()
+     pour le compte local). Renvoie `node` pour chaîner. */
+  const withCreatorBadge = (node, data) => {
+    if (!node) return node;
+    const flagged = data && typeof data === 'object' ? data.creator === true : isAdmin();
+    if (flagged) node.append(creatorBadge());
+    return node;
+  };
+
   /* ------------------------------------------------------------------ refs */
 
   const app = $('app');
@@ -5402,6 +5428,12 @@
         /* Liste publique d'amis : c'est ce qui permet d'afficher « ses amis »
            sur le profil d'un joueur et de mettre les amis en commun devant. */
         friends: friends.slice(0, 500),
+        /* Drapeau public « créateur » : seul le compte propriétaire (ADMIN_EMAIL)
+           l'écrit, et c'est lui qui fait apparaître le marteau à côté de son
+           pseudo chez tous les joueurs. Les règles Firestore n'autorisent
+           creator: true que pour cet e-mail ; sinon le champ doit être absent
+           ou false. */
+        ...(isAdmin() ? { creator: true } : {}),
         updatedAt: serverTimestamp()
       }, { merge: true });
       return true;
@@ -5440,6 +5472,7 @@
   function syncHudName() {
     if (accountEmail) {
       accountEmail.textContent = profile.pseudo || currentEmail || 'Joueur';
+      withCreatorBadge(accountEmail, null);
       accountEmail.title = currentEmail || profile.pseudo || '';
     }
   }
@@ -5491,7 +5524,10 @@
         if (profileAvatarFallback) profileAvatarFallback.hidden = false;
       }
     }
-    if (profilePseudo) profilePseudo.textContent = profile.pseudo || 'Joueur';
+    if (profilePseudo) {
+      profilePseudo.textContent = profile.pseudo || 'Joueur';
+      withCreatorBadge(profilePseudo, null);
+    }
     if (profileEmail) profileEmail.textContent = currentEmail || '';
     if (friendCodeEl) friendCodeEl.textContent = profile.friendCode || 'REFS-······';
     if (pseudoInput && document.activeElement !== pseudoInput) pseudoInput.value = profile.pseudo || '';
@@ -5799,7 +5835,7 @@
     if (!force && friendProfiles.has(uid)) return friendProfiles.get(uid);
     const fallback = {
       pseudo: 'Joueur', avatar: '', friendCode: '',
-      coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: [], friends: []
+      coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: [], friends: [], creator: false
     };
     if (!cloudReady()) return fallback;
     try {
@@ -5817,7 +5853,8 @@
           collection: Array.isArray(d.collection) ? d.collection : [],
           friends: Array.isArray(d.friends)
             ? d.friends.filter((uid) => typeof uid === 'string' && uid).slice(0, 500)
-            : []
+            : [],
+          creator: d.creator === true
         };
         friendProfiles.set(uid, data);
         return data;
@@ -6238,6 +6275,7 @@
           const row = el('li', 'leaderboard-row');
           const rank = el('span', 'leaderboard-rank', `#${index + 1}`);
           const name = el('strong', 'leaderboard-name', typeof data.pseudo === 'string' && data.pseudo.trim() ? data.pseudo : 'Joueur');
+          withCreatorBadge(name, data);
           if (id === uid) name.append(el('span', 'leaderboard-you', ' · Toi'));
           const value = el('span', 'leaderboard-value', `${fmt(data[field])} ${unit}`);
           row.append(rank, name, value);
@@ -6333,7 +6371,7 @@
         if (data.avatar) fb.hidden = true;
         const idBox = el('div', 'friend-row-id');
         idBox.append(
-          el('strong', 'friend-row-pseudo', data.pseudo || 'Joueur'),
+          withCreatorBadge(el('strong', 'friend-row-pseudo', data.pseudo || 'Joueur'), data),
           el('span', 'friend-row-sub', `${data.uniqueCards || 0} uniques · ${data.totalCards || 0} cartes`)
         );
         const view = el('button', 'mini-btn', 'Voir');
@@ -6446,7 +6484,7 @@
     const fb = el('span', 'friend-row-fallback', ((data && data.pseudo) || '?').slice(0, 1).toUpperCase());
     if (data && data.avatar) fb.hidden = true;
     box.append(
-      el('strong', 'friend-row-pseudo', (data && data.pseudo) || 'Joueur'),
+      withCreatorBadge(el('strong', 'friend-row-pseudo', (data && data.pseudo) || 'Joueur'), data),
       el('span', 'friend-row-sub', `${(data && data.uniqueCards) || 0} uniques · ${(data && data.totalCards) || 0} cartes`)
     );
     const wrap = el('div', 'request-id');
@@ -6536,7 +6574,10 @@
         if (friendAvatarFallback) friendAvatarFallback.hidden = false;
       }
     }
-    if (friendPseudo) friendPseudo.textContent = data.pseudo || 'Joueur';
+    if (friendPseudo) {
+      friendPseudo.textContent = data.pseudo || 'Joueur';
+      withCreatorBadge(friendPseudo, data);
+    }
     if (friendCodeLabel) friendCodeLabel.textContent = data.friendCode ? `Code ami · ${data.friendCode}` : '';
     if (friendStats) {
       const stats = statsFor(data.collection, data.coins);
@@ -7430,7 +7471,7 @@
 
     if (mode === 'received') {
       head.append(
-        el('strong', 'flip-row-pseudo', `${flipPseudo(game.fromUid)} te défie`),
+        withCreatorBadge(el('strong', 'flip-row-pseudo', `${flipPseudo(game.fromUid)} te défie`), friendProfiles.get(game.fromUid)),
         el('span', 'flip-bet-pill', `Mise adverse : ${fmt(amount)} 🪙`)
       );
       row.append(head);
@@ -7474,7 +7515,7 @@
 
     if (mode === 'sent') {
       head.append(
-        el('strong', 'flip-row-pseudo', `Défi à ${flipPseudo(game.toUid)}`),
+        withCreatorBadge(el('strong', 'flip-row-pseudo', `Défi à ${flipPseudo(game.toUid)}`), friendProfiles.get(game.toUid)),
         el('span', 'flip-bet-pill', `Ta mise : ${fmt(amount)} 🪙 (${FLIP_LABELS[game.fromChoice] || '—'})`)
       );
       row.append(head);
@@ -7493,7 +7534,7 @@
 
     /* Historique : parties finies, annulées, refusées ou encaissées. */
     const decided = game.status === 'finished' || game.status === 'claimed';
-    head.append(el('strong', 'flip-row-pseudo', `vs ${flipPseudo(opponentUid)}`));
+    head.append(withCreatorBadge(el('strong', 'flip-row-pseudo', `vs ${flipPseudo(opponentUid)}`), friendProfiles.get(opponentUid)));
     if (decided && game.result) {
       head.append(el('span', 'flip-bet-pill', `Résultat : ${FLIP_LABELS[game.result] || game.result}`));
     }
