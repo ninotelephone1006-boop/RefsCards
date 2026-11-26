@@ -121,7 +121,14 @@ service cloud.firestore {
         && (!('creator' in request.resource.data)
             || request.resource.data.creator == false
             || (request.resource.data.creator == true
-                && request.auth.token.email == 'ninotelephone1006@gmail.com'));
+                && request.auth.token.email == 'ninotelephone1006@gmail.com'))
+        // Réglage GLOBAL de l'affichage des chapeaux (position, taille,
+        // rotation de chaque décor sur les photos de profil). Il est publié
+        // dans le profil public du créateur, lisible par tous les joueurs
+        // connectés (allow read ci-dessus) : un seul réglage s'applique à
+        // tout le monde, sans notification. Seul ce compte peut l'écrire.
+        && (!('decoLayout' in request.resource.data)
+            || request.auth.token.email == 'ninotelephone1006@gmail.com');
       allow delete: if false;
     }
 

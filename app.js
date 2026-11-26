@@ -122,12 +122,84 @@
     'chapeau-beret': 1500
   };
   const DECO_TYPES = Object.keys(DECO_IMAGES);
+  const DECO_LABELS = {
+    'chapeau-noel': 'Chapeau de Noël',
+    'chapeau-cowboy': 'Chapeau de cowboy',
+    'chapeau-sombrero': 'Sombrero mexicain',
+    'chapeau-beret': 'Béret rouge'
+  };
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
+
+  /* --------------------------------------------- réglage global des chapeaux
+     Position (x / y, en % du socle de l'avatar), taille (multiplicateur de la
+     largeur de chaque contexte) et rotation (degrés) de CHAQUE chapeau sur la
+     photo de profil. Les valeurs sont publiées par l'admin dans son profil
+     public (`playerProfiles.decoLayout`) : tout joueur connecté les lit, donc
+     un seul réglage s'applique à tout le monde, immédiatement (snapshot) et
+     après rechargement, sans la moindre notification. Le CSS lit les variables
+     --deco-* posées sur chaque image ; sans réglage publié, on retombe
+     exactement sur les valeurs d'origine (54 % / 54 % / ×1 / −11°). */
+  const DECO_LAYOUT_DEFAULT = { x: 54, y: 54, scale: 1, rotate: -11 };
+  const DECO_LAYOUT_LIMITS = { x: [-20, 120], y: [-20, 120], scale: [0.3, 2.5], rotate: [-180, 180] };
+  let decoLayouts = {};        // réglages publiés (4 chapeaux, toujours complets)
+  let decoDraft = {};          // réglages en cours d'édition, pas encore publiés
+  let decoEditorDirty = false; // l'admin a des modifications non enregistrées
+  let decoLayoutUnsub = null;  // écoute temps réel du profil du créateur
+
+  function decoLayoutNumber(value, key, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    const limits = DECO_LAYOUT_LIMITS[key] || [0, 100];
+    /* Math.min/max plutôt que clamp() : cette fonction sert aussi à
+       initialiser l'état au tout début du script, avant sa déclaration. */
+    return Math.round(Math.min(Math.max(n, limits[0]), limits[1]) * 100) / 100;
+  }
+
+  function normalizeDecoLayout(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    return {
+      x: decoLayoutNumber(src.x, 'x', DECO_LAYOUT_DEFAULT.x),
+      y: decoLayoutNumber(src.y, 'y', DECO_LAYOUT_DEFAULT.y),
+      scale: decoLayoutNumber(src.scale, 'scale', DECO_LAYOUT_DEFAULT.scale),
+      rotate: decoLayoutNumber(src.rotate, 'rotate', DECO_LAYOUT_DEFAULT.rotate)
+    };
+  }
+
+  /* Toujours les 4 chapeaux, toujours des nombres bornés : un document
+     ancien, incomplet ou corrompu ne peut pas casser l'affichage. */
+  function publishedDecoLayouts(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = {};
+    DECO_TYPES.forEach((id) => { out[id] = normalizeDecoLayout(src[id]); });
+    return out;
+  }
+
+  /* État initial = valeurs d'origine, avant même la lecture du cloud. */
+  decoLayouts = publishedDecoLayouts(null);
+  decoDraft = publishedDecoLayouts(null);
+
+  function decoLayoutOf(id) { return decoLayouts[id] || DECO_LAYOUT_DEFAULT; }
+
+  /* Pose les variables CSS sur une image de chapeau (réelle ou aperçu). */
+  function applyDecoVars(node, layout) {
+    if (!node || !node.style) return;
+    const l = normalizeDecoLayout(layout);
+    node.style.setProperty('--deco-x', `${l.x}%`);
+    node.style.setProperty('--deco-y', `${l.y}%`);
+    node.style.setProperty('--deco-scale', String(l.scale));
+    node.style.setProperty('--deco-rotate', `${l.rotate}deg`);
+  }
+
+  function decoIdFor(data) {
+    const id = data && typeof data === 'object' ? data.deco : state.decoEquipped;
+    return typeof id === 'string' && isDecoType(id) ? id : '';
+  }
+
   /* Décor équipé à afficher pour un profil donné : le mien (state local) ou
      celui d'un autre joueur (champ public `deco` de son profil). */
   function decoFor(data) {
-    const id = data && typeof data === 'object' ? data.deco : state.decoEquipped;
-    return typeof id === 'string' && isDecoType(id) && DECO_IMAGES[id] ? DECO_IMAGES[id] : '';
+    const id = decoIdFor(data);
+    return id ? DECO_IMAGES[id] : '';
   }
   function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
   function packLabelFr(type) {
@@ -386,7 +458,8 @@
      mon propre profil (state.decoEquipped) ; sinon champ public `deco` du
      profil de l'autre joueur. Renvoie null quand aucun décor n'est équipé. */
   const decoLayer = (data) => {
-    const src = decoFor(data);
+    const id = decoIdFor(data);
+    const src = id ? DECO_IMAGES[id] : '';
     if (!src) return null;
     const img = el('img', 'avatar-deco');
     img.src = src;
@@ -394,6 +467,8 @@
     img.decoding = 'async';
     img.draggable = false;
     img.setAttribute('aria-hidden', 'true');
+    img.dataset.deco = id;
+    applyDecoVars(img, decoLayoutOf(id));
     return img;
   };
 
@@ -418,6 +493,10 @@
       if (existing.getAttribute('src') !== layer.getAttribute('src')) {
         existing.src = layer.getAttribute('src');
       }
+      /* Le chapeau a peut-être changé : on remet l'identifiant et le réglage
+         global correspondant à jour sur l'image réutilisée. */
+      existing.dataset.deco = layer.dataset.deco;
+      applyDecoVars(existing, decoLayoutOf(existing.dataset.deco));
       return;
     }
     slot.append(layer);
@@ -4657,6 +4736,9 @@
        connexion ne doit pas être écrasé par ce chargement (qui réécrit le
        profil cloud avec les anciennes valeurs). */
     await loadProfile();
+    /* Réglage global des chapeaux : lu (et suivi en temps réel) pour TOUS les
+       joueurs, juste après le profil — `creator: true` est alors publié. */
+    loadDecoLayouts();
     loadFriendRequests();
     subscribeFriendRequests();
     /* Échanges désactivés : seul le marché existe (cartes + packs en vente).
@@ -4773,6 +4855,12 @@
     renderPackInventory();
     /* Le panneau d'administration ne doit jamais rester affiché pour un
        autre compte sur le même appareil : on le masque à la déconnexion. */
+    unsubscribeDecoLayouts();
+    decoLayouts = publishedDecoLayouts(null);
+    decoDraft = publishedDecoLayouts(null);
+    decoEditorDirty = false;
+    decoDrag = null;
+    refreshDecoLayers();
     renderAdminPanel();
     if (friendRequestsUnsub) {
       try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
@@ -5960,6 +6048,22 @@
   const adminCardGive = $('admin-card-give');
   const adminMsg = $('admin-msg');
 
+  /* Éditeur de chapeaux (même panneau, donc invisible pour les autres
+     comptes). Un chapeau à la fois : glisser sur l'aperçu ou utiliser les
+     curseurs, puis « Enregistrer » publie LES QUATRE réglages d'un coup. */
+  const decoEditorSelect = $('admin-deco-select');
+  const decoEditorPfp = $('admin-deco-pfp');
+  const decoEditorHat = $('admin-deco-hat');
+  const decoEditorMsg = $('admin-deco-msg');
+  const decoEditorSave = $('admin-deco-save');
+  const decoEditorReset = $('admin-deco-reset');
+  const DECO_EDITOR_INPUTS = {
+    x: $('admin-deco-x'),
+    y: $('admin-deco-y'),
+    scale: $('admin-deco-scale'),
+    rotate: $('admin-deco-rotate')
+  };
+
   function isAdmin() {
     return (currentEmail || '').trim().toLowerCase() === ADMIN_EMAIL;
   }
@@ -5967,6 +6071,186 @@
   function setAdminMsg(message) {
     if (adminMsg) adminMsg.textContent = message || '';
   }
+
+  /* --------------------- publication / lecture du réglage global ----------
+     Le réglage vit dans le profil PUBLIC du créateur (`creator: true`), que
+     les règles Firestore laissent lire à tout joueur connecté. Pas de nouvelle
+     collection, donc rien à déployer : la config est déjà accessible à tous.
+     L'écoute onSnapshot fait que le changement s'applique aux autres joueurs
+     sans recharger, en silence — aucun toast, annonce ou notification push. */
+  function decoConfigQuery() {
+    if (!cloudReady()) return null;
+    const coll = cloudDb.collection('playerProfiles');
+    if (!coll || typeof coll.where !== 'function') return null;
+    const q = coll.where('creator', '==', true);
+    if (!q || typeof q.get !== 'function') return null;
+    return typeof q.limit === 'function' ? q.limit(1) : q;
+  }
+
+  function applyDecoConfigSnapshot(snap) {
+    for (const doc of snapshotDocs(snap)) {
+      const data = doc.data;
+      if (data && data.decoLayout && typeof data.decoLayout === 'object') {
+        setPublishedDecoLayouts(data.decoLayout);
+        return;
+      }
+    }
+  }
+
+  function setPublishedDecoLayouts(raw) {
+    decoLayouts = publishedDecoLayouts(raw);
+    /* On n'écrase pas une édition en cours chez l'admin. */
+    if (!decoEditorDirty) decoDraft = publishedDecoLayouts(decoLayouts);
+    refreshDecoLayers();
+    syncDecoEditorFields();
+  }
+
+  async function loadDecoLayouts() {
+    const q = decoConfigQuery();
+    if (!q) return;
+    try {
+      applyDecoConfigSnapshot(await q.get());
+    } catch (error) { /* réglage facultatif : on garde les valeurs d'origine */ }
+    subscribeDecoLayouts();
+  }
+
+  function subscribeDecoLayouts() {
+    if (decoLayoutUnsub) return;
+    const q = decoConfigQuery();
+    if (!q || typeof q.onSnapshot !== 'function') return;
+    try {
+      decoLayoutUnsub = q.onSnapshot((snap) => { applyDecoConfigSnapshot(snap); }, () => {});
+    } catch (error) { /* temps réel indisponible : le rechargement suffit */ }
+  }
+
+  function unsubscribeDecoLayouts() {
+    if (!decoLayoutUnsub) return;
+    try { decoLayoutUnsub(); } catch (error) { /* déjà fermé */ }
+    decoLayoutUnsub = null;
+  }
+
+  /* Une seule écriture, sur le profil du créateur : elle devient la source de
+     vérité de TOUS les joueurs et reste en place après déconnexion / reload. */
+  async function saveDecoLayouts() {
+    if (!isAdmin() || !cloudReady()) return;
+    const payload = publishedDecoLayouts(decoDraft);
+    try {
+      await cloudDb.collection('playerProfiles').doc(currentUser.uid).set({
+        decoLayout: payload,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      decoLayouts = payload;
+      decoDraft = publishedDecoLayouts(payload);
+      decoEditorDirty = false;
+      setDecoEditorMsg('');
+      refreshDecoLayers();
+      syncDecoEditorFields();
+      /* Silence total : ni toast, ni annonce, ni notification. */
+    } catch (error) {
+      setDecoEditorMsg('Enregistrement impossible pour le moment. Réessaie.');
+    }
+  }
+
+  /* ----------------------------- éditeur ---------------------------------- */
+  function currentDecoEditorId() {
+    const id = decoEditorSelect && decoEditorSelect.value;
+    return isDecoType(id) ? id : DECO_TYPES[0];
+  }
+
+  function draftDecoLayout(id) {
+    if (!decoDraft[id]) decoDraft[id] = normalizeDecoLayout(decoLayoutOf(id));
+    return decoDraft[id];
+  }
+
+  function setDecoEditorMsg(text) {
+    if (decoEditorMsg) decoEditorMsg.textContent = text || '';
+  }
+
+  function renderDecoEditorPreview() {
+    if (!decoEditorHat) return;
+    const id = currentDecoEditorId();
+    decoEditorHat.src = DECO_IMAGES[id];
+    decoEditorHat.title = DECO_LABELS[id] || id;
+    applyDecoVars(decoEditorHat, draftDecoLayout(id));
+  }
+
+  /* Réapplique le réglage publié à TOUS les chapeaux déjà affichés (HUD,
+     Compte, amis, marché, classements…), sans reconstruire les listes. */
+  function refreshDecoLayers() {
+    document.querySelectorAll('.avatar-deco[data-deco]').forEach((node) => {
+      applyDecoVars(node, decoLayoutOf(node.dataset.deco));
+    });
+    renderDecoEditorPreview();
+  }
+
+  function updateDecoEditorOutputs() {
+    const l = draftDecoLayout(currentDecoEditorId());
+    const set = (id, text) => { const out = $(id); if (out) out.textContent = text; };
+    set('admin-deco-x-value', `${Math.round(l.x)} %`);
+    set('admin-deco-y-value', `${Math.round(l.y)} %`);
+    set('admin-deco-scale-value', `×${l.scale.toFixed(2)}`);
+    set('admin-deco-rotate-value', `${Math.round(l.rotate)}°`);
+  }
+
+  function syncDecoEditorFields(force) {
+    updateDecoEditorOutputs();
+    renderDecoEditorPreview();
+    if (decoEditorDirty && !force) return;
+    const l = draftDecoLayout(currentDecoEditorId());
+    Object.keys(DECO_EDITOR_INPUTS).forEach((key) => {
+      const input = DECO_EDITOR_INPUTS[key];
+      if (input && document.activeElement !== input) input.value = String(l[key]);
+    });
+  }
+
+  Object.keys(DECO_EDITOR_INPUTS).forEach((key) => {
+    on(DECO_EDITOR_INPUTS[key], 'input', (event) => {
+      if (!isAdmin()) return;
+      const layout = draftDecoLayout(currentDecoEditorId());
+      layout[key] = decoLayoutNumber(event.target.value, key, DECO_LAYOUT_DEFAULT[key]);
+      decoEditorDirty = true;
+      setDecoEditorMsg('');
+      syncDecoEditorFields(true);
+    });
+  });
+
+  on(decoEditorSelect, 'change', () => {
+    setDecoEditorMsg('');
+    syncDecoEditorFields(true);
+  });
+
+  on(decoEditorReset, 'click', () => {
+    if (!isAdmin()) return;
+    decoDraft[currentDecoEditorId()] = normalizeDecoLayout(null);
+    decoEditorDirty = true;
+    setDecoEditorMsg('');
+    syncDecoEditorFields(true);
+  });
+
+  /* Glisser le chapeau directement sur la photo de l'aperçu. */
+  let decoDrag = null;
+  on(decoEditorHat, 'pointerdown', (event) => {
+    if (!isAdmin() || !decoEditorPfp || typeof decoEditorPfp.getBoundingClientRect !== 'function') return;
+    const rect = decoEditorPfp.getBoundingClientRect();
+    if (!rect || !rect.width || !rect.height) return;
+    const l = draftDecoLayout(currentDecoEditorId());
+    decoDrag = { px: event.clientX, py: event.clientY, x: l.x, y: l.y, w: rect.width, h: rect.height };
+    if (decoEditorHat.setPointerCapture && event.pointerId != null) {
+      try { decoEditorHat.setPointerCapture(event.pointerId); } catch (error) { /* facultatif */ }
+    }
+    event.preventDefault();
+  });
+  on(decoEditorHat, 'pointermove', (event) => {
+    if (!decoDrag) return;
+    const l = draftDecoLayout(currentDecoEditorId());
+    l.x = decoLayoutNumber(decoDrag.x + (event.clientX - decoDrag.px) / decoDrag.w * 100, 'x', DECO_LAYOUT_DEFAULT.x);
+    l.y = decoLayoutNumber(decoDrag.y - (event.clientY - decoDrag.py) / decoDrag.h * 100, 'y', DECO_LAYOUT_DEFAULT.y);
+    decoEditorDirty = true;
+    syncDecoEditorFields(true);
+  });
+  on(decoEditorHat, 'pointerup', () => { decoDrag = null; });
+  on(decoEditorHat, 'pointercancel', () => { decoDrag = null; });
+  on(decoEditorSave, 'click', () => { saveDecoLayouts(); });
 
   /* Affiche/masque le panneau et le synchronise avec l'état courant. Appelé
      à chaque rendu du compte, à la connexion et à la déconnexion : impossible
@@ -6000,6 +6284,9 @@
         return option;
       }));
     }
+    /* L'éditeur de chapeaux reflète le réglage publié (ou l'édition en
+       cours) à chaque ouverture de la page Compte. */
+    syncDecoEditorFields();
   }
 
   on(adminCoinsSet, 'click', () => {

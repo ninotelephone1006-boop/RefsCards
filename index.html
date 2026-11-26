@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.26-8">
+  <meta name="app-version" content="2026.11.26-9">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.26-7">
+  <link rel="stylesheet" href="styles.css?v=2026.11.26-9">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -50,7 +50,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.26-8" defer></script>
+  <script src="app.js?v=2026.11.26-9" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -637,6 +637,42 @@
               <button class="mini-btn" id="admin-card-give" type="button">Donner</button>
             </div>
             <p class="admin-msg" id="admin-msg" role="status"></p>
+
+            <!-- Éditeur de chapeaux : le compte propriétaire règle la position
+                 et la taille de CHAQUE chapeau sur les photos de profil. Le
+                 bouton « Enregistrer » publie le réglage pour tous les joueurs,
+                 sans notification ni annonce, et il reste après rechargement. -->
+            <section class="admin-deco-editor" id="admin-deco-editor" aria-labelledby="admin-deco-editor-title">
+              <h4 id="admin-deco-editor-title">🎩 Éditeur de chapeaux</h4>
+              <p class="admin-deco-editor-sub">Règle la position et la taille de chaque chapeau sur les photos de profil. « Enregistrer » applique les réglages à tous les joueurs, tout de suite et sans notification ; ils restent en place après rechargement.</p>
+              <div class="admin-deco-select-row">
+                <label for="admin-deco-select">Chapeau</label>
+                <select id="admin-deco-select">
+                  <option value="chapeau-noel">Chapeau de Noël</option>
+                  <option value="chapeau-cowboy">Chapeau de cowboy</option>
+                  <option value="chapeau-sombrero">Sombrero mexicain</option>
+                  <option value="chapeau-beret">Béret rouge</option>
+                </select>
+                <button class="mini-btn" id="admin-deco-reset" type="button">Réinitialiser</button>
+              </div>
+              <div class="admin-deco-preview">
+                <div class="admin-deco-pfp" id="admin-deco-pfp">
+                  <span class="admin-deco-face" aria-hidden="true">✦</span>
+                  <img class="admin-deco-hat" id="admin-deco-hat" src="assets/deco/chapeau-noel.png" alt="" draggable="false">
+                </div>
+                <p class="admin-deco-hint">Glisse le chapeau sur la photo ou utilise les curseurs. L'aperçu montre le rendu exact sur un avatar.</p>
+              </div>
+              <div class="admin-deco-sliders">
+                <label class="admin-deco-slider" for="admin-deco-x"><span>↔ Position horizontale <output id="admin-deco-x-value">54 %</output></span><input id="admin-deco-x" type="range" min="-20" max="120" step="1" value="54"></label>
+                <label class="admin-deco-slider" for="admin-deco-y"><span>↕ Position verticale <output id="admin-deco-y-value">54 %</output></span><input id="admin-deco-y" type="range" min="-20" max="120" step="1" value="54"></label>
+                <label class="admin-deco-slider" for="admin-deco-scale"><span>⤢ Taille <output id="admin-deco-scale-value">×1.00</output></span><input id="admin-deco-scale" type="range" min="0.3" max="2.5" step="0.05" value="1"></label>
+                <label class="admin-deco-slider" for="admin-deco-rotate"><span>⟳ Rotation <output id="admin-deco-rotate-value">-11°</output></span><input id="admin-deco-rotate" type="range" min="-180" max="180" step="1" value="-11"></label>
+              </div>
+              <div class="admin-deco-actions">
+                <button class="mini-btn primary" id="admin-deco-save" type="button">Enregistrer</button>
+              </div>
+              <p class="admin-deco-msg" id="admin-deco-msg" role="status"></p>
+            </section>
           </section>
         </div>
       </section>
