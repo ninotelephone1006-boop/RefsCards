@@ -104,7 +104,6 @@
   /* Décorations (Shop → Déco) : se placent au-dessus de la photo de profil.
      Un seul décor équipé à la fois (`decoEquipped`). Pour ajouter un décor :
      une entrée ici + une carte dans index.html (`.deco-card`) + une image. */
-  const DECO_PRICES = { 'chapeau-noel': 500 };
   const DECO_IMAGES = { 'chapeau-noel': 'assets/deco/chapeau-noel.png' };
   const DECO_TYPES = ['chapeau-noel'];
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
@@ -1156,7 +1155,6 @@
     updateBuy('ultra', qtyUltra, buyUltra);
     refreshPromoShop();
     refreshDoublePromo();
-    renderDecoShop();
 
     const total = packTotal();
     if (shopInventoryLabel) {
@@ -1371,57 +1369,6 @@
     renderPackInventory();
     /* Quête « Premier achat », « Grossiste » + succès « Client », « Accro… » */
     trackProgress();
-  }
-
-  /* ------------------------------------------------------------- DÉCO (Shop)
-     Achat unique (pas de quantité) : 500 🪙 pour le chapeau de Noël.
-     Acheté → équipé automatiquement au-dessus de la photo de profil.
-     Le bouton du Shop sert ensuite à équiper / retirer. */
-  function renderDecoShop() {
-    const btn = $('buy-chapeau-noel');
-    const stock = $('deco-stock-chapeau-noel');
-    if (!btn && !stock) return;
-    const owned = (state.decoOwned || []).indexOf('chapeau-noel') >= 0;
-    const equipped = state.decoEquipped === 'chapeau-noel';
-    if (stock) stock.textContent = equipped ? 'Équipé ✓' : owned ? 'Possédé — clique pour équiper' : 'Non possédé';
-    if (btn) {
-      btn.classList.toggle('is-owned', owned && !equipped);
-      btn.classList.toggle('is-equipped', equipped);
-      btn.textContent = equipped ? 'ÉQUIPÉ ✓ · CLIQUER POUR RETIRER'
-        : owned ? 'ÉQUIPER'
-          : `ACHETER · ${fmt(DECO_PRICES['chapeau-noel'])} 🪙`;
-      btn.disabled = !owned && state.coins < DECO_PRICES['chapeau-noel'];
-    }
-  }
-
-  function buyOrToggleDeco(id) {
-    if (!isDecoType(id)) return;
-    SFX.unlock();
-    const owned = (state.decoOwned || []).indexOf(id) >= 0;
-    if (!owned) {
-      const price = DECO_PRICES[id] || 0;
-      if (state.coins < price) {
-        SFX.snap();
-        setShopMsg(`Pas assez de pièces : il te manque ${fmt(price - state.coins)} 🪙 pour ce décor.`);
-        return;
-      }
-      SFX.chaChing();
-      state.decoOwned = [...(state.decoOwned || []), id];
-      state.decoEquipped = id;
-      addCoins(-price);
-      setShopMsg('Décor acheté et équipé au-dessus de ta photo de profil !');
-      showToast('Chapeau de Noël équipé ! 🎅');
-    } else if (state.decoEquipped === id) {
-      state.decoEquipped = '';
-      setShopMsg('Décor retiré de ta photo de profil.');
-    } else {
-      state.decoEquipped = id;
-      SFX.tick();
-      setShopMsg('Décor équipé au-dessus de ta photo de profil !');
-    }
-    save();
-    renderShop();
-    renderAccount();
   }
 
   /* --------------------------------------------------------------- tirage */
@@ -5133,7 +5080,6 @@
   on($('buy-doubleRare'), 'click', () => buyPacks('doubleRare'));
   on($('open-doubleRare'), 'click', () => openFromInventory('doubleRare'));
   on(buyUltra, 'click', () => buyPacks('ultra'));
-  on($('buy-chapeau-noel'), 'click', () => buyOrToggleDeco('chapeau-noel'));
   function openFromInventory(type) {
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
@@ -6426,6 +6372,44 @@
     next.focus();
   }));
   setOnlineTab(onlinePanel);
+
+  /* Sous-onglets de la boutique : sépare les packs des décorations, comme
+     les panneaux de la page En ligne. */
+  const shopTabs = [...document.querySelectorAll('[data-shop-tab]')];
+  const shopPanels = [...document.querySelectorAll('[data-shop-panel]')];
+  function setShopTab(panel, { scroll = false } = {}) {
+    const known = shopPanels.some((node) => node.dataset.shopPanel === panel);
+    const activePanel = known ? panel : 'packs';
+    shopPanels.forEach((node) => {
+      const active = node.dataset.shopPanel === activePanel;
+      node.hidden = !active;
+      node.classList.toggle('is-active', active);
+    });
+    shopTabs.forEach((tab) => {
+      const active = tab.dataset.shopTab === activePanel;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+    });
+    if (scroll) {
+      const scroller = $('shop-view')?.querySelector('.page-scroll');
+      if (scroller) scroller.scrollTop = 0;
+    }
+  }
+  shopTabs.forEach((tab) => on(tab, 'click', () => {
+    if (tab.getAttribute('aria-selected') === 'true') return;
+    setShopTab(tab.dataset.shopTab, { scroll: true });
+    SFX.tick();
+  }));
+  shopTabs.forEach((tab) => on(tab, 'keydown', (e) => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = shopTabs[(shopTabs.indexOf(tab) + step + shopTabs.length) % shopTabs.length];
+    if (!next) return;
+    setShopTab(next.dataset.shopTab, { scroll: true });
+    next.focus();
+  }));
+  setShopTab('packs');
 
   function renderOnline() {
     if (!onlineView) return;
