@@ -2002,8 +2002,73 @@
     packOpening.setAttribute('aria-hidden', 'true');
   }
 
+  /* Ouverture atomique : une erreur pendant la cinématique (tirage, image,
+     canvas ou animation différée) ne doit jamais laisser le jeu dans un état
+     « tearing » bloqué, avec un pack consommé et une page à recharger. On
+     garde donc un jeton d'ouverture, les compteurs d'avant ouverture, et on
+     sait revenir proprement à l'écran du booster. Le même jeton annule les
+     animations en attente si une nouvelle ouverture démarre entre-temps. */
+  let openingToken = 0;
+  let openingTimers = [];
+  const PACK_BUSY_CLASS = 'refs-pack-opening';
+
+  function setPackBusy(busy) {
+    if (document.body) document.body.classList.toggle(PACK_BUSY_CLASS, Boolean(busy));
+  }
+
+  function openingLater(fn, ms) {
+    const token = openingToken;
+    const id = window.setTimeout(() => {
+      openingTimers = openingTimers.filter((timer) => timer !== id);
+      if (token === openingToken) fn();
+    }, ms);
+    openingTimers.push(id);
+    return id;
+  }
+
+  function clearOpeningTimers() {
+    openingTimers.forEach((id) => window.clearTimeout(id));
+    openingTimers = [];
+  }
+
+  function recoverPackOpening(error, type, stockBefore, openedBefore, token) {
+    if (token !== openingToken) return;
+    openingToken += 1;               // annule les animations déjà programmées
+    clearOpeningTimers();
+    setPackBusy(false);
+    console.error('[Refs Cards] ouverture du booster interrompue :', error);
+    if (isPackType(type) && !isDemoMode()) {
+      /* Le pack n'a pas été ouvert : on le rend, ainsi que le compteur, et on
+         réécrit la sauvegarde (save() annule l'écriture différée du pack
+         consommé). */
+      state.packStock[type] = Math.max(stockBefore, (Number(state.packStock[type]) || 0) + 1);
+      state.packsOpened = openedBefore;
+      save();
+    }
+    state.phase = 'pack';
+    resetToPack({ quiet: true });
+    showToast('Ouverture interrompue : ton booster est intact, réessaie.', 4200);
+  }
+
   function openPack() {
+    /* Appels normaux : phase « tearing » après la déchirure. Les tests et
+       quelques raccourcis appellent directement depuis « pack ». */
+    if (state.phase !== 'pack' && state.phase !== 'tearing') return;
     const type = isPackType(state.currentPackType) ? state.currentPackType : 'classic';
+    const stockBefore = state.packStock[type] || 0;
+    const openedBefore = state.packsOpened || 0;
+    const startPhase = state.phase;
+    const token = ++openingToken;
+    clearOpeningTimers();
+    setPackBusy(true);
+    try {
+      runPackOpening(type, { stockBefore, openedBefore, token, startPhase });
+    } catch (error) {
+      recoverPackOpening(error, type, stockBefore, openedBefore, token);
+    }
+  }
+
+  function runPackOpening(type, { stockBefore, openedBefore, token, startPhase }) {
     const theme = packOpeningFor(type);
     /* Consomme 1 pack de l'inventaire (sauf en démo, où l'ouverture est
        gratuite pour les tests/apercus). */
@@ -2055,7 +2120,7 @@
       }
     }
 
-    window.setTimeout(() => {
+    openingLater(() => {
       if (packOpening) packOpening.classList.add('is-burst');
       flash.classList.remove('run');
       void flash.offsetWidth;
@@ -2078,7 +2143,23 @@
       stage.classList.add(theme.shake);
     }, reduceMotion.matches ? 40 : theme.burstDelay);
 
-    window.setTimeout(() => showReveal(type), reduceMotion.matches ? 320 : theme.revealDelay);
+    /* La révélation est différée : si elle échoue (donnée de carte invalide,
+       Canvas indisponible…), on annule la consommation au lieu de laisser la
+       page figée puis de forcer l'utilisateur à recharger. */
+    openingLater(() => {
+      if (token !== openingToken || (state.phase !== 'tearing' && state.phase !== startPhase)) return;
+      try {
+        /* Un tirage vide (pool sans carte valide) est aussi une ouverture
+           avortée : le pack ne doit pas disparaître de l'inventaire. */
+        if (showReveal(type) === false) {
+          recoverPackOpening(new Error('tirage vide'), type, stockBefore, openedBefore, token);
+        }
+      } catch (error) {
+        recoverPackOpening(error, type, stockBefore, openedBefore, token);
+      } finally {
+        setPackBusy(false);
+      }
+    }, reduceMotion.matches ? 320 : theme.revealDelay);
   }
 
   on(packArea, 'pointerdown', onDragStart);
@@ -3415,7 +3496,7 @@
     if (!cardsDatabase.some((c) => RARITIES[c.rarity])) {
       state.phase = 'pack';
       showToast('Ajoute au moins une carte valide dans cards.js.');
-      return;
+      return false;
     }
     nextCard.hidden = true;
     const boostMode = packType === 'ultra' ? 'ultra' : packType === 'rare';
@@ -3431,7 +3512,7 @@
       showToast(packType === 'video'
         ? 'Ajoute au moins une carte vidéo dans cards.js (bloc « video »).'
         : 'Aucune carte à tirer.');
-      return;
+      return false;
     }
     packView.hidden = true;
     revealView.hidden = false;
@@ -3494,6 +3575,7 @@
     current = remaining[0];
     window.setTimeout(() => current && current.node.classList.add('is-top'), reduceMotion.matches ? 10 : 420);
     state.phase = 'reveal';
+    return true;
   }
 
   function advanceStack() {

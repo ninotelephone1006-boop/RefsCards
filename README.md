@@ -71,6 +71,18 @@ Le site est statique : un onglet déjà ouvert continue d'exécuter les fichiers
 - **Silencieux en cas de problème** : hors ligne, `fetch` indisponible (fichier local), réponse non-HTML ou page vide → aucune alerte, la page continue de fonctionner. Le bandeau s'affiche aussi par-dessus l'écran de compte (z-index 110), et le toast remonte (`body.has-update-banner`) pour ne pas être masqué.
 - **En déploiement** : à chaque mise en production, incrémente les `?v=` des fichiers modifiés **et** `<meta name="app-version">` dans `index.html`. Le bandeau n'apparaît que chez les onglets déjà ouverts : c'est exactement son rôle — les visiteurs qui arrivent après le déploiement reçoivent directement la nouvelle version.
 - **Réglages** : les constantes `FIRST_CHECK_DELAY`, `CHECK_INTERVAL` et `MIN_GAP` sont en tête de `version-check.js`. L'API `window.REFS_CARDS_VERSION_CHECK` expose `check(force)`, `state()`, `dismiss()` et `reload()` (utilisée par les tests et par les boutons).
+- **Pendant une ouverture** : `app.js` pose `body.refs-pack-opening` dès la déchirure. Si le joueur appuie malgré tout sur **Recharger**, `version-check.js` attend la fin de la cinématique (au plus 4 s) au lieu de couper l'ouverture en cours.
+
+## Ouverture de booster : pas de plantage ni de booster perdu
+
+Une erreur pendant la cinématique (tirage vide, image ou Canvas indisponible, animation différée qui échoue) ne doit pas laisser le jeu figé avec un booster déjà consommé, obligé de recharger la page. L'ouverture est donc **atomique** dans `app.js` :
+
+- `openPack()` n'agit que pendant la déchirure (ou depuis l'écran du booster pour les tests), mémorise le stock et le compteur d'avant ouverture, et annule les animations en attente avec un jeton (`openingToken`) si une autre ouverture démarre.
+- Les animations diffusées (`burst`, révélation) passent par `openingLater()` : une ancienne ouverture ne peut plus révéler ses cartes par-dessus la nouvelle.
+- Si `showReveal()` lève une erreur **ou** ne peut pas tirer de carte, `recoverPackOpening()` rend le booster et le compteur, réécrit la sauvegarde, revient à l'écran du booster et affiche un toast. Aucun rechargement n'est nécessaire.
+- Le drapeau `body.refs-pack-opening` est retiré à la fin, y compris en cas d'erreur, pour que le bandeau de mise à jour redevienne utilisable.
+
+`node tests/pack-open-recovery.cjs` (dans `npm test`) couvre l'erreur de révélation, le tirage vide et le report du bouton **Recharger**.
 
 ## Arrivée de nouvelles cartes
 
