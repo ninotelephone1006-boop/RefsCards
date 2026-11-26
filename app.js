@@ -102,11 +102,21 @@
   const PACK_TYPES = ['classic', 'rare', 'doubleRare', 'legend', 'video', 'ultra'];
   function isPackType(type) { return PACK_TYPES.indexOf(type) >= 0; }
   /* Décorations (Shop → Déco) : se placent au-dessus de la photo de profil.
-     Un seul décor équipé à la fois (`decoEquipped`). Pour ajouter un décor :
-     une entrée ici + une carte dans index.html (`.deco-card`) + une image. */
+     Un seul décor équipé à la fois (`decoEquipped`). Le décor équipé est
+     PUBLIC (profil `playerProfiles.deco`), donc il s'affiche partout où ta
+     photo apparaît : page Compte, HUD en haut de l'écran, listes d'amis et
+     de demandes, fiche d'un ami, vendeurs du marché global et classements.
+     Pour ajouter un décor : une entrée ici + une carte dans index.html
+     (`.deco-card`) + une image. */
   const DECO_IMAGES = { 'chapeau-noel': 'assets/deco/chapeau-noel.png' };
   const DECO_TYPES = ['chapeau-noel'];
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
+  /* Décor équipé à afficher pour un profil donné : le mien (state local) ou
+     celui d'un autre joueur (champ public `deco` de son profil). */
+  function decoFor(data) {
+    const id = data && typeof data === 'object' ? data.deco : state.decoEquipped;
+    return typeof id === 'string' && isDecoType(id) && DECO_IMAGES[id] ? DECO_IMAGES[id] : '';
+  }
   function cardCountFor(type) { return PACK_CARD_COUNT[type] || CARD_COUNT; }
   function packLabelFr(type) {
     return type === 'doubleRare' ? 'double rare' : type === 'rare' ? 'rare'
@@ -360,6 +370,60 @@
     return node;
   };
 
+  /* Image du décor équipé (chapeau de Noël, Shop → Déco). `data` absent =
+     mon propre profil (state.decoEquipped) ; sinon champ public `deco` du
+     profil de l'autre joueur. Renvoie null quand aucun décor n'est équipé. */
+  const decoLayer = (data) => {
+    const src = decoFor(data);
+    if (!src) return null;
+    const img = el('img', 'avatar-deco');
+    img.src = src;
+    img.alt = '';
+    img.decoding = 'async';
+    img.draggable = false;
+    img.setAttribute('aria-hidden', 'true');
+    return img;
+  };
+
+  /* Applique le décor sur une image d'avatar existante (HUD, photo de
+     profil du compte, fiche d'un ami). Le socle (`.avatar-deco-slot` dédié
+     dans index.html, sinon le parent de l'image) devient `position:
+     relative`, et l'image `.avatar-deco` est ajoutée dedans : le chapeau se
+     pose sur le haut de la photo. Le décor reste affiché quand la photo est
+     remplacée par la pastille de repli. Sans décor, tout est nettoyé. */
+  const syncAvatarDeco = (img, data) => {
+    if (!img) return;
+    const slot = (img.closest && img.closest('.avatar-deco-slot')) || img.parentNode;
+    if (!slot) return;
+    const existing = slot.querySelector(':scope > .avatar-deco');
+    const layer = decoLayer(data);
+    slot.classList.toggle('avatar-deco-slot', Boolean(layer));
+    if (!layer) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) {
+      if (existing.getAttribute('src') !== layer.getAttribute('src')) {
+        existing.src = layer.getAttribute('src');
+      }
+      return;
+    }
+    slot.append(layer);
+  };
+
+  /* Pastille photo + décor pour les listes construites en JS (amis,
+     demandes, vendeurs du marché, classements). L'image (et sa pastille de
+     repli) sont enveloppées dans `avatar-deco-slot` (position: relative) :
+     le chapeau se place au-dessus de la photo, comme sur la page Compte. */
+  const avatarWithDeco = (img, data, fallback) => {
+    const wrap = el('span', 'avatar-deco-slot');
+    wrap.append(img);
+    if (fallback) wrap.append(fallback);
+    const layer = decoLayer(data);
+    if (layer) wrap.append(layer);
+    return wrap;
+  };
+
   /* ------------------------------------------------------------------ refs */
 
   const app = $('app');
@@ -440,6 +504,7 @@
   const authHintText = $('auth-hint-text');
   const authOpenTab = $('auth-open-tab');
   const accountAvatar = $('account-avatar');
+  const accountAvatarFallback = $('account-avatar-fallback');
   const accountEmail = $('account-email');
   const logoutBtn = $('logout-btn');
   const gameRegions = document.querySelectorAll('.hud, #stage, #tabbar, .toast');
@@ -1128,6 +1193,24 @@
     }
 
     if ($('shop-stock-doubleRare')) $('shop-stock-doubleRare').textContent = stockText(state.packStock.doubleRare || 0);
+
+    /* Déco : la carte du décor possédé n'apparaît que s'il est possédé, avec
+       le bouton Équiper / Retirer (le même état que sur la page Compte). */
+    const decoCard = $('deco-owned-card');
+    const decoToggle = $('deco-toggle-chapeau-noel');
+    const decoStock = $('deco-stock-chapeau-noel');
+    if (decoCard || decoToggle) {
+      const owned = (state.decoOwned || []).indexOf('chapeau-noel') >= 0;
+      const equipped = state.decoEquipped === 'chapeau-noel';
+      if (decoCard) decoCard.hidden = !owned;
+      if (decoStock) decoStock.textContent = equipped ? 'Équipé ✓' : 'Possédé — non équipé';
+      if (decoToggle) {
+        decoToggle.classList.toggle('is-owned', owned && !equipped);
+        decoToggle.classList.toggle('is-equipped', equipped);
+        decoToggle.textContent = equipped ? 'ÉQUIPÉ ✓ · CLIQUER POUR RETIRER' : 'ÉQUIPER';
+        decoToggle.disabled = !owned;
+      }
+    }
 
     const updateBuy = (type, qtyEl, btn) => {
       const qty = clamp(shopQty[type] || 1, 1, MAX_QTY);
@@ -4558,6 +4641,7 @@
     profile.pseudo = '';
     profile.avatar = '';
     profile.friendCode = '';
+    profile.deco = '';
     friends = [];
     friendProfiles.clear();
     friendRequests = [];
@@ -4639,6 +4723,8 @@
       accountAvatar.removeAttribute('src');
       accountAvatar.hidden = true;
     }
+    if (accountAvatarFallback) accountAvatarFallback.hidden = true;
+    syncAvatarDeco(accountAvatar);
     if (app) app.classList.remove('is-authenticated');
     gameRegions.forEach((region) => region.setAttribute('inert', ''));
     showLoginPage();
@@ -5080,6 +5166,25 @@
   on($('buy-doubleRare'), 'click', () => buyPacks('doubleRare'));
   on($('open-doubleRare'), 'click', () => openFromInventory('doubleRare'));
   on(buyUltra, 'click', () => buyPacks('ultra'));
+
+  /* Déco : équiper / retirer un décor possédé. Le décor équipé s'affiche
+     immédiatement partout (HUD, Compte, listes) et est publié dans le
+     profil public pour que les autres joueurs le voient aussi. */
+  function toggleDeco(id) {
+    if (!isDecoType(id)) return;
+    if ((state.decoOwned || []).indexOf(id) < 0) return;
+    SFX.tick();
+    state.decoEquipped = state.decoEquipped === id ? '' : id;
+    setShopMsg(state.decoEquipped
+      ? 'Décor équipé : il apparaît au-dessus de ta photo partout dans le jeu.'
+      : 'Décor retiré de ta photo.');
+    save();
+    renderAccount();
+    renderOnline();
+    renderShop();
+    saveProfileSoon();
+  }
+  on($('deco-toggle-chapeau-noel'), 'click', () => toggleDeco('chapeau-noel'));
   function openFromInventory(type) {
     if (!(state.packStock[type] > 0) || (state.phase !== 'pack' && state.phase !== 'done')) return;
     if (state.phase === 'done') resetToPack();
@@ -5195,7 +5300,7 @@
   /* Profil public (playerProfiles/{uid}) : pseudo, avatar, code ami, stats et
      collection — c'est ce que les amis voient. La sauvegarde privée
      (playerSaves/{uid}) garde en plus la liste d'amis. */
-  const profile = { pseudo: '', avatar: '', friendCode: '' };
+  const profile = { pseudo: '', avatar: '', friendCode: '', deco: '' };
   let leaderboardAnnounced = false;
   let leaderboardRequest = 0;
   let friends = [];                  // uids de mes amis (acceptés des deux côtés)
@@ -5406,6 +5511,12 @@
         profile.pseudo = typeof d.pseudo === 'string' ? d.pseudo : '';
         profile.avatar = typeof d.avatar === 'string' ? d.avatar : '';
         profile.friendCode = typeof d.friendCode === 'string' ? d.friendCode : '';
+        /* Décor public (ce que les AUTRES joueurs voient sur ta photo). Il
+           n'est jamais réutilisé pour t'équiper toi-même : la sauvegarde
+           privée reste la seule source de vérité, sinon un retrait dont
+           l'écriture publique différée aurait été perdue ferait réapparaître
+           le chapeau au rechargement. */
+        profile.deco = typeof d.deco === 'string' && isDecoType(d.deco) ? d.deco : '';
       }
     } catch (error) {
       noteCloudError('Profil illisible', error);
@@ -5436,6 +5547,10 @@
       await cloudDb.collection('playerProfiles').doc(currentUser.uid).set({
         pseudo: profile.pseudo.slice(0, 24),
         avatar: profile.avatar || '',
+        /* Décor équipé, PUBLIC : c'est lui qui affiche le chapeau sur ta
+           photo partout où les autres joueurs te voient (amis, marché
+           global, classements) — pas seulement sur ton onglet Compte. */
+        deco: isDecoType(state.decoEquipped) ? state.decoEquipped : '',
         friendCode: profile.friendCode,
         coins: stats.coins,
         packsOpened: Math.max(0, Math.floor(Number(state.packsOpened) || 0)),
@@ -5510,6 +5625,10 @@
       accountAvatar.removeAttribute('src');
       accountAvatar.hidden = true;
     }
+    /* Sans photo, une pastille prend sa place dans le HUD : le décor équipé
+       reste visible partout, comme sur la page Compte. */
+    if (accountAvatarFallback) accountAvatarFallback.hidden = Boolean(src);
+    syncAvatarDeco(accountAvatar);
   }
 
   function setProfileMsg(msg) {
@@ -5543,16 +5662,7 @@
       }
     }
     /* Décor équipé au-dessus de la photo de profil (Shop → Déco). */
-    const profileDeco = $('profile-deco');
-    if (profileDeco) {
-      const equipped = state.decoEquipped;
-      if (equipped && isDecoType(equipped) && DECO_IMAGES[equipped]) {
-        profileDeco.src = DECO_IMAGES[equipped];
-        profileDeco.hidden = false;
-      } else {
-        profileDeco.hidden = true;
-      }
-    }
+    syncAvatarDeco(profileAvatar);
     if (profilePseudo) {
       profilePseudo.textContent = profile.pseudo || 'Joueur';
       withCreatorBadge(profilePseudo, null);
@@ -5863,7 +5973,7 @@
   async function fetchFriendProfile(uid, { force = false } = {}) {
     if (!force && friendProfiles.has(uid)) return friendProfiles.get(uid);
     const fallback = {
-      pseudo: 'Joueur', avatar: '', friendCode: '',
+      pseudo: 'Joueur', avatar: '', deco: '', friendCode: '',
       coins: 0, totalCards: 0, uniqueCards: 0, bestRarity: null, collection: [], friends: [], creator: false
     };
     if (!cloudReady()) return fallback;
@@ -5874,6 +5984,9 @@
         const data = {
           pseudo: d.pseudo || 'Joueur',
           avatar: d.avatar || '',
+          /* Décor équipé (public) : le chapeau de Noël s'affiche aussi sur
+             la photo de cet ami, dans les listes et sur sa fiche. */
+          deco: typeof d.deco === 'string' && isDecoType(d.deco) ? d.deco : '',
           friendCode: d.friendCode || '',
           coins: Number(d.coins) || 0,
           totalCards: Number(d.totalCards) || 0,
@@ -6303,11 +6416,17 @@
         entries.forEach(({ id, data }, index) => {
           const row = el('li', 'leaderboard-row');
           const rank = el('span', 'leaderboard-rank', `#${index + 1}`);
+          /* Photo + décor équipé : le chapeau de Noël se voit aussi au
+             classement, comme sur la page Compte et les listes d'amis. */
+          const img = el('img', 'leaderboard-avatar');
+          img.alt = '';
+          if (data.avatar) img.src = data.avatar;
+          else img.hidden = true;
           const name = el('strong', 'leaderboard-name', typeof data.pseudo === 'string' && data.pseudo.trim() ? data.pseudo : 'Joueur');
           withCreatorBadge(name, data);
           if (id === uid) name.append(el('span', 'leaderboard-you', ' · Toi'));
           const value = el('span', 'leaderboard-value', `${fmt(data[field])} ${unit}`);
-          row.append(rank, name, value);
+          row.append(rank, avatarWithDeco(img, data), name, value);
           list.append(row);
         });
         node.replaceChildren(list);
@@ -6447,7 +6566,7 @@
         const remove = el('button', 'mini-btn danger', 'Retirer');
         remove.type = 'button';
         on(remove, 'click', () => removeFriend(uid));
-        row.append(img, fb, idBox, view, remove);
+        row.append(avatarWithDeco(img, data, fb), idBox, view, remove);
         frag.append(row);
       });
       friendsList.replaceChildren(frag);
@@ -6555,7 +6674,7 @@
       el('span', 'friend-row-sub', `${(data && data.uniqueCards) || 0} uniques · ${(data && data.totalCards) || 0} cartes`)
     );
     const wrap = el('div', 'request-id');
-    wrap.append(img, fb, box);
+    wrap.append(avatarWithDeco(img, data, fb), box);
     return wrap;
   }
 
@@ -6640,6 +6759,8 @@
         friendAvatar.hidden = true;
         if (friendAvatarFallback) friendAvatarFallback.hidden = false;
       }
+      /* Le décor équipé par cet ami s'affiche aussi sur sa fiche. */
+      syncAvatarDeco(friendAvatar, data);
     }
     if (friendPseudo) {
       friendPseudo.textContent = data.pseudo || 'Joueur';
