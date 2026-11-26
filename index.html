@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.26-7">
+  <meta name="app-version" content="2026.11.26-8">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -50,7 +50,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.26-6" defer></script>
+  <script src="app.js?v=2026.11.26-8" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -450,6 +450,42 @@
                 <p class="shop-desc">Visible au-dessus de ta photo partout où les joueurs la voient.</p>
                 <p class="shop-stock" id="deco-stock-chapeau-noel">Non possédé</p>
                 <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-noel" type="button">ACHETER · 1 500 🪙</button>
+              </div>
+            </article>
+
+            <article class="shop-card deco-card" data-deco="chapeau-cowboy">
+              <div class="shop-img-wrap deco-img-wrap">
+                <img class="deco-img" src="assets/deco/chapeau-cowboy.png" alt="Chapeau de cowboy" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Chapeau de cowboy</h3>
+                <p class="shop-desc">Un Stetson marron posé sur ta photo, partout où les joueurs la voient.</p>
+                <p class="shop-stock" id="deco-stock-chapeau-cowboy">Non possédé</p>
+                <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-cowboy" type="button">ACHETER · 1 500 🪙</button>
+              </div>
+            </article>
+
+            <article class="shop-card deco-card" data-deco="chapeau-sombrero">
+              <div class="shop-img-wrap deco-img-wrap">
+                <img class="deco-img" src="assets/deco/chapeau-sombrero.png" alt="Sombrero mexicain" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Sombrero</h3>
+                <p class="shop-desc">Le grand chapeau coloré, bien en évidence au-dessus de ton avatar.</p>
+                <p class="shop-stock" id="deco-stock-chapeau-sombrero">Non possédé</p>
+                <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-sombrero" type="button">ACHETER · 1 500 🪙</button>
+              </div>
+            </article>
+
+            <article class="shop-card deco-card" data-deco="chapeau-beret">
+              <div class="shop-img-wrap deco-img-wrap">
+                <img class="deco-img" src="assets/deco/chapeau-beret.png" alt="Béret rouge" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Béret rouge</h3>
+                <p class="shop-desc">La touche française, posée de travers sur ta photo de profil.</p>
+                <p class="shop-stock" id="deco-stock-chapeau-beret">Non possédé</p>
+                <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-beret" type="button">ACHETER · 1 500 🪙</button>
               </div>
             </article>
           </div>
