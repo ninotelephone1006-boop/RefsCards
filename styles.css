@@ -4505,6 +4505,41 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .admin-msg{margin:12px 0 0;font-size:12px;min-height:15px;color:#86efac}
 .admin-msg:empty{display:none}
 
+/* --- éditeur de chapeaux (panneau d'administration, page Compte) ---------
+   Aperçu grandeur réelle d'une photo de profil : le chapeau y utilise les
+   MÊMES variables --deco-* que les vrais avatars, donc l'admin voit
+   exactement ce que tout le monde verra après « Enregistrer ». */
+.admin-deco-editor{margin-top:16px;padding:12px;border:1px solid #ffffff1a;border-radius:12px;
+  background:#0d0912aa;text-align:left}
+.admin-deco-editor h4{margin:0;font:800 13px 'Space Grotesk',sans-serif;color:#fff}
+.admin-deco-editor-sub{margin:6px 0 10px;font-size:11.5px;line-height:1.5;color:#a79fbd}
+.admin-deco-select-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.admin-deco-select-row>label{font-size:11.5px;font-weight:700;color:#cdc3e4}
+.admin-deco-select-row select{flex:1 1 140px;min-width:0;padding:9px 10px;border-radius:10px;
+  border:1px solid #ffffff1a;background:#0d0912;color:#fff;font:600 13px 'Space Grotesk',sans-serif}
+.admin-deco-select-row .mini-btn{flex:0 0 auto;width:auto}
+.admin-deco-preview{display:flex;align-items:center;gap:14px;margin:14px 0 10px;flex-wrap:wrap}
+.admin-deco-pfp{position:relative;flex:0 0 auto;width:124px;height:124px;border-radius:50%;
+  background:radial-gradient(circle at 50% 35%,#3b2b52,#171021 70%);
+  border:2px solid #8b5cf6;box-shadow:0 10px 26px -12px #000c;overflow:visible}
+.admin-deco-face{position:absolute;inset:0;display:grid;place-items:center;font-size:52px;color:#c4b5fd99}
+.admin-deco-hat{position:absolute;left:var(--deco-x,54%);bottom:var(--deco-y,54%);
+  width:calc(88% * var(--deco-scale,1));height:auto;
+  transform:translateX(-50%) rotate(var(--deco-rotate,-11deg));
+  z-index:2;cursor:grab;touch-action:none;user-select:none;
+  filter:drop-shadow(0 3px 5px #000a)}
+.admin-deco-hat:active{cursor:grabbing}
+.admin-deco-hint{margin:0;flex:1 1 140px;font-size:11.5px;line-height:1.5;color:#a79fbd}
+.admin-deco-sliders{display:grid;gap:8px;margin-top:8px}
+.admin-deco-slider{display:block;font-size:11.5px;font-weight:700;color:#cdc3e4}
+.admin-deco-slider span{display:flex;justify-content:space-between;gap:8px;margin-bottom:3px}
+.admin-deco-slider output{color:#fde68a;font-variant-numeric:tabular-nums}
+.admin-deco-slider input[type="range"]{width:100%;accent-color:#fbbf24;cursor:pointer}
+.admin-deco-actions{display:flex;gap:8px;margin-top:12px}
+.admin-deco-actions .mini-btn{flex:1 1 auto;width:auto}
+.admin-deco-msg{margin:8px 0 0;font-size:11.5px;color:#fca5a5}
+.admin-deco-msg:empty{display:none}
+
 @media(max-width:559px){
   .push-kind-desc{font-size:10.5px}
   .push-actions{flex-direction:column;align-items:stretch}
@@ -4600,16 +4635,24 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 .friend-row>.avatar-deco-slot,.request-id>.avatar-deco-slot{font-size:42px}
 .add-friend-preview .avatar-deco-slot{font-size:48px}
 .global-market-offer .avatar-deco-slot{font-size:34px}
-.avatar-deco{position:absolute;left:54%;bottom:54%;transform:translateX(-50%) rotate(-11deg);
-  width:.88em;height:auto;object-fit:contain;pointer-events:none;z-index:4;
+/* Les variables --deco-* sont posées par app.js sur CHAQUE chapeau, d'après
+   le réglage global publié par l'admin (position x / y, taille ×scale et
+   rotation). Elles sont lues dans TOUS les contextes : un seul réglage déplace
+   / redimensionne le chapeau sur le HUD, le Compte, les listes d'amis, le
+   marché et les classements. Les valeurs par défaut reproduisent l'ancien
+   rendu à l'identique ; `scale` est un multiplicateur, ce qui respecte les
+   tailles propres à chaque contexte (.88em, .96em, 88 %, .92em). */
+.avatar-deco{position:absolute;left:var(--deco-x,54%);bottom:var(--deco-y,54%);
+  transform:translateX(-50%) rotate(var(--deco-rotate,-11deg));
+  width:calc(.88em * var(--deco-scale,1));height:auto;object-fit:contain;pointer-events:none;z-index:4;
   filter:drop-shadow(0 3px 5px #000a)}
 /* HUD (avatar 24 px, socle dédié dans .account-control) */
 .account-avatar-slot{font-size:24px;align-items:center;justify-content:center}
-.account-avatar-slot .avatar-deco{width:.96em;height:auto}
+.account-avatar-slot .avatar-deco{width:calc(.96em * var(--deco-scale,1));height:auto}
 /* Page Compte (photo 124 px dans .avatar-wrap) : le chapeau se pose sur
    le haut de la photo sans masquer le visage. */
 .avatar-wrap{position:relative}
-.avatar-wrap .avatar-deco{width:88%;height:auto;bottom:54%;z-index:4}
+.avatar-wrap .avatar-deco{width:calc(88% * var(--deco-scale,1));height:auto;bottom:var(--deco-y,54%);z-index:4}
 /* Fiche d'un ami (avatar 64 px, socle dédié) */
 .friend-avatar-slot{font-size:64px}
 /* Pastilles des listes : le chapeau suit la photo ET sa pastille de repli */
@@ -4619,7 +4662,7 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
   border:2px solid #8b5cf6;background:#241c2e}
 .leaderboard-avatar[hidden]{display:none}
 .leaderboard-row .avatar-deco-slot{font-size:28px}
-.leaderboard-row>.avatar-deco-slot .avatar-deco{width:.92em;height:auto}
+.leaderboard-row>.avatar-deco-slot .avatar-deco{width:calc(.92em * var(--deco-scale,1));height:auto}
 @media(max-width:559px){
   .deco-card{flex-direction:column;align-items:center;text-align:center}
   .deco-img-wrap{flex:none;width:100%}
