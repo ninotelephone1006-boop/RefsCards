@@ -132,7 +132,11 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   assert.match(html, /data-pack="video"/, 'carte Pack Vidéo dans le Shop');
   assert.match(html, /id="buy-video"/, 'bouton d’achat vidéo');
   assert.match(html, /id="open-video"/, 'bouton d’ouverture vidéo');
-  assert.doesNotMatch(html, /BIENTÔT/, 'plus de badge « BIENTÔT » dans le Shop');
+  /* Le teaser « BIENTÔT DISPONIBLE » de l'onglet Déco est normal : cette
+     vérification ne concerne que le panneau des packs. */
+  const packsPanel = html.slice(html.indexOf('id="shop-packs"'), html.indexOf('id="shop-deco"'));
+  assert.ok(packsPanel, 'panneau des packs présent');
+  assert.doesNotMatch(packsPanel, /BIENTÔT/, 'plus de badge « BIENTÔT » sur les packs du Shop');
   assert.doesNotMatch(html, /pas encore achetable ni ouvrable/, 'plus de message d’avant-première');
   assert.doesNotMatch(html, /is-coming-soon/, 'plus de classe avant-première');
   assert.match(html, /id="buy-video"[^>]*>ACHETER/, 'bouton d’achat vidéo actif (prix affiché)');

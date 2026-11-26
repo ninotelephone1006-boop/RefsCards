@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.26-5">
+  <meta name="app-version" content="2026.11.26-6">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.26-5">
+  <link rel="stylesheet" href="styles.css?v=2026.11.26-6">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -50,7 +50,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.26-5" defer></script>
+  <script src="app.js?v=2026.11.26-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -149,7 +149,10 @@
           <span class="coin-float" id="coin-float" aria-hidden="true"></span>
         </div>
         <div class="account-control">
-          <img id="account-avatar" class="account-avatar" alt="" referrerpolicy="no-referrer" hidden>
+          <!-- Photo + décor : la pastille est enveloppée pour que le décor
+               équipé (Shop → Déco) se cale sur l'avatar du HUD, comme les
+               autres avatars du jeu. -->
+          <span class="avatar-deco-slot account-avatar-slot"><img id="account-avatar" class="account-avatar" alt="" referrerpolicy="no-referrer" hidden><span id="account-avatar-fallback" class="account-avatar-fallback" aria-hidden="true" hidden>✦</span></span>
           <span id="account-email"></span>
           <button id="logout-btn" type="button" aria-label="Se déconnecter">Déconnexion</button>
         </div>
@@ -434,10 +437,24 @@
           <div class="deco-head">
             <p class="kicker"><span>✦</span> DÉCO <span>✦</span></p>
             <h2 class="deco-title">Décore ta photo de profil</h2>
-            <p class="shop-sub">Les décors se placent au-dessus de ta photo de profil (onglet Compte).</p>
+            <p class="shop-sub">Le décor équipé se place au-dessus de ta photo de profil, partout dans le jeu : HUD, onglet Compte, listes d’amis et de demandes, fiche d’un ami, marché global et classements.</p>
           </div>
 
           <div class="deco-grid">
+            <!-- Décor possédé (acheté avant que la vente soit retirée) :
+                 bouton pour l'équiper / le retirer. Masqué si non possédé. -->
+            <article class="shop-card deco-card" id="deco-owned-card" data-deco="chapeau-noel" hidden>
+              <div class="shop-img-wrap deco-img-wrap">
+                <img class="deco-img" src="assets/deco/chapeau-noel.png" alt="Chapeau de Noël" draggable="false">
+              </div>
+              <div class="shop-info">
+                <h3>Chapeau de Noël</h3>
+                <p class="shop-desc">Visible au-dessus de ta photo partout où les joueurs la voient.</p>
+                <p class="shop-stock" id="deco-stock-chapeau-noel">Possédé</p>
+                <button class="shop-buy shop-buy-deco" id="deco-toggle-chapeau-noel" type="button">ÉQUIPER</button>
+              </div>
+            </article>
+
             <article class="shop-card deco-card deco-soon" aria-label="Décoration bientôt disponible">
               <div class="shop-img-wrap deco-img-wrap deco-blur-wrap" aria-hidden="true">
                 <img class="deco-img deco-blur" src="assets/deco/chapeau-noel.png" alt="" draggable="false">
@@ -520,7 +537,6 @@
             <div class="avatar-wrap">
               <img id="profile-avatar" class="profile-avatar" alt="Ta photo de profil" hidden>
               <span id="profile-avatar-fallback" class="profile-avatar-fallback" aria-hidden="true">✦</span>
-              <img id="profile-deco" class="profile-deco" src="assets/deco/chapeau-noel.png" alt="" hidden draggable="false">
               <button id="avatar-upload-btn" class="avatar-edit" type="button" aria-label="Changer ma photo de profil">📷</button>
               <input type="file" id="avatar-input" accept="image/*" hidden>
             </div>
@@ -760,8 +776,10 @@
 
             <section class="friend-detail" id="friend-detail" hidden aria-label="Profil d'un ami">
               <div class="friend-detail-head">
-                <img id="friend-avatar" class="friend-avatar" alt="" hidden>
-                <span id="friend-avatar-fallback" class="friend-avatar-fallback" aria-hidden="true">✦</span>
+                <span class="avatar-deco-slot friend-avatar-slot">
+                  <img id="friend-avatar" class="friend-avatar" alt="" hidden>
+                  <span id="friend-avatar-fallback" class="friend-avatar-fallback" aria-hidden="true">✦</span>
+                </span>
                 <div class="friend-detail-id">
                   <h3 id="friend-pseudo">Ami</h3>
                   <p id="friend-code-label"></p>

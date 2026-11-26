@@ -165,7 +165,16 @@ async function boot() {
     assert.equal(packs.querySelectorAll('li').length, 20);
     assert.match(coins.querySelector('li').textContent, /1\s?024/);
     assert.match(packs.querySelector('li').textContent, /Joueur 0/);
-    assert.equal(coins.querySelector('img'), null, 'les pseudos sont du texte');
+    /* Les pseudos restent du TEXTE (le pseudo HTML hostile ne crée aucun
+       élément) : la seule image autorisée dans une ligne est la pastille de
+       photo, qui affiche le décor équipé. */
+    assert.equal(coins.querySelector('img[src="x"]'), null, 'aucun HTML injecté par un pseudo');
+    coins.querySelectorAll('li').forEach((row) => {
+      row.querySelectorAll('img').forEach((img) => {
+        assert.match(img.className, /leaderboard-avatar|avatar-deco/,
+          'une ligne ne contient que la photo et son décor');
+      });
+    });
     assert.deepEqual(db.queries.slice(-2).map(q => [q.coll, q.field, q.direction, q.n]), [
       ['playerProfiles', 'coins', 'desc', 20], ['playerProfiles', 'packsOpened', 'desc', 20]
     ]);
