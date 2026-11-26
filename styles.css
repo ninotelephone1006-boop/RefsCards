@@ -4579,13 +4579,15 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 .deco-blur{filter:blur(10px) brightness(.7);transform:scale(1.05)}
 .deco-blur-info{filter:blur(6px);opacity:.55;pointer-events:none}
 .deco-soon-badge{position:absolute;top:12px;right:12px;padding:6px 12px;border-radius:99px;background:#ffffff14;border:1px solid #ffffff33;color:#fff;font-size:10px;font-weight:800;letter-spacing:1px;backdrop-filter:blur(4px)}
-/* Décor équipé sur une photo : le chapeau se cale au-dessus de l'avatar.
-   Le même décor suit la photo PARTOUT où elle apparaît (HUD, page Compte,
-   listes d'amis et de demandes, fiche d'un ami, marché global, classements)
-   grâce à `.avatar-deco-slot`, posé par app.js (syncAvatarDeco /
-   avatarWithDeco). Tailles et décalages par contexte. */
-/* Le socle : le parent de l'avatar est le repère, le chapeau se pose sur le
-   haut de la photo. `em` suit la taille de l'avatar (1.5em = 150 %). */
+/* Décor équipé sur une photo : le chapeau est posé SUR la tête, comme un
+   bonnet — son bord blanc traverse le haut du visage au lieu de flotter
+   au-dessus de l'avatar. Le même décor suit la photo PARTOUT où elle
+   apparaît (HUD, page Compte, listes d'amis et de demandes, fiche d'un ami,
+   marché global, classements) grâce à `.avatar-deco-slot`, posé par app.js
+   (syncAvatarDeco / avatarWithDeco). Tailles et décalages par contexte. */
+/* Le socle : le parent de l'avatar est le repère. `em` suit la taille de
+   l'avatar (1.5em = 150 %) ; `bottom:15%` fait arriver le bas du chapeau à
+   85 % de la hauteur de la photo, bien calé sur le crâne. */
 .avatar-deco-slot{position:relative}
 /* Socles créés par le HTML / les listes : ils se comportent comme une
    pastille (pas de retour à la ligne, taille figée). */
@@ -4597,15 +4599,16 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 .friend-row>.avatar-deco-slot,.request-id>.avatar-deco-slot{font-size:42px}
 .add-friend-preview .avatar-deco-slot{font-size:48px}
 .global-market-offer .avatar-deco-slot{font-size:34px}
-.avatar-deco{position:absolute;left:50%;bottom:calc(100% - 38%);transform:translateX(-50%) rotate(-9deg);
+.avatar-deco{position:absolute;left:50%;bottom:15%;transform:translateX(-50%) rotate(6deg);
   width:1.5em;height:1.5em;object-fit:contain;pointer-events:none;z-index:4;
   filter:drop-shadow(0 3px 5px #000a)}
 /* HUD (avatar 24 px, socle dédié dans .account-control) */
 .account-avatar-slot{font-size:24px;align-items:center;justify-content:center}
 .account-avatar-slot .avatar-deco{width:1.4em;height:1.4em}
-/* Page Compte (photo 124 px dans .avatar-wrap) */
+/* Page Compte (photo 124 px dans .avatar-wrap) : le chapeau épouse toute la
+   largeur de la photo et se pose comme un bonnet sur le haut du visage. */
 .avatar-wrap{position:relative}
-.avatar-wrap .avatar-deco{top:-42px;bottom:auto;width:112px;height:105px;z-index:4}
+.avatar-wrap .avatar-deco{width:100%;height:auto;bottom:15%;z-index:4}
 /* Fiche d'un ami (avatar 64 px, socle dédié) */
 .friend-avatar-slot{font-size:64px}
 /* Pastilles des listes : le chapeau suit la photo ET sa pastille de repli */
@@ -4616,9 +4619,6 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 .leaderboard-avatar[hidden]{display:none}
 .leaderboard-row .avatar-deco-slot{font-size:28px}
 .leaderboard-row>.avatar-deco-slot .avatar-deco{width:1.5em;height:1.4em}
-@media(max-width:559px){
-  .avatar-wrap .avatar-deco{top:-40px;width:104px;height:100px}
-}
 @media(max-width:559px){
   .deco-card{flex-direction:column;align-items:center;text-align:center}
   .deco-img-wrap{flex:none;width:100%}
