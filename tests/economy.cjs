@@ -48,7 +48,7 @@ function makeDom() {
         neuve paie toujours plein tarif. Le solde de départ n'est pas touché. */
   {
     const { w, doc, api } = makeDom();
-    api.applySave({ coins: 1000, firstPack: false, collection: ['chasseur-royer'] });
+    api.applySave({ coins: 1000, firstPack: false, decoReleaseClaimed: true, collection: ['chasseur-royer'] });
     api.showReveal();
     for (let tries = 0; tries < 60 && !doc.querySelector('#stack .card.is-top'); tries++) await wait(20);
     const first = doc.querySelector('#stack .card.is-top');

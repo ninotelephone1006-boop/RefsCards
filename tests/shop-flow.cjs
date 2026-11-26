@@ -120,7 +120,7 @@ function yesterdayKey() {
   /* 1. Achat multiple : quantité 5 classique = 2 500 🪙, inventaire +5. */
   {
     const { w, doc, store } = await boot({
-      coins: 3000, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 3000, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     assert.equal(doc.getElementById('coins').textContent.replace(/\s/g, ' '), '3 000');
@@ -148,7 +148,7 @@ function yesterdayKey() {
         bloqué jusqu'à demain. */
   {
     const { w, doc, store } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     const claim = doc.getElementById('free-claim');
@@ -174,7 +174,7 @@ function yesterdayKey() {
   /* 3. Jour suivant d'affilée : on passe au cran 2, plus avantageux. */
   {
     const { w, doc, store } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, streakDate: yesterdayKey(), streak: 1, claimedDays: [yesterdayKey()]
     });
     const claim = doc.getElementById('free-claim');
@@ -193,7 +193,7 @@ function yesterdayKey() {
   /* 3bis. Série interrompue : le cadeau repart au jour 1. */
   {
     const { w, doc } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, streakDate: '2000-01-01', streak: 5, claimedDays: []
     });
     const claim = doc.getElementById('free-claim');
@@ -209,7 +209,7 @@ function yesterdayKey() {
         aujourd'hui = cadeau déjà pris ; sinon la série repart de zéro. */
   {
     const { w, doc } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, freeDate: todayKey(), freeUsed: 2
     });
     const claim = doc.getElementById('free-claim');
@@ -220,7 +220,7 @@ function yesterdayKey() {
   }
   {
     const { w, doc } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, freeDate: '2000-01-01', freeUsed: 0
     });
     const claim = doc.getElementById('free-claim');
@@ -233,7 +233,7 @@ function yesterdayKey() {
   /* 4. Pack rare : sélection change l'image et les chances affichées. */
   {
     const { w, doc } = await boot({
-      coins: 5000, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 5000, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 1, rare: 1 }, streakDate: '', streak: 0, claimedDays: []
     });
     doc.getElementById('open-rare').click();
@@ -265,7 +265,7 @@ function yesterdayKey() {
   /* 5. Pack légendaire : 10 cartes, 800 🪙, visible immédiatement dans l'onglet Inventaire et Pack sans recharger la page. */
   {
     const { w, doc, store } = await boot({
-      coins: 1600, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 1600, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0, legend: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     // Avant achat : inventaire vide et badge caché.
@@ -315,7 +315,7 @@ function yesterdayKey() {
         vide devant le booster (l'ancien .pack-inventory est supprimé). */
   {
     const { w, doc } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     assert.equal(doc.getElementById('pack-stock-label').textContent, 'Aucun booster');
@@ -338,7 +338,7 @@ function yesterdayKey() {
          booster reste visible (aucun bandeau au-dessus de lui). */
   {
     const { w, doc } = await boot({
-      coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+      coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
       packStock: { classic: 2, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
     });
     assert.equal(doc.getElementById('pack-area').hidden, false, 'booster visible');

@@ -54,7 +54,7 @@ function makeFirestore(store) {
 
 async function boot({ seen, extraIds = [] } = {}) {
   const store = makeStore({
-    coins: 1234, firstPack: false, collection: [], friends: [], packsOpened: 0,
+    coins: 1234, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
     packStock: { classic: 1, rare: 0 }, streakDate: '', streak: 0, claimedDays: []
   });
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {

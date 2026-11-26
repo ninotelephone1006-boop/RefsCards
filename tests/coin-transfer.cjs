@@ -13,11 +13,11 @@ function makeStore() {
   return {
     playerSaves: {
       me: {
-        coins: 500, firstPack: false, collection: ['pieds-de-rapace'],
+        coins: 500, firstPack: false, decoReleaseClaimed: true, collection: ['pieds-de-rapace'],
         friends: ['friend1'], packsOpened: 2
       },
       friend1: {
-        coins: 40, firstPack: false, collection: ['chasseur-royer'],
+        coins: 40, firstPack: false, decoReleaseClaimed: true, collection: ['chasseur-royer'],
         friends: ['me'], packsOpened: 1
       }
     },

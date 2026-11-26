@@ -17,7 +17,7 @@ function makeStore() {
     playerSaves: {
       me: {
         coins: 5000,
-        firstPack: false,
+        firstPack: false, decoReleaseClaimed: true,
         collection: ['pieds-de-rapace'],
         friends: ['friend1'],
         packsOpened: 3,

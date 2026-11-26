@@ -18,7 +18,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function makeStore() {
   return {
     playerSaves: {
-      me: { coins: 500, firstPack: false, collection: ['pieds-de-rapace', 'chasseur-royer'], friends: [], packsOpened: 3 }
+      me: { coins: 500, firstPack: false, decoReleaseClaimed: true, collection: ['pieds-de-rapace', 'chasseur-royer'], friends: [], packsOpened: 3 }
     },
     playerProfiles: {
       friend1: {

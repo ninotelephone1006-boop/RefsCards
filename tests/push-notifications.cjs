@@ -162,7 +162,7 @@ async function flushAsk(w, tries = 4) {
 }
 
 const freshSave = () => ({
-  coins: 0, firstPack: false, collection: [], friends: [], packsOpened: 0,
+  coins: 0, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0,
   packStock: { classic: 3, rare: 0, legend: 0, video: 0 }
 });
 

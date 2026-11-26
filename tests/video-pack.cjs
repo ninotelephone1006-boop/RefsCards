@@ -284,7 +284,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   /* Chargement d'une sauvegarde contenant des packs vidéo. */
   test.applySave({
     coins: 5000,
-    firstPack: false,
+    firstPack: false, decoReleaseClaimed: true,
     collection: [],
     friends: [],
     packsOpened: 0,
