@@ -21,7 +21,7 @@ const denied = () => Object.assign(
   { code: 'permission-denied' }
 );
 
-function makeStore() {
+function makeStore({ avatar = 'data:image/jpeg;base64,CUSTOMAVATAR' } = {}) {
   return {
     playerSaves: {
       me: {
@@ -35,7 +35,7 @@ function makeStore() {
     playerProfiles: {
       me: {
         pseudo: 'AncienPseudo',
-        avatar: 'data:image/jpeg;base64,CUSTOMAVATAR',
+        avatar,
         friendCode: 'REFS-ABC123',
         coins: 500,
         totalCards: 2,
@@ -81,8 +81,8 @@ function makeFirestore(store, { failProfileSet = false } = {}) {
   };
 }
 
-async function boot({ failProfileSet = false } = {}) {
-  const store = makeStore();
+async function boot({ failProfileSet = false, avatar } = {}) {
+  const store = makeStore({ avatar });
   const dom = new JSDOM(fs.readFileSync('index.html', 'utf8'), {
     url: 'https://refs-cards.test/',
     runScripts: 'outside-only',
@@ -186,16 +186,33 @@ function submitForm(w, form) {
   assert.match(doc.getElementById('profile-msg').textContent, /mise à jour/);
   console.log('PASS photo téléversée = cloud + page Compte + HUD mis à jour');
 
-  /* 5. « Utiliser ma photo Google » : avatar vidé dans le cloud, HUD
-        retombe sur la photo Google. */
-  doc.getElementById('avatar-google-btn').click();
-  await wait(80);
-  assert.equal(store.playerProfiles.me.avatar, '');
-  assert.equal(doc.getElementById('account-avatar').src, 'https://google.test/photo.jpg');
-  assert.match(doc.getElementById('profile-msg').textContent, /photo Google/);
-  console.log('PASS retour à la photo Google = cloud + HUD mis à jour');
+  /* 5. Le bouton « Utiliser ma photo Google » a disparu : la photo Google
+        n'est plus utilisée comme repli d'avatar. */
+  assert.equal(doc.getElementById('avatar-google-btn'), null,
+    'le bouton « Utiliser ma photo Google » ne doit plus exister');
+  assert.doesNotMatch(fs.readFileSync('index.html', 'utf8'), /photo Google/,
+    'index.html ne propose plus la photo Google comme avatar');
 
   w.close();
+
+  /* 5 bis. Compte SANS photo personnalisée : l'image de base du jeu est
+     affichée partout (page Compte + HUD), et PAS la photo Google — même
+     quand le compte Google en a une. */
+  const bare = await boot({ avatar: '' });
+  const bdoc = bare.doc;
+  assert.match(bdoc.getElementById('account-avatar').src, /assets\/default-avatar\.png$/,
+    'sans photo, le HUD affiche l’image de base du jeu');
+  assert.equal(bdoc.getElementById('account-avatar').hidden, false,
+    'l’image de base reste visible (plus de pastille ✦)');
+  bdoc.querySelector('[data-tab="account"]').click();
+  await wait(40);
+  assert.match(bdoc.getElementById('profile-avatar').src, /assets\/default-avatar\.png$/,
+    'sans photo, la page Compte affiche aussi l’image de base');
+  assert.equal(bdoc.getElementById('profile-avatar').hidden, false);
+  assert.doesNotMatch(bdoc.getElementById('profile-avatar').src, /google\.test/,
+    'la photo Google ne sert plus de repli');
+  bare.w.close();
+  console.log('PASS sans photo = image de base du jeu (pas la photo Google), HUD + Compte');
 
   /* 6. Échec de la sauvegarde cloud : l'ancienne valeur est restaurée,
         un message d'erreur s'affiche, et aucun faux « mis à jour ». */

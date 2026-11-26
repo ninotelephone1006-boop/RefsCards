@@ -174,6 +174,12 @@ async function boot() {
         assert.match(img.className, /leaderboard-avatar|avatar-deco/,
           'une ligne ne contient que la photo et son décor');
       });
+      /* Sans photo, le classement montre l'image de base du jeu (les profils
+         de ce test n'ont pas d'avatar) : aucune ligne sans image. */
+      const face = row.querySelector('img.leaderboard-avatar');
+      assert.ok(face, 'chaque ligne a une photo (image de base comprise)');
+      assert.match(face.getAttribute('src'), /assets\/default-avatar\.png$/,
+        'sans photo, l’image de base du jeu est affichée');
     });
     assert.deepEqual(db.queries.slice(-2).map(q => [q.coll, q.field, q.direction, q.n]), [
       ['playerProfiles', 'coins', 'desc', 20], ['playerProfiles', 'packsOpened', 'desc', 20]

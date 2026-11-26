@@ -2323,8 +2323,6 @@ html,body{background:var(--bg)}
 .auth-free{margin:17px 0 0;color:#71687b;font-size:11px}
 .account-control{display:flex;align-items:center;gap:9px;max-width:230px;color:#a99fb2;font-size:11px}
 .account-avatar{flex:0 0 auto;width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid #ffffff2b;background:#241c2e}
-.account-avatar-fallback{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;font-size:12px;color:#c7a9ff;border:1px solid #8b5cf666;background:radial-gradient(120% 90% at 30% 10%,#2a1b45,#120c1e 70%)}
-.account-avatar-fallback[hidden]{display:none}
 .account-avatar[hidden]{display:none}
 #account-email{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .account-control button{padding:6px 8px;border:1px solid #302639;border-radius:8px;background:#ffffff06;color:#c3b8cb;font-size:10px;white-space:nowrap;cursor:pointer}
@@ -2360,8 +2358,6 @@ html,body{background:var(--bg)}
 .avatar-wrap{position:relative;width:124px;height:124px;margin-bottom:14px}
 .profile-avatar{width:124px;height:124px;border-radius:50%;object-fit:cover;border:3px solid #8b5cf6;
   background:#241c2e;box-shadow:0 0 0 6px #8b5cf622,0 10px 30px #000a}
-.profile-avatar-fallback{display:grid;place-items:center;width:124px;height:124px;border-radius:50%;font-size:52px;color:#c7a9ff;
-  border:3px solid #8b5cf6;background:radial-gradient(120% 90% at 30% 10%,#2a1b45,#120c1e 70%);box-shadow:0 0 0 6px #8b5cf622,0 10px 30px #000a}
 .avatar-edit{position:absolute;right:-4px;bottom:-4px;width:38px;height:38px;border-radius:50%;border:2px solid #0f0b14;
   background:linear-gradient(100deg,#8b5cf6,#c026d3);font-size:16px;cursor:pointer;display:grid;place-items:center;
   transition:transform .2s var(--ease-spring)}
@@ -2442,7 +2438,7 @@ html,body{background:var(--bg)}
 .add-friend-preview{display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border:1px solid #8b5cf633;border-radius:12px;background:#1a1226}
 .add-friend-preview[hidden]{display:none}
 .add-friend-preview .friend-row-id{flex:1 1 auto;min-width:0}
-.add-friend-preview .friend-row-avatar,.add-friend-preview .friend-row-fallback{width:48px;height:48px;font-size:19px}
+.add-friend-preview .friend-row-avatar{width:48px;height:48px}
 .online-empty{margin:10px 0;color:#8d84a8;font-size:12px;line-height:1.5}
 .trades-list{display:flex;flex-direction:column;gap:8px}
 .trade-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 12px;border:1px solid #ffffff12;border-radius:12px;background:#0f0b14f5}
@@ -2459,8 +2455,9 @@ html,body{background:var(--bg)}
 .request-actions .mini-btn{padding:7px 11px;font-size:11px}
 .request-status{font-size:11px;color:#8d84a8;font-style:italic;flex:0 0 auto}
 .request-row>.mini-btn{flex:0 0 auto;padding:7px 11px;font-size:11px}
-.friend-row-avatar,.friend-row-fallback{flex:0 0 auto;width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid #8b5cf6;background:#241c2e}
-.friend-row-fallback{display:grid;place-items:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;color:#c7a9ff}
+/* L'initiale du pseudo n'est plus une pastille : sans photo, c'est
+   l'image de base du jeu (`assets/default-avatar.png`) qui s'affiche. */
+.friend-row-avatar{flex:0 0 auto;width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid #8b5cf6;background:#241c2e}
 .friend-row-id{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
 .friend-row-pseudo{font-size:14px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .friend-row-sub{font-size:11px;color:#8d84a8}
@@ -2473,8 +2470,7 @@ html,body{background:var(--bg)}
 .friend-detail-head{flex-wrap:wrap}
 .friend-detail-id h3{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .friend-detail-head{display:flex;align-items:center;gap:12px}
-.friend-avatar,.friend-avatar-fallback{flex:0 0 auto;width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #8b5cf6;background:#241c2e}
-.friend-avatar-fallback{display:grid;place-items:center;font-size:26px;color:#c7a9ff}
+.friend-avatar{flex:0 0 auto;width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #8b5cf6;background:#241c2e}
 .friend-detail-id{flex:1 1 auto;min-width:0}
 .friend-detail-id h3{margin:0;font-size:20px}
 .friend-detail-id p{margin:3px 0 0;font-size:11px;color:#8d84a8}
@@ -3001,7 +2997,7 @@ html,body{background:var(--bg)}
 .global-market-offer{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:9px;border:1px solid #ffffff12;border-radius:11px;background:#161020}
 .global-market-offer+.global-market-offer{margin-top:7px}
 .global-market-offer .request-id{flex:1 1 145px;min-width:0}
-.global-market-offer .friend-row-avatar,.global-market-offer .friend-row-fallback{width:34px;height:34px;font-size:13px}
+.global-market-offer .friend-row-avatar{width:34px;height:34px}
 .global-market-offer .friend-row-id{min-width:0}
 .global-market-offer .friend-row-pseudo{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .global-market-offer .friend-row-sub{display:none}
@@ -4522,7 +4518,7 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .admin-deco-pfp{position:relative;flex:0 0 auto;width:124px;height:124px;border-radius:50%;
   background:radial-gradient(circle at 50% 35%,#3b2b52,#171021 70%);
   border:2px solid #8b5cf6;box-shadow:0 10px 26px -12px #000c;overflow:visible}
-.admin-deco-face{position:absolute;inset:0;display:grid;place-items:center;font-size:52px;color:#c4b5fd99}
+.admin-deco-face{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover}
 .admin-deco-hat{position:absolute;left:var(--deco-x,54%);bottom:var(--deco-y,54%);
   width:calc(88% * var(--deco-scale,1));height:auto;
   transform:translateX(-50%) rotate(var(--deco-rotate,-11deg));
@@ -4656,7 +4652,7 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 /* Fiche d'un ami (avatar 64 px, socle dédié) */
 .friend-avatar-slot{font-size:64px}
 /* Pastilles des listes : le chapeau suit la photo ET sa pastille de repli */
-.avatar-deco-slot>.friend-row-avatar,.avatar-deco-slot>.friend-row-fallback,
+.avatar-deco-slot>.friend-row-avatar,
 .avatar-deco-slot>.leaderboard-avatar{flex:0 0 auto}
 .leaderboard-avatar{flex:0 0 auto;width:28px;height:28px;border-radius:50%;object-fit:cover;
   border:2px solid #8b5cf6;background:#241c2e}
