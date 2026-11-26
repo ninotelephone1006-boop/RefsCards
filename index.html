@@ -250,6 +250,12 @@
             <p class="shop-sub">Les packs achetés vont dans ton inventaire ci-dessous. Tu peux en acheter plusieurs d'un coup — les prix sont réglés pour que l'argent reste un vrai défi.</p>
           </div>
 
+          <nav class="online-tabs shop-tabs" role="tablist" aria-label="Sections de la boutique">
+            <button class="online-tab is-active" type="button" role="tab" data-shop-tab="packs" aria-selected="true" aria-controls="shop-packs">📦 Packs</button>
+            <button class="online-tab" type="button" role="tab" data-shop-tab="deco" aria-selected="false" aria-controls="shop-deco">✨ Déco</button>
+          </nav>
+
+          <section class="shop-panel" id="shop-packs" role="tabpanel" aria-label="Packs" data-shop-panel="packs">
           <div class="free-banner" id="free-banner">
             <div class="free-info">
               <span class="free-gift" aria-hidden="true">🎁</span>
@@ -409,40 +415,6 @@
             </article>
           </div>
 
-          <!-- ================================ DÉCO ================================ -->
-          <div class="deco-head">
-            <p class="kicker"><span>✦</span> DÉCO <span>✦</span></p>
-            <h2 class="deco-title">Décore ta photo de profil</h2>
-            <p class="shop-sub">Les décors se placent au-dessus de ta photo de profil (onglet Compte).</p>
-          </div>
-
-          <div class="deco-grid">
-            <article class="shop-card deco-card" data-deco="chapeau-noel">
-              <div class="shop-img-wrap deco-img-wrap">
-                <img class="deco-img" src="assets/deco/chapeau-noel.png" alt="Chapeau de Noël" draggable="false">
-              </div>
-              <div class="shop-info">
-                <h3>Chapeau de Noël</h3>
-                <p class="shop-desc">Se place au-dessus de ta photo de profil.</p>
-                <p class="shop-stock" id="deco-stock-chapeau-noel">Non possédé</p>
-                <button class="shop-buy shop-buy-deco" id="buy-chapeau-noel" type="button">ACHETER · 500 🪙</button>
-              </div>
-            </article>
-
-            <article class="shop-card deco-card deco-soon" aria-label="Bientôt disponible">
-              <div class="shop-img-wrap deco-img-wrap deco-blur-wrap" aria-hidden="true">
-                <img class="deco-img deco-blur" src="assets/deco/chapeau-noel.png" alt="" draggable="false">
-              </div>
-              <div class="shop-info deco-blur-info" aria-hidden="true">
-                <h3>???</h3>
-                <p class="shop-desc">???</p>
-                <p class="shop-stock">???</p>
-                <button class="shop-buy" type="button" disabled>???</button>
-              </div>
-              <span class="deco-soon-badge">BIENTÔT DISPONIBLE</span>
-            </article>
-          </div>
-
           <div class="shop-inventory">
             <p class="shop-inventory-label" id="shop-inventory-label" aria-live="polite">Inventaire : 0 pack</p>
             <div class="inventory-open-actions">
@@ -455,6 +427,31 @@
             </div>
             <p class="shop-msg" id="shop-msg" role="status"></p>
           </div>
+          </section>
+
+          <!-- ================================ DÉCO ================================ -->
+          <section class="shop-panel" id="shop-deco" role="tabpanel" aria-label="Décorations" data-shop-panel="deco" hidden>
+          <div class="deco-head">
+            <p class="kicker"><span>✦</span> DÉCO <span>✦</span></p>
+            <h2 class="deco-title">Décore ta photo de profil</h2>
+            <p class="shop-sub">Les décors se placent au-dessus de ta photo de profil (onglet Compte).</p>
+          </div>
+
+          <div class="deco-grid">
+            <article class="shop-card deco-card deco-soon" aria-label="Décoration bientôt disponible">
+              <div class="shop-img-wrap deco-img-wrap deco-blur-wrap" aria-hidden="true">
+                <img class="deco-img deco-blur" src="assets/deco/chapeau-noel.png" alt="" draggable="false">
+              </div>
+              <div class="shop-info deco-blur-info" aria-hidden="true">
+                <h3>???</h3>
+                <p class="shop-desc">???</p>
+                <p class="shop-stock">???</p>
+                <button class="shop-buy" type="button" disabled>???</button>
+              </div>
+              <span class="deco-soon-badge">BIENTÔT DISPONIBLE</span>
+            </article>
+          </div>
+          </section>
         </div>
       </section>
 
