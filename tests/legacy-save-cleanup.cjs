@@ -23,7 +23,7 @@ const STRICT_SAVE_KEYS = ['coins', 'firstPack', 'collection', 'friends',
   'packsOpened', 'packStock', 'streakDate', 'streak', 'claimedDays',
   'fusions', 'packsBought', 'freePacks', 'marketSales', 'marketEarned',
   'marketBuys', 'xp', 'quests', 'questBaseline', 'achievements',
-  'notifications', 'updatedAt'];
+  'notifications', 'leaderboardAnnounced', 'updatedAt'];
 
 function denied() {
   return Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });

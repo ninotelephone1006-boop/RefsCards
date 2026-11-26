@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.25-3">
+  <meta name="app-version" content="2026.11.26-1">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.25-3">
+  <link rel="stylesheet" href="styles.css?v=2026.11.26-1">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -50,7 +50,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.24-1" defer></script>
-  <script src="app.js?v=2026.11.25-5" defer></script>
+  <script src="app.js?v=2026.11.26-1" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -538,7 +538,7 @@
         <div class="online-head">
           <div class="online-head-top">
             <p class="kicker"><span>✦</span> EN LIGNE <span>✦</span></p>
-            <h2>Le marché <em>du jeu</em></h2>
+            <h2>La communauté <em>du jeu</em></h2>
           </div>
           <nav class="online-tabs" role="tablist" aria-label="Sections de la page En ligne">
             <button class="online-tab is-active" type="button" role="tab" data-online-tab="market" aria-selected="true" aria-controls="online-market">
@@ -552,6 +552,9 @@
             </button>
             <button class="online-tab" type="button" role="tab" data-online-tab="friends" aria-selected="false" aria-controls="online-friends">
               👥 Amis <span class="online-tab-count" id="online-tab-count-friends" hidden></span>
+            </button>
+            <button class="online-tab" type="button" role="tab" data-online-tab="leaderboard" aria-selected="false" aria-controls="online-leaderboard">
+              🏆 Classement
             </button>
             <button class="online-tab" type="button" role="tab" data-online-tab="games" aria-selected="false" aria-controls="online-games">
               🎲 Jeux <span class="online-tab-count" id="online-tab-count-games" hidden></span>
@@ -721,6 +724,27 @@
               <p class="online-empty" id="friend-requests-empty">Aucune demande reçue. Quand un joueur t’ajoute avec ton code ami, sa demande apparaît ici : accepte-la pour devenir amis.</p>
               <h4 class="market-sub">Envoyées</h4>
               <div id="friend-requests-out" class="requests-list"></div>
+            </section>
+          </section>
+
+          <!-- -------------------------- CLASSEMENT -------------------------- -->
+          <section class="online-panel" id="online-leaderboard" role="tabpanel" aria-label="Classement" data-online-panel="leaderboard" hidden>
+            <section class="market-block leaderboard" aria-labelledby="leaderboard-title">
+              <div class="block-head">
+                <h3 id="leaderboard-title">🏆 Classements du jeu</h3>
+                <p class="block-sub">Top 20 des joueurs par solde actuel et par nombre de boosters ouverts depuis le début. Les statistiques publiques sont actualisées quand les joueurs se connectent et jouent ; les anciens comptes apparaissent après leur prochaine connexion.</p>
+              </div>
+              <button class="mini-btn" id="leaderboard-refresh" type="button">Actualiser les classements</button>
+              <div class="leaderboard-grid">
+                <section aria-labelledby="leaderboard-coins-title">
+                  <h4 id="leaderboard-coins-title">🪙 Les plus riches</h4>
+                  <div id="leaderboard-coins" aria-live="polite"><p class="online-empty">Ouvre cet onglet pour charger le classement.</p></div>
+                </section>
+                <section aria-labelledby="leaderboard-packs-title">
+                  <h4 id="leaderboard-packs-title">📦 Boosters ouverts</h4>
+                  <div id="leaderboard-packs" aria-live="polite"><p class="online-empty">Ouvre cet onglet pour charger le classement.</p></div>
+                </section>
+              </div>
             </section>
           </section>
 

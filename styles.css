@@ -4489,3 +4489,15 @@ body:has(.inspect.is-open) .update-banner{display:none}
   .push-actions{flex-direction:column;align-items:stretch}
   .push-actions .mini-btn{width:100%}
 }
+
+/* Classements publics */
+.leaderboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px}
+.leaderboard-grid h4{margin:0 0 10px;color:#e9dcff;font-size:15px}
+.leaderboard-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.leaderboard-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #ffffff12;border-radius:12px;background:#0f0b14f5}
+.leaderboard-rank{flex:0 0 32px;color:#d4b4ff;font-weight:700;font-size:12px}
+.leaderboard-row:first-child .leaderboard-rank{color:#ffd56b}
+.leaderboard-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-size:13px}
+.leaderboard-you{color:#b9a0ee;font-size:11px}
+.leaderboard-value{flex:0 0 auto;color:#f5d884;font-weight:700;font-size:12px;white-space:nowrap}
+@media(max-width:600px){.leaderboard-grid{grid-template-columns:1fr}}

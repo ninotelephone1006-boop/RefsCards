@@ -4222,6 +4222,7 @@
       ? d.friends.filter((u) => typeof u === 'string')
       : [];
     state.packsOpened = Math.max(0, Number(d && d.packsOpened) || 0);
+    leaderboardAnnounced = Boolean(d && d.leaderboardAnnounced);
     /* Compteurs quêtes/succès (absents des anciennes sauvegardes → 0). */
     state.fusions = Math.max(0, Number(d && d.fusions) || 0);
     state.packsBought = Math.max(0, Number(d && d.packsBought) || 0);
@@ -4342,6 +4343,7 @@
         quests: questState.completed.slice(),
         achievements: questState.achievements.slice(),
         notifications: questState.notifications.slice(0, QUEST_NOTIFICATIONS_MAX),
+        leaderboardAnnounced: leaderboardAnnounced,
         updatedAt: serverTimestamp()
       });
     saveQueue = saveQueue.then(async () => {
@@ -4405,6 +4407,10 @@
     /* Annonce du catalogue : une fois le jeu affiché, on compare les cartes
        disponibles avec celles de la dernière visite (cf. announceNewCards). */
     announceNewCards();
+    if (!leaderboardAnnounced) {
+      leaderboardAnnounced = true;
+      pushNotification('system', 'Nouveaux classements 🏆', 'Découvre les joueurs les plus riches et ceux qui ont ouvert le plus de boosters dans En ligne → Classement.');
+    }
     /* Annonce de sortie du Pack Ultra Rare (−20 % / 24 h). Légèrement
        différée pour laisser l'écran de chargement disparaître, et jamais
        par-dessus l'annonce des nouvelles cartes. */
@@ -4466,6 +4472,8 @@
     questState.achievements = [];
     questState.xp = 0;
     questState.notifications = [];
+    leaderboardAnnounced = false;
+    leaderboardRequest++;
     questReadyNotifiedIds.clear();
     questSeenIds.clear();
     questSeenInitialized = false;
@@ -4708,6 +4716,7 @@
       updateQuestBadges();
     } else if (tab === 'online') {
       renderOnline();
+      if (onlinePanel === 'leaderboard') loadLeaderboard();
       loadMarket();
       loadGlobalMarket();
       loadFriendRequests();
@@ -5052,6 +5061,8 @@
      collection — c'est ce que les amis voient. La sauvegarde privée
      (playerSaves/{uid}) garde en plus la liste d'amis. */
   const profile = { pseudo: '', avatar: '', friendCode: '' };
+  let leaderboardAnnounced = false;
+  let leaderboardRequest = 0;
   let friends = [];                  // uids de mes amis (acceptés des deux côtés)
   const friendProfiles = new Map();  // uid -> profil public d'un ami
   let friendRequests = [];           // demandes d'ami où je suis destinataire
@@ -5292,6 +5303,7 @@
         avatar: profile.avatar || '',
         friendCode: profile.friendCode,
         coins: stats.coins,
+        packsOpened: Math.max(0, Math.floor(Number(state.packsOpened) || 0)),
         totalCards: stats.total,
         uniqueCards: stats.unique,
         bestRarity: stats.best ? stats.best.rarity : null,
@@ -5986,11 +5998,54 @@
       tab.classList.toggle('is-active', active);
       tab.setAttribute('aria-selected', String(active));
     });
+    if (onlinePanel === 'leaderboard') loadLeaderboard();
     if (scroll) {
       const scroller = onlineView.querySelector('.page-scroll');
       if (scroller) scroller.scrollTop = 0;
     }
   }
+
+  /* Deux requêtes indexées, limitées indépendamment : les profils sans le
+     compteur (anciens clients) rejoignent le classement à leur reconnexion. */
+  async function loadLeaderboard() {
+    const coinsList = $('leaderboard-coins');
+    const packsList = $('leaderboard-packs');
+    if (!coinsList || !packsList || !cloudReady()) return;
+    const uid = currentUser.uid;
+    const request = ++leaderboardRequest;
+    const lists = [
+      { field: 'coins', node: coinsList, unit: '🪙' },
+      { field: 'packsOpened', node: packsList, unit: 'boosters' }
+    ];
+    lists.forEach(({ node }) => node.replaceChildren(el('p', 'online-empty', 'Chargement du classement…')));
+    await Promise.all(lists.map(async ({ field, node, unit }) => {
+      try {
+        const snap = await cloudDb.collection('playerProfiles').orderBy(field, 'desc').limit(20).get();
+        if (!currentUser || currentUser.uid !== uid || request !== leaderboardRequest) return;
+        const entries = snapshotDocs(snap).filter(({ data }) => data && Number.isFinite(data[field]) && data[field] >= 0);
+        if (!entries.length) {
+          node.replaceChildren(el('p', 'online-empty', 'Aucun joueur classé pour le moment.'));
+          return;
+        }
+        const list = el('ol', 'leaderboard-list');
+        entries.forEach(({ id, data }, index) => {
+          const row = el('li', 'leaderboard-row');
+          const rank = el('span', 'leaderboard-rank', `#${index + 1}`);
+          const name = el('strong', 'leaderboard-name', typeof data.pseudo === 'string' && data.pseudo.trim() ? data.pseudo : 'Joueur');
+          if (id === uid) name.append(el('span', 'leaderboard-you', ' · Toi'));
+          const value = el('span', 'leaderboard-value', `${fmt(data[field])} ${unit}`);
+          row.append(rank, name, value);
+          list.append(row);
+        });
+        node.replaceChildren(list);
+      } catch (error) {
+        if (!currentUser || currentUser.uid !== uid || request !== leaderboardRequest) return;
+        noteCloudError('Classement illisible', error);
+        node.replaceChildren(el('p', 'online-empty', 'Classement indisponible. Réessaie avec Actualiser.'));
+      }
+    }));
+  }
+  on($('leaderboard-refresh'), 'click', loadLeaderboard);
 
   /* Raccourci « vendre » : on amène directement sur l'onglet Vendre. */
   function openSellPanel() {
