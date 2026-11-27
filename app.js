@@ -123,7 +123,6 @@
     'chapeau-beret': 1500,
     'chapeau-onepiece': 1500
   };
-  const DECO_TYPES = Object.keys(DECO_IMAGES);
   const DECO_LABELS = {
     'chapeau-noel': 'Chapeau de Noël',
     'chapeau-cowboy': 'Chapeau de cowboy',
@@ -131,6 +130,25 @@
     'chapeau-beret': 'Béret rouge',
     'chapeau-onepiece': 'Chapeau One Piece'
   };
+  /* Filet anti-désynchronisation HTML / JS : si index.html déclare déjà un
+     chapeau dans .deco-card[data-deco] qui n'était pas encore au registre, on
+     l'enregistre avant de figer DECO_TYPES plutôt que de retomber sur Noël. */
+  if (typeof document !== 'undefined' && document.querySelectorAll) {
+    document.querySelectorAll('.deco-card[data-deco]').forEach((card) => {
+      const id = (card.getAttribute('data-deco') || '').trim();
+      if (!id || DECO_IMAGES[id]) return;
+      const img = card.querySelector('.deco-img');
+      const src = img && img.getAttribute('src');
+      if (!src) return;
+      const title = card.querySelector('h3');
+      DECO_IMAGES[id] = src;
+      if (!DECO_PRICES[id]) DECO_PRICES[id] = 1500;
+      if (!DECO_LABELS[id]) {
+        DECO_LABELS[id] = (title && title.textContent.trim()) || (img.getAttribute('alt') || '').trim() || id;
+      }
+    });
+  }
+  const DECO_TYPES = Object.keys(DECO_IMAGES);
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
 
   /* ------------------------------------------- photo de profil par défaut
@@ -177,7 +195,7 @@
      exactement sur les valeurs d'origine (54 % / 54 % / ×1 / −11°). */
   const DECO_LAYOUT_DEFAULT = { x: 54, y: 54, scale: 1, rotate: -11 };
   const DECO_LAYOUT_LIMITS = { x: [-20, 120], y: [-20, 120], scale: [0.3, 2.5], rotate: [-180, 180] };
-  let decoLayouts = {};        // réglages publiés (4 chapeaux, toujours complets)
+  let decoLayouts = {};        // réglages publiés (tous les chapeaux du registre)
   let decoDraft = {};          // réglages en cours d'édition, pas encore publiés
   let decoEditorDirty = false; // l'admin a des modifications non enregistrées
   let decoLayoutUnsub = null;  // écoute temps réel du profil du créateur
@@ -201,8 +219,8 @@
     };
   }
 
-  /* Toujours les 4 chapeaux, toujours des nombres bornés : un document
-     ancien, incomplet ou corrompu ne peut pas casser l'affichage. */
+  /* Toujours tous les chapeaux du registre, toujours des nombres bornés : un
+     document ancien, incomplet ou corrompu ne peut pas casser l'affichage. */
   function publishedDecoLayouts(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const out = {};
@@ -6212,6 +6230,21 @@
   }
 
   /* ----------------------------- éditeur ---------------------------------- */
+  function syncDecoEditorSelectOptions() {
+    if (!decoEditorSelect) return;
+    const previous = decoEditorSelect.value;
+    const existing = Array.from(decoEditorSelect.options).map((o) => o.value);
+    if (existing.length === DECO_TYPES.length && existing.every((v, i) => v === DECO_TYPES[i])) return;
+    decoEditorSelect.replaceChildren(...DECO_TYPES.map((id) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = DECO_LABELS[id] || id;
+      return opt;
+    }));
+    if (isDecoType(previous)) decoEditorSelect.value = previous;
+  }
+  syncDecoEditorSelectOptions();
+
   function currentDecoEditorId() {
     const id = decoEditorSelect && decoEditorSelect.value;
     return isDecoType(id) ? id : DECO_TYPES[0];
@@ -6229,8 +6262,11 @@
   function renderDecoEditorPreview() {
     if (!decoEditorHat) return;
     const id = currentDecoEditorId();
-    decoEditorHat.src = DECO_IMAGES[id];
+    const src = DECO_IMAGES[id];
+    if (decoEditorHat.getAttribute('src') !== src) decoEditorHat.src = src;
+    decoEditorHat.alt = DECO_LABELS[id] || id;
     decoEditorHat.title = DECO_LABELS[id] || id;
+    decoEditorHat.dataset.deco = id;
     applyDecoVars(decoEditorHat, draftDecoLayout(id));
   }
 
@@ -6253,6 +6289,7 @@
   }
 
   function syncDecoEditorFields(force) {
+    syncDecoEditorSelectOptions();
     updateDecoEditorOutputs();
     renderDecoEditorPreview();
     if (decoEditorDirty && !force) return;
@@ -6274,9 +6311,69 @@
     });
   });
 
-  on(decoEditorSelect, 'change', () => {
+  function onDecoEditorSelectChange() {
     setDecoEditorMsg('');
     syncDecoEditorFields(true);
+  }
+  on(decoEditorSelect, 'change', onDecoEditorSelectChange);
+  on(decoEditorSelect, 'input', onDecoEditorSelectChange);
+
+  /* Frappe au clavier sur le sélecteur de chapeaux : un <select> natif coupe
+     sur l'espace ou ne cherche que le préfixe (« Chapeau… » → Noël). Ce tampon
+     multi-mots sans accents fait que taper « chapeau one piece » ou « one piece »
+     sélectionne bien le Chapeau One Piece au lieu de retomber sur Noël. */
+  let decoSelectBuffer = '';
+  let decoSelectBufferTimer = 0;
+  function normalizeDecoSearch(str) {
+    return String(str || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+  function matchDecoTypeByQuery(rawQuery) {
+    const query = normalizeDecoSearch(rawQuery);
+    if (!query) return '';
+    const words = query.split(' ').filter(Boolean);
+    const entries = DECO_TYPES.map((id) => {
+      const label = normalizeDecoSearch(DECO_LABELS[id] || id);
+      const hay = normalizeDecoSearch(`${DECO_LABELS[id] || ''} ${id}`);
+      return { id, label, hay };
+    });
+    const byPrefix = entries.find((e) => e.label.startsWith(query));
+    if (byPrefix) return byPrefix.id;
+    const bySub = entries.find((e) => e.label.includes(query) || e.hay.includes(query));
+    if (bySub) return bySub.id;
+    const byWords = entries.find((e) => words.every((w) => e.hay.includes(w)));
+    return byWords ? byWords.id : '';
+  }
+  on(decoEditorSelect, 'keydown', (event) => {
+    if (!decoEditorSelect || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'Backspace' && decoSelectBuffer) {
+      decoSelectBuffer = decoSelectBuffer.slice(0, -1);
+      window.clearTimeout(decoSelectBufferTimer);
+      decoSelectBufferTimer = window.setTimeout(() => { decoSelectBuffer = ''; }, 1200);
+      const match = matchDecoTypeByQuery(decoSelectBuffer);
+      if (match && decoEditorSelect.value !== match) {
+        decoEditorSelect.value = match;
+        onDecoEditorSelectChange();
+      }
+      event.preventDefault();
+      return;
+    }
+    if (typeof event.key !== 'string' || event.key.length !== 1) return;
+    if (event.key === ' ' && !decoSelectBuffer) return;
+    decoSelectBuffer += event.key;
+    window.clearTimeout(decoSelectBufferTimer);
+    decoSelectBufferTimer = window.setTimeout(() => { decoSelectBuffer = ''; }, 1200);
+    const match = matchDecoTypeByQuery(decoSelectBuffer);
+    if (!match) return;
+    event.preventDefault();
+    if (decoEditorSelect.value !== match) {
+      decoEditorSelect.value = match;
+      onDecoEditorSelectChange();
+    }
   });
 
   on(decoEditorReset, 'click', () => {

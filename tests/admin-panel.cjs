@@ -195,7 +195,61 @@ async function boot(email) {
     console.log('PASS don de cartes (normale + shiny) : collection créditée et persistée');
   }
 
-  /* 6. Déconnexion : le panneau est masqué, impossible à retrouver pour le
+  /* 6. Éditeur de chapeaux : choisir ou taper « chapeau one piece » affiche
+        bien le chapeau One Piece (et jamais le chapeau de Noël), et enregistre
+        son propre réglage dans playerProfiles.decoLayout. */
+  {
+    const { w, doc, store } = await boot(ADMIN_EMAIL);
+    doc.querySelector('[data-tab="account"]').click();
+    await wait(30);
+    const select = doc.getElementById('admin-deco-select');
+    const hat = doc.getElementById('admin-deco-hat');
+    assert.ok(select && hat, 'sélecteur et aperçu de chapeau présents');
+
+    /* Sélection directe (mobile / souris) de chaque chapeau, dont One Piece. */
+    select.value = 'chapeau-onepiece';
+    select.dispatchEvent(new w.Event('change', { bubbles: true }));
+    assert.equal(hat.getAttribute('src'), 'assets/deco/chapeau-onepiece.png',
+      'choisir Chapeau One Piece doit afficher chapeau-onepiece.png');
+    assert.equal(hat.dataset.deco, 'chapeau-onepiece');
+
+    /* Frappe clavier « chapeau one piece » sur le sélecteur : ne doit pas
+       retomber sur le chapeau de Noël à cause du mot « Chapeau » ou des espaces. */
+    select.value = 'chapeau-cowboy';
+    select.dispatchEvent(new w.Event('change', { bubbles: true }));
+    assert.equal(hat.getAttribute('src'), 'assets/deco/chapeau-cowboy.png');
+    for (const ch of 'chapeau one piece') {
+      select.dispatchEvent(new w.KeyboardEvent('keydown', { key: ch, bubbles: true, cancelable: true }));
+    }
+    assert.equal(select.value, 'chapeau-onepiece',
+      'taper « chapeau one piece » sélectionne bien chapeau-onepiece');
+    assert.equal(hat.getAttribute('src'), 'assets/deco/chapeau-onepiece.png',
+      'taper « chapeau one piece » affiche chapeau-onepiece.png et pas Noël');
+
+    /* Modification de la place du chapeau One Piece et publication globale. */
+    const sliderX = doc.getElementById('admin-deco-x');
+    const sliderY = doc.getElementById('admin-deco-y');
+    sliderX.value = '48';
+    sliderX.dispatchEvent(new w.Event('input', { bubbles: true }));
+    sliderY.value = '62';
+    sliderY.dispatchEvent(new w.Event('input', { bubbles: true }));
+    assert.equal(hat.style.getPropertyValue('--deco-x'), '48%');
+    assert.equal(hat.style.getPropertyValue('--deco-y'), '62%');
+
+    doc.getElementById('admin-deco-save').click();
+    await wait(100);
+    assert.ok(store.playerProfiles.me.decoLayout, 'decoLayout publié sur le profil créateur');
+    assert.deepEqual({ ...store.playerProfiles.me.decoLayout['chapeau-onepiece'] }, {
+      x: 48, y: 62, scale: 1, rotate: -11
+    }, 'le réglage propre au chapeau One Piece est sauvegardé');
+    assert.deepEqual({ ...store.playerProfiles.me.decoLayout['chapeau-noel'] }, {
+      x: 54, y: 54, scale: 1, rotate: -11
+    }, 'le réglage du chapeau de Noël reste intact');
+    w.close();
+    console.log('PASS éditeur de chapeaux : sélection et frappe « chapeau one piece » + sauvegarde');
+  }
+
+  /* 7. Déconnexion : le panneau est masqué, impossible à retrouver pour le
         compte suivant sur le même appareil. */
   {
     const { w, doc, authState } = await boot(ADMIN_EMAIL);
