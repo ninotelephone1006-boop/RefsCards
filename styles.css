@@ -2747,6 +2747,9 @@ html,body{background:var(--bg)}
   color:#fbbf24;padding-top:2px}
 .pack-odds-video-note{display:block;width:100%;text-align:center;font-size:8px;font-weight:700;letter-spacing:.8px;
   color:#67e8f9;padding-top:2px}
+.pack-odds-shiny-total,.pack-odds-shiny-base{display:block;width:100%;text-align:center;padding-top:3px;line-height:1.45}
+.pack-odds-shiny-total{color:#f9d86a;font-size:8.5px;font-weight:800}
+.pack-odds-shiny-base{color:#aaa1b3;font-size:7px;font-weight:600;letter-spacing:0}
 
 /* --- Page Shop --- */
 .shop-view{justify-content:flex-start;align-items:stretch}
