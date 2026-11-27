@@ -1199,12 +1199,124 @@
        (streakDate/streak/claimedDays persistés ; cf. DAILY_REWARD_CYCLE).
      - Ouverture : consomme 1 pack du type choisi (currentPackType). */
 
+  /* Horloge fiable (indépendante de l'heure du téléphone) :
+     - Si le serveur HTTP répond avec l'en-tête `Date`, on cale une ancre
+       serveur sur l'horloge monotone `performance.now()` (qui ne saute pas
+       quand le joueur modifie l'heure du téléphone).
+     - En repli hors-ligne, on borne avec le dernier horodatage serveur connu
+       (`updatedAt` Firestore / dernière synchro) pour ne jamais reculer. */
+  const SERVER_SYNC_MIN_GAP_MS = 15000;
+  let serverAnchorMs = 0;
+  let serverMonoAnchorMs = 0;
+  let serverWallAnchorMs = 0;
+  let serverTimeSynced = false;
+  let minKnownServerMs = 0;
+  let lastServerSyncAttempt = 0;
+  let serverSyncPromise = null;
+
+  function monotonicNow() {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+    return Date.now();
+  }
+
+  function noteMinServerTime(ms) {
+    const n = Number(ms);
+    if (Number.isFinite(n) && n > minKnownServerMs) minKnownServerMs = n;
+  }
+
+  function clockDrifted() {
+    if (!serverTimeSynced) return false;
+    const monoDelta = monotonicNow() - serverMonoAnchorMs;
+    const wallDelta = Date.now() - serverWallAnchorMs;
+    return Math.abs(wallDelta - monoDelta) > 5000;
+  }
+
+  function serverNowMs() {
+    if (serverTimeSynced) {
+      const elapsed = Math.max(0, monotonicNow() - serverMonoAnchorMs);
+      return Math.max(serverAnchorMs + elapsed, minKnownServerMs);
+    }
+    return Math.max(Date.now(), minKnownServerMs);
+  }
+
+  function serverNow() {
+    return new Date(serverNowMs());
+  }
+
+  function syncServerTime({ force = false } = {}) {
+    if (typeof window === 'undefined' || typeof window.fetch !== 'function') {
+      return Promise.resolve(false);
+    }
+    const nowWall = Date.now();
+    if (!force && serverSyncPromise) return serverSyncPromise;
+    if (!force && serverTimeSynced && !clockDrifted()
+        && (nowWall - lastServerSyncAttempt) < SERVER_SYNC_MIN_GAP_MS) {
+      return Promise.resolve(true);
+    }
+    lastServerSyncAttempt = nowWall;
+    const prevKey = todayKey();
+    const url = (window.location && window.location.pathname) ? window.location.pathname : './';
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctrl ? window.setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 1500) : 0;
+    const reqMonoStart = monotonicNow();
+    serverSyncPromise = window.fetch(url, {
+      method: 'HEAD',
+      cache: 'no-store',
+      signal: ctrl ? ctrl.signal : undefined
+    }).then((res) => {
+      if (timer) window.clearTimeout(timer);
+      const dateHeader = res && res.headers && typeof res.headers.get === 'function'
+        ? res.headers.get('date')
+        : '';
+      const parsed = dateHeader ? Date.parse(dateHeader) : NaN;
+      if (!Number.isFinite(parsed) || parsed <= 0) return false;
+      const reqMonoEnd = monotonicNow();
+      const rtt = Math.max(0, reqMonoEnd - reqMonoStart);
+      serverAnchorMs = parsed + Math.round(rtt / 2);
+      serverMonoAnchorMs = reqMonoEnd;
+      serverWallAnchorMs = Date.now();
+      serverTimeSynced = true;
+      noteMinServerTime(serverAnchorMs);
+      if (currentUser && prevKey !== todayKey()) {
+        renderShop();
+      }
+      return true;
+    }).catch(() => {
+      if (timer) window.clearTimeout(timer);
+      return false;
+    }).finally(() => {
+      serverSyncPromise = null;
+    });
+    return serverSyncPromise;
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && currentUser) {
+        syncServerTime({ force: true }).then((ok) => {
+          if (ok && currentUser) renderShop();
+        });
+      }
+    });
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', () => {
+      if (currentUser) {
+        syncServerTime({ force: clockDrifted() }).then((ok) => {
+          if (ok && currentUser) renderShop();
+        });
+      }
+    });
+  }
+
   function pad2(n) {
     return String(n).padStart(2, '0');
   }
 
   function dayKey(offset) {
-    const now = new Date();
+    const now = serverNow();
     now.setDate(now.getDate() + offset);
     return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
   }
@@ -1218,11 +1330,13 @@
   }
 
   /* Calendrier de connexion : le cadeau du jour est disponible tant que le
-     dernier cadeau récupéré n'est pas d'aujourd'hui. Une série interrompue
-     (dernier cadeau il y a 2 jours ou plus) repart au jour 1. */
+     dernier cadeau récupéré précède aujourd'hui. Une série interrompue
+     (dernier cadeau il y a 2 jours ou plus) repart au jour 1. Si la date
+     enregistrée est postérieure à l'horloge (changement d'heure ou de fuseau
+     horaire), on ne remet jamais la série à zéro et on bloque le double gain. */
   function refreshStreak() {
-    if (!state.streakDate
-        || (state.streakDate !== todayKey() && state.streakDate !== yesterdayKey())) {
+    const yesterday = yesterdayKey();
+    if (!state.streakDate || state.streakDate < yesterday) {
       state.streak = 0;
     }
     state.streak = clamp(Math.floor(Number(state.streak) || 0), 0, 999);
@@ -1230,7 +1344,7 @@
 
   function dailyAvailable() {
     refreshStreak();
-    return state.streakDate !== todayKey();
+    return !state.streakDate || state.streakDate < todayKey();
   }
 
   /* Prochain cran du calendrier (1..7, cycle). Quand le cadeau du jour est
@@ -1298,7 +1412,7 @@
      du jour est entourée (semaine commençant le lundi). */
   function renderDailyCalendar() {
     if (!dailyCalendar) return;
-    const now = new Date();
+    const now = serverNow();
     const year = now.getFullYear();
     const month = now.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1365,7 +1479,7 @@
     if (freeLabel) {
       freeLabel.textContent = available
         ? `Jour ${nextDailyDay()} du calendrier — ${describeReward(rewardForDay(nextDailyDay()))}. Connecte-toi chaque jour pour améliorer les cadeaux.`
-        : `Cadeau du jour ${state.streak} récupéré. Demain : jour ${nextDailyDay()} — ${describeReward(rewardForDay(nextDailyDay()))}.`;
+        : `Cadeau du jour ${Math.max(1, state.streak)} récupéré. Demain : jour ${nextDailyDay()} — ${describeReward(rewardForDay(nextDailyDay()))}.`;
     }
     if (tabBadgeShop) tabBadgeShop.hidden = !available;
     renderDailyCalendar();
@@ -4735,6 +4849,18 @@
       state.packStock.classic += 1;
       state.firstPack = false;
     }
+    /* Horodatage serveur de la sauvegarde : sert de borne inférieure si
+       l'horloge du téléphone a été reculée hors-ligne. */
+    if (d && d.updatedAt) {
+      let saveServerMs = 0;
+      try {
+        if (typeof d.updatedAt.toMillis === 'function') saveServerMs = d.updatedAt.toMillis();
+        else if (typeof d.updatedAt.seconds === 'number') saveServerMs = d.updatedAt.seconds * 1000;
+      } catch (e) {}
+      if (Number.isFinite(saveServerMs) && saveServerMs > 0) {
+        noteMinServerTime(saveServerMs);
+      }
+    }
     /* Calendrier de connexion (streakDate/streak/claimedDays). Les anciennes
        sauvegardes « 3 gratuits/jour » migrent : un quota déjà entamé aujourd'hui
        compte comme cadeau récupéré, sinon la série repart de zéro. */
@@ -4751,14 +4877,18 @@
         noteClaimedDay(d.freeDate);
       }
     }
-    /* L'affichage du calendrier ne garde que le mois en cours. */
+    /* L'affichage du calendrier ne garde que le mois en cours lorsque
+       l'horloge serveur est confirmée (pour qu'une horloge locale déréglée
+       n'efface jamais les jours cochés). */
     const monthPrefix = savedToday.slice(0, 7);
-    state.claimedDays = state.claimedDays.filter((k) => k.slice(0, 7) === monthPrefix);
+    if (serverTimeSynced) {
+      state.claimedDays = state.claimedDays.filter((k) => k.slice(0, 7) === monthPrefix);
+    }
     const previousStreakDate = state.streakDate;
     refreshStreak();
     /* Nouveau jour calendaire : un nouveau cadeau est disponible — on prévient
        (une fois par session) pour ne pas le laisser passer. */
-    const newDay = Boolean(previousStreakDate) && previousStreakDate !== savedToday;
+    const newDay = Boolean(previousStreakDate) && previousStreakDate < savedToday;
     state.currentPackType = firstAvailablePackType();
     if (revealView.classList.contains('is-results')) resetToPack({ quiet: true });
     state.phase = 'pack';
@@ -5146,7 +5276,10 @@
         setLoadingText('Chargement de ta collection…');
         setAuthStatus('Chargement de ta collection…');
         try {
-          const snapshot = await cloudDb.collection('playerSaves').doc(user.uid).get();
+          const [snapshot] = await Promise.all([
+            cloudDb.collection('playerSaves').doc(user.uid).get(),
+            syncServerTime()
+          ]);
           if (!currentUser || currentUser.uid !== user.uid) return;
           await showGame(user, snapshot.exists ? snapshot.data() : null);
         } catch (error) {
@@ -5194,6 +5327,9 @@
       tabBadge.hidden = true;
     } else if (tab === 'shop') {
       renderShop();
+      syncServerTime({ force: clockDrifted() }).then((ok) => {
+        if (ok && currentUser && app.dataset.tab === 'shop') renderShop();
+      });
     } else if (tab === 'inventory') {
       renderInventory();
     } else if (tab === 'quests') {
