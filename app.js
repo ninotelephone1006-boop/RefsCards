@@ -364,9 +364,8 @@
      tirage (en %), `fx` le niveau de mise en scène (calm | rare | epic | gold)
      et `next` la rareté obtenue par fusion. Les couleurs servent au cadre, au
      badge, au titre et aux lueurs de la carte. Au-dessus de Secrète (0,5 %) :
-     Ultra Secrète (0,3 %), Hyper Secrète (0,2 %) et Unique (0,05 % = 1/2000).
-     L'Unique est réservée aux grosses tables : 0,05 % (1/2000) en base, mais
-     0,5 % (1/200) dans le Pack Ultra Rare — voir PACK_TABLES. */
+     Ultra Secrète (0,3 %), Hyper Secrète (0,2 %) et Unique (1/10 000 en base,
+     1/8 000 dans le Pack Ultra Rare ; voir PACK_UNIQUE_CHANCE). */
   const RARITIES = {
     common:     { label: 'Commune',      rank: 0, weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
     uncommon:   { label: 'Inhabituelle', rank: 1, weight: 22,  color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 35,  fx: 'calm', next: 'rare' },
@@ -380,7 +379,7 @@
     secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: 'ultrasecret' },
     ultrasecret:{ label: 'Ultra Secrète',rank: 10, weight: 0.3, color: '#c084fc', ink: '#2a0a3d', glow: '#a855f7', reward: 1400, fx: 'gold', next: 'hypersecret' },
     hypersecret:{ label: 'Hyper Secrète',rank: 11, weight: 0.2, color: '#fb7185', ink: '#3d0714', glow: '#f43f5e', reward: 2200, fx: 'gold', next: 'unique' },
-    unique:     { label: 'Unique',       rank: 12, weight: 0.05, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 5000, fx: 'gold', next: null }
+    unique:     { label: 'Unique',       rank: 12, weight: 0.01, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 5000, fx: 'gold', next: null }
   };
 
   /* Une fusion ne peut jamais produire mieux qu'Ultra épique. */
@@ -391,8 +390,9 @@
 
   /* ====================================================== SYSTÈME DE TIRAGE
      Principe (refonte complète) : on tire d'abord la RARETÉ, puis la carte.
-     - Chaque pack a sa propre table de rareté (PACK_TABLES, en % par rareté,
-       somme = 100) et sa liste de slots (PACK_SLOTS). Un slot « std » tire
+     - Chaque pack a sa propre table de rareté (PACK_TABLES, poids relatifs
+       par rareté, renormalisés au tirage) et sa liste de slots (PACK_SLOTS).
+       Un slot « std » tire
        dans toute la table ; un slot { minRank } ne tire que dans les raretés
        de rang >= minRank (poids renormalisés) : c'est la garantie
        (« 1 Rare+ par pack classique », etc.).
@@ -405,15 +405,15 @@
        renormalisés sur les raretés disponibles. Si toutes les cartes d'une
        rareté tirée sont déjà au plafond, on retire une autre rareté.
      - Les chances Shiny restent multipliées par pack (rare ×2, ultra ×7).
-     Pour changer les probas, il suffit de modifier PACK_TABLES / PACK_SLOTS :
-     l'affichage des chances (renderOdds) et le tirage suivent automatiquement. */
+     Les probabilités Unique sont fixées dans PACK_UNIQUE_CHANCE ; pour les
+     autres raretés, modifier PACK_TABLES / PACK_SLOTS met à jour tirage et affichage. */
   const PACK_TABLES = {
-    classic: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.05 },
-    rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.05 },
-    doubleRare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.05 },
-    legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.05 },
-    video: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.05 },
-    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 20.5, divine: 14, secret: 10, ultrasecret: 0.8, hypersecret: 0.2, unique: 0.5 }
+    classic: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
+    rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
+    doubleRare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
+    legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
+    video: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
+    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 20.5, divine: 14, secret: 10, ultrasecret: 0.8, hypersecret: 0.2, unique: 0.0125 }
   };
   /* Slots par pack : 'std' = table complète ; { minRank } = garantie
      (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
@@ -426,6 +426,7 @@
     video: ['std', 'std'],
     ultra: ['std', 'std', { minRank: 4 }, { minRank: 6 }, { minRank: 7 }]
   };
+  const PACK_UNIQUE_CHANCE = { standard: 1 / 10000, ultra: 1 / 8000 };
   const PACK_SHINY_MULTIPLIER = { classic: 1, rare: 2, doubleRare: 2, legend: 1, video: 1, ultra: 7 };
   /* Coup de pouce « pack rentable » : probabilité qu'un pack dont la valeur
      brute (somme des récompenses de rareté, hors réduction doublon) est sous
@@ -1802,6 +1803,28 @@
     return weights;
   }
 
+  /* Partage de raretés réellement utilisé par le tirage et son affichage :
+     l'Unique a une probabilité fixe par carte, indépendamment des garanties. */
+  function slotRarityShares(packType, slot, pool) {
+    const weights = slotRarityWeights(packType, slot, pool);
+    const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+    if (total <= 0) return {};
+    const nonUniqueTotal = total - (weights.unique || 0);
+    const shares = {};
+    if (weights.unique > 0 && nonUniqueTotal > 0) {
+      const uniqueChance = packType === 'ultra'
+        ? PACK_UNIQUE_CHANCE.ultra
+        : PACK_UNIQUE_CHANCE.standard;
+      Object.entries(weights).forEach(([key, weight]) => {
+        if (key !== 'unique') shares[key] = (weight / nonUniqueTotal) * (1 - uniqueChance);
+      });
+      shares.unique = uniqueChance;
+      return shares;
+    }
+    Object.entries(weights).forEach(([key, weight]) => { shares[key] = weight / total; });
+    return shares;
+  }
+
   /* Tire une rareté selon ses poids (renormalisés). Renvoie null si vide. */
   function rollRarity(weights) {
     const keys = Object.keys(weights || {});
@@ -1831,6 +1854,16 @@
     Object.keys(weights).forEach((key) => {
       if (availableCards(key, packCounts, validPool, maxSame).length) usable[key] = weights[key];
     });
+    if (usable.unique && Object.keys(usable).some((key) => key !== 'unique')) {
+      const uniqueChance = packType === 'ultra'
+        ? PACK_UNIQUE_CHANCE.ultra
+        : PACK_UNIQUE_CHANCE.standard;
+      const uniqueCards = availableCards('unique', packCounts, validPool, maxSame);
+      if (uniqueCards.length && Math.random() < uniqueChance) {
+        return uniqueCards[Math.floor(Math.random() * uniqueCards.length)];
+      }
+      delete usable.unique;
+    }
     if (Object.keys(usable).length) weights = usable;
     const rarity = rollRarity(weights);
     if (!rarity) return null;
@@ -4616,11 +4649,9 @@
     const slots = packSlotsFor(type);
     const blended = {};
     slots.forEach((slot) => {
-      const weights = slotRarityWeights(type, slot, list);
-      const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
-      if (total <= 0) return;
-      Object.entries(weights).forEach(([key, w]) => {
-        blended[key] = (blended[key] || 0) + (w / total) / slots.length;
+      const shares = slotRarityShares(type, slot, list);
+      Object.entries(shares).forEach(([key, chance]) => {
+        blended[key] = (blended[key] || 0) + chance / slots.length;
       });
     });
     Object.entries(RARITIES).forEach(([key, r]) => {
@@ -4641,6 +4672,20 @@
     }
     if (type === 'video') {
       packOdds.append(el('span', 'pack-odds-video-note', 'PACK VIDÉO : 2 CARTES ANIMÉES · FPS, SON ET BOUCLE PAR CARTE'));
+    }
+    const shinyRates = CardMutations.definitions.find((mutation) => mutation.id === 'shiny')?.rates || {};
+    const shinyMultiplier = packShinyFor(type);
+    const totalShinyChance = Object.entries(blended).reduce((sum, [rarity, chance]) => {
+      return sum + chance * (shinyRates[rarity] || 0) * shinyMultiplier;
+    }, 0);
+    if (totalShinyChance > 0) {
+      packOdds.append(el('span', 'pack-odds-shiny-total',
+        `✦ Chance totale de Shiny par carte : 1 sur ${fmt(Math.round(1 / totalShinyChance))} (boost ×${shinyMultiplier})`));
+      const baseRates = Object.entries(RARITIES)
+        .filter(([rarity]) => shinyRates[rarity] > 0)
+        .map(([rarity, rarityInfo]) => `${rarityInfo.label} 1/${fmt(Math.round(1 / shinyRates[rarity]))}`)
+        .join(' · ');
+      packOdds.append(el('span', 'pack-odds-shiny-base', `Chances Shiny de base : ${baseRates}`));
     }
   }
 
