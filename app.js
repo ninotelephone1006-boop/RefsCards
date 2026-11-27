@@ -4315,22 +4315,42 @@
   on(buyBtn, 'pointerenter', () => SFX.tick());
 
   on(soundBtn, 'click', () => {
-    SFX.unlock();
+    /* setMuted(false) reprend le contexte et redemande le canal média iOS ;
+       le tick de confirmation est joué par audio.js. */
     const muted = !SFX.muted;
+    SFX.gesture();
     SFX.setMuted(muted);
     soundBtn.setAttribute('aria-pressed', String(muted));
     soundBtn.setAttribute('aria-label', muted ? 'Activer le son' : 'Couper le son');
     if (!muted) SFX.tick();
   });
 
-  function unlockOnce(e) {
-    SFX.unlock();
-    if (!SFX.muted && e.type === 'pointerdown') SFX.tick();
-    window.removeEventListener('pointerdown', unlockOnce);
-    window.removeEventListener('keydown', unlockOnce);
+  /* Déblocage du son : Safari iOS ne considère PAS `pointerdown` comme un
+     geste d'activation — seul le doigt levé (touchend / pointerup / click) ou
+     une touche de clavier débloquent l'AudioContext. On écoute donc tous ces
+     gestes : tant que le contexte n'est pas « running », chaque geste tente de
+     le réveiller (aucun coût une fois le son lancé). */
+  let soundRunning = false;
+  function gestureUnlock() {
+    if (typeof SFX.gesture !== 'function') return;
+    SFX.gesture();
+    const running = SFX.state() === 'running';
+    /* Petit clic à chaque (re)prise du son : la première activation et le
+       retour après un appel/verrouillage s'entendent tout de suite. */
+    if (running && !soundRunning && !SFX.muted) SFX.tick();
+    soundRunning = running;
   }
-  window.addEventListener('pointerdown', unlockOnce, { passive: true });
-  window.addEventListener('keydown', unlockOnce);
+  ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach((type) => {
+    window.addEventListener(type, gestureUnlock, { passive: true, capture: true });
+  });
+  /* iOS laisse le contexte « interrupted » après un appel, un verrouillage ou
+     le passage par une autre app : on le reprend au retour dans le jeu (puis
+     au geste suivant si iOS l'exige). */
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) gestureUnlock();
+  });
+  window.addEventListener('pageshow', gestureUnlock);
+  window.addEventListener('focus', gestureUnlock);
 
   /* ---------------------------------------------------- dimensionnement */
 

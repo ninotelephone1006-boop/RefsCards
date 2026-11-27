@@ -240,6 +240,16 @@ Tous les bruitages sont de **vrais fichiers audio téléchargés depuis GitHub**
 
 Pour changer un son : déposer le mp3 dans `assets/sounds/`, re-mesurer sa fenêtre utile et sa crête (voir `CREDITS.md`), mettre à jour la table `CUES` et `SOUND_VERSION` dans `audio.js`, puis incrémenter le `?v=` d'`audio.js` dans `index.html` — `node tests/sounds-github.cjs` (dans `npm test`) vérifie la cohérence de tout ça.
 
+### Son sur iPhone / iPad (Safari)
+
+Le Web Audio de Safari a trois particularités qui rendaient le jeu muet sur iPhone ; `audio.js` les traite toutes les trois :
+
+- **Déblocage.** Safari ne compte pas `pointerdown` (le doigt qui se pose) comme geste d'activation : un `AudioContext` créé là reste « suspended ». `Sound.gesture()` est donc appelé par `app.js` sur `pointerup`, `touchend`, `click` et `keydown`, et le contexte est repris à chaque geste tant qu'il ne tourne pas (un échantillon muet est joué dans le geste, et un petit *tick* confirme que le son est bien actif).
+- **Interruptions.** Après un appel, un verrouillage ou un passage dans une autre app, iOS laisse le contexte dans l'état « interrupted » (ni « running » ni « suspended ») : il est repris au geste suivant, au retour dans le jeu (`visibilitychange`, `pageshow`, `focus`) et dès qu'un son est demandé.
+- **Bouton silencieux.** iOS joue le Web Audio sur le canal « ambient », que le bouton silencieux coupe. Le moteur demande donc le canal « playback » (`navigator.audioSession.type = 'playback'`, Safari 16.4+) et, sur les iOS plus anciens, entretient une boucle `<audio playsinline>` (0,12 s de silence WAV intégré en base64, média audible mais fichier silencieux — iOS n’accorde le canal média qu’à un média audible) qui bascule la page sur le canal média : les bruitages sortent même avec l'iPhone en silencieux, comme une vidéo. Le bouton haut-parleur du HUD reste le seul interrupteur du son du jeu.
+
+`node tests/ios-audio.cjs` (dans `npm test`) simule un iPhone : contexte suspendu puis « interrupted », `audioSession` présent ou non, absence de doublon de la boucle muette, et vérifie que `app.js` écoute bien le doigt levé et non plus seulement `pointerdown`.
+
 ## Paramètres utiles
 
 - `?demo=1` : force un tirage de démonstration (aperçu de plusieurs raretés).
