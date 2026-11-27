@@ -6,17 +6,8 @@
 (() => {
   'use strict';
 
-  /* Boutique : les packs s'achètent dans le Shop et vont dans l'inventaire
-     (onglet Pack). Les prix sont réglés AU-DESSUS de la valeur moyenne d'un
-     pack (classique ≈ 451 🪙, rare ≈ 878 🪙, légende ≈ 788 🪙 pour 10 cartes,
-     vidéo ≈ 153 🪙 pour 2 cartes, ultra ≈ 1 964 🪙 — valeurs calculées depuis
-     les tables de rareté et les slots garantis, voir PACK_TABLES) : à 100 🪙,
-     chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait
-     infini. À 500 / 1 000 🪙, acheter fait perdre un peu en moyenne — sauf
-     coup de pouce « pack rentable » (PACK_PROFIT_CHANCE, plus bas) : avec la
-     probabilité annoncée par pack (1/2 classique et légende, 2/5 rare et
-     double rare, 1/3 vidéo et ultra rare), la valeur brute des cartes du
-     pack est remontée au moins au prix payé. */
+  /* Boutique : le bonus de rentabilité est propre à chaque pack ; le pack
+     classique n'en bénéficie pas afin de préserver ses taux par carte. */
   const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1700, legend: 800, video: 1000, ultra: 10000 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
 
@@ -276,7 +267,7 @@
      longue et la plus spectaculaire ; le classique reste punchy. */
   const PACK_OPENING = {
     classic: {
-      title: 'CLASSIQUE', sub: '5 cartes · 1 Rare+ garantie',
+      title: 'CLASSIQUE', sub: '5 cartes · taux fixes par carte',
       colors: ['#ffffff', '#c084fc', '#a855f7', '#f0abfc', '#e9d5ff'],
       burstDelay: 240, revealDelay: 820, sparks: 26, dots: 34, confetti: 26, rain: 0,
       shake: 'shake', sound: 'classic'
@@ -360,12 +351,8 @@
   }
   const TEAR_THRESHOLD = 0.75;
 
-  /* Treize raretés, du plus courant au plus rare. `weight` est la probabilité de
-     tirage (en %), `fx` le niveau de mise en scène (calm | rare | epic | gold)
-     et `next` la rareté obtenue par fusion. Les couleurs servent au cadre, au
-     badge, au titre et aux lueurs de la carte. Au-dessus de Secrète (0,5 %) :
-     Ultra Secrète (0,3 %), Hyper Secrète (0,2 %) et Unique (1/10 000 en base,
-     1/8 000 dans le Pack Ultra Rare ; voir PACK_UNIQUE_CHANCE). */
+  /* Treize raretés : propriétés visuelles, récompenses et fusions. Les taux
+     de tirage sont définis dans PACK_TABLES, indépendamment de ces propriétés. */
   const RARITIES = {
     common:     { label: 'Commune',      rank: 0, weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
     uncommon:   { label: 'Inhabituelle', rank: 1, weight: 22,  color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 35,  fx: 'calm', next: 'rare' },
@@ -388,27 +375,11 @@
 
   const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
 
-  /* ====================================================== SYSTÈME DE TIRAGE
-     Principe (refonte complète) : on tire d'abord la RARETÉ, puis la carte.
-     - Chaque pack a sa propre table de rareté (PACK_TABLES, poids relatifs
-       par rareté, renormalisés au tirage) et sa liste de slots (PACK_SLOTS).
-       Un slot « std » tire
-       dans toute la table ; un slot { minRank } ne tire que dans les raretés
-       de rang >= minRank (poids renormalisés) : c'est la garantie
-       (« 1 Rare+ par pack classique », etc.).
-     - La carte est ensuite tirée UNIFORMÉMENT parmi les cartes du pool qui
-       ont cette rareté (plafond de 2 copies par pack, 1 pour le Pack Vidéo).
-       Chaque carte d'une même rareté a donc exactement la même chance : les
-       pourcentages affichés sous le booster sont les vraies probabilités.
-     - Si une rareté n'a aucune carte dans le pool (ex. Pack Vidéo, qui ne
-       contient que des Rare/Épique), elle est écartée et les poids sont
-       renormalisés sur les raretés disponibles. Si toutes les cartes d'une
-       rareté tirée sont déjà au plafond, on retire une autre rareté.
-     - Les chances Shiny restent multipliées par pack (rare ×2, ultra ×7).
-     Les probabilités Unique sont fixées dans PACK_UNIQUE_CHANCE ; pour les
-     autres raretés, modifier PACK_TABLES / PACK_SLOTS met à jour tirage et affichage. */
+  /* Tables de tirage par pack. Les taux classiques sont des probabilités
+     par carte : pas de garantie, de plafond de doublons ni de bonus rentable.
+     Les autres packs conservent leurs garanties et règles spécifiques. */
   const PACK_TABLES = {
-    classic: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
+    classic: { common: 45.30, uncommon: 22, rare: 15, superrare: 7, epic: 5, ultraepic: 2.5, mythic: 1.2, legendary: 0.8, divine: 0.4, secret: 0.35, ultrasecret: 0.25, hypersecret: 0.17, unique: 0.03 },
     rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
     doubleRare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
     legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
@@ -419,7 +390,7 @@
      (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
      La longueur de la liste = nombre de cartes du pack (cf. PACK_CARD_COUNT). */
   const PACK_SLOTS = {
-    classic: ['std', 'std', 'std', 'std', { minRank: 2 }],
+    classic: ['std', 'std', 'std', 'std', 'std'],
     rare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
     doubleRare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }, 'std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
     legend: ['std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std'],
@@ -431,9 +402,9 @@
   /* Coup de pouce « pack rentable » : probabilité qu'un pack dont la valeur
      brute (somme des récompenses de rareté, hors réduction doublon) est sous
      son prix soit remonté au moins au prix payé (voir boostPackProfit).
-     Classique / Légende : 1 sur 2, Rare / Double Rare : 2 sur 5,
+     Légende : 1 sur 2, Rare / Double Rare : 2 sur 5,
      Vidéo / Ultra Rare : 1 sur 3. Un pack déjà rentable ne change pas. */
-  const PACK_PROFIT_CHANCE = { classic: 1 / 2, rare: 2 / 5, doubleRare: 2 / 5, legend: 1 / 2, video: 1 / 3, ultra: 1 / 3 };
+  const PACK_PROFIT_CHANCE = { classic: 0, rare: 2 / 5, doubleRare: 2 / 5, legend: 1 / 2, video: 1 / 3, ultra: 1 / 3 };
   function packProfitChanceFor(packType) {
     return PACK_PROFIT_CHANCE[packType] || 0;
   }
@@ -1620,7 +1591,7 @@
     const definitions = {
       classic: {
         title: 'Booster Classique',
-        desc: '5 cartes · 1 Rare+ garantie par pack.',
+        desc: '5 cartes · taux fixes par carte.',
         rare: false,
       },
       rare: {
@@ -1768,7 +1739,7 @@
   /* Nouveau moteur de tirage (voir PACK_TABLES / PACK_SLOTS plus haut) :
      1. on tire la rareté du slot (table du pack, garantie éventuelle),
      2. puis la carte, uniformément parmi les cartes de cette rareté.
-     Plafond : 2 copies d'une même carte par pack (1 pour le Pack Vidéo).
+     Plafond : 2 copies par pack (1 pour la vidéo), aucun en classique.
      Si la rareté tirée n'a plus de carte disponible (plafond atteint), on
      retire parmi les raretés encore disponibles. */
   const MAX_SAME_CARD_PER_PACK = 2;
@@ -1804,14 +1775,14 @@
   }
 
   /* Partage de raretés réellement utilisé par le tirage et son affichage :
-     l'Unique a une probabilité fixe par carte, indépendamment des garanties. */
+     hors classique, l'Unique a une probabilité fixe indépendamment des garanties. */
   function slotRarityShares(packType, slot, pool) {
     const weights = slotRarityWeights(packType, slot, pool);
     const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
     if (total <= 0) return {};
     const nonUniqueTotal = total - (weights.unique || 0);
     const shares = {};
-    if (weights.unique > 0 && nonUniqueTotal > 0) {
+    if (packType !== 'classic' && weights.unique > 0 && nonUniqueTotal > 0) {
       const uniqueChance = packType === 'ultra'
         ? PACK_UNIQUE_CHANCE.ultra
         : PACK_UNIQUE_CHANCE.standard;
@@ -1854,7 +1825,7 @@
     Object.keys(weights).forEach((key) => {
       if (availableCards(key, packCounts, validPool, maxSame).length) usable[key] = weights[key];
     });
-    if (usable.unique && Object.keys(usable).some((key) => key !== 'unique')) {
+    if (packType !== 'classic' && usable.unique && Object.keys(usable).some((key) => key !== 'unique')) {
       const uniqueChance = packType === 'ultra'
         ? PACK_UNIQUE_CHANCE.ultra
         : PACK_UNIQUE_CHANCE.standard;
@@ -1973,7 +1944,7 @@
     }
     /* Le Pack Vidéo ne tire que 2 cartes : on évite les doublons dès qu'il
        existe assez de cartes vidéo différentes (sinon le pool est rempli). */
-    const maxSame = packType === 'video' ? 1 : MAX_SAME_CARD_PER_PACK;
+    const maxSame = packType === 'classic' ? Infinity : packType === 'video' ? 1 : MAX_SAME_CARD_PER_PACK;
     packSlotsFor(packType).forEach((slot) => {
       if (drawn.length >= cardCountFor(packType)) return;
       const card = pickCardForSlot(packType, slot, packCounts, cardPool, maxSame);
@@ -4637,10 +4608,8 @@
     openInspect(cardById(slot.dataset.cardId));
   });
 
-  /* Probabilités affichées : moyenne des distributions de chaque slot
-     (table du pack + garanties, restreinte au pool). Ce sont exactement les
-     chances du tirage (drawPack) : changer PACK_TABLES / PACK_SLOTS met
-     l'affichage à jour tout seul. `boosted` est conservé pour compatibilité. */
+  /* Moyenne des taux de base par slot, adaptée aux garanties et au pool.
+     Hors classique, doublons et bonus de rentabilité peuvent les modifier. */
   function renderOdds(boosted, pool, packType) {
     if (!packOdds) return;
     packOdds.replaceChildren();
@@ -4661,10 +4630,13 @@
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const label = `${r.label} ${pct.toFixed(1).replace(/\.0$/, '').replace('.', ',')} %`;
+      const label = `${r.label} ${pct.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')} %`;
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
+    if (type !== 'classic') {
+      packOdds.append(el('span', 'pack-odds-video-note', 'Taux de base par carte avant plafond de doublons et bonus de rentabilité.'));
+    }
     if (type === 'ultra') {
       packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : GROSSES RARETÉS MASSIVEMENT BOOSTÉES · SHINY ×7'));
     } else if (type === 'rare' || type === 'doubleRare') {
@@ -4680,12 +4652,12 @@
     }, 0);
     if (totalShinyChance > 0) {
       packOdds.append(el('span', 'pack-odds-shiny-total',
-        `✦ Chance totale de Shiny par carte : 1 sur ${fmt(Math.round(1 / totalShinyChance))} (boost ×${shinyMultiplier})`));
+        `✦ Chance Shiny de base par carte : ${(totalShinyChance * 100).toFixed(2).replace('.', ',')} % (boost ×${shinyMultiplier})`));
       const baseRates = Object.entries(RARITIES)
         .filter(([rarity]) => shinyRates[rarity] > 0)
-        .map(([rarity, rarityInfo]) => `${rarityInfo.label} 1/${fmt(Math.round(1 / shinyRates[rarity]))}`)
+        .map(([rarity, rarityInfo]) => `${rarityInfo.label} ${(shinyRates[rarity] * 100 * shinyMultiplier).toFixed(3).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',')} %`)
         .join(' · ');
-      packOdds.append(el('span', 'pack-odds-shiny-base', `Chances Shiny de base : ${baseRates}`));
+      packOdds.append(el('span', 'pack-odds-shiny-base', `Chances Shiny par rareté : ${baseRates}`));
     }
   }
 
