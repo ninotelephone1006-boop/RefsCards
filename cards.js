@@ -647,6 +647,15 @@ const cardsDatabase = [
     emoji: '👁️',
     image: 'assets/Cartes/le-regard.jpg',
     color: '#fef08a'
+  },
+  {
+    id: 'sussy-fagar',
+    name: 'sussy fagar',
+    description: '',
+    rarity: 'unique',
+    emoji: '😛',
+    image: 'assets/Cartes/sussy-fagar.png',
+    color: '#fef08a'
   }
 ];
 
