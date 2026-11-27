@@ -624,7 +624,7 @@ const cardsDatabase = [
   {
     id: 'jeune-sapeur',
     name: 'Jeune bricoleur',
-    description: "",
+    description: " ",
     rarity: 'uncommon',
     emoji: '🚒',
     image: 'assets/Cartes/jeune-sapeur.jpg',
@@ -668,7 +668,7 @@ const cardsDatabase = [
   },
   {
     id: 'bierry-intellectuel',
-    name: 'la bierry intellectuel',
+    name: 'bierry intellectuel',
     description: '',
     rarity: 'ultraepic',
     emoji: '📖',
