@@ -4407,6 +4407,51 @@
   });
   window.addEventListener('orientationchange', handleResize);
 
+  /* ------------------------------------------- hauteur réelle de l'écran
+     La barre d'onglets est le dernier élément de la colonne : elle ne reste
+     collée en bas que si .app fait exactement la hauteur visible. Or, sur
+     mobile, `100dvh` n'est pas toujours recalculé pendant que la barre
+     d'adresse se replie, qu'un rebond de scroll est en cours ou que le clavier
+     s'ouvre — la barre « décroche » alors et le contenu saute. On mesure donc
+     la hauteur visible (visualViewport quand il existe) et on la publie dans
+     --app-h, sans jamais laisser le document lui-même défiler. */
+  /* Deux notions de hauteur, à ne pas confondre :
+     - la hauteur de MISE EN PAGE (`innerHeight`, = 100dvh) : celle que doit
+       faire .app pour coller aux bords ;
+     - la hauteur VISIBLE (visualViewport) : plus petite quand le clavier
+       s'ouvre ou qu'un zoom de saisie agrandit la page.
+     On garde la première (avec la seconde seulement si elle est plus
+     grande, cas d'un navigateur où innerHeight est en retard) : replier la
+     coquille sous le clavier ferait remonter la barre d'onglets au milieu de
+     l'écran et ferait sauter toutes les vues. Le défilement du document, lui,
+     est déjà interdit (html/body { overflow: hidden }). */
+  let appHeight = 0;
+  function syncAppHeight() {
+    const viewport = window.visualViewport;
+    const layout = Math.round(window.innerHeight || 0);
+    const visible = viewport && viewport.height > 0 ? Math.round(viewport.height) : 0;
+    // Une zone visible nettement plus courte que la mise en page = clavier
+    // ouvert (ou zoom de saisie) : on garde la coquille à la hauteur de la
+    // mise en page. Sinon (barre d'adresse repliée ou affichée) on suit la
+    // zone visible, qui est la seule à jour pendant ce temps-là.
+    const keyboard = layout > 0 && visible > 0 && visible < layout * 0.72;
+    const height = Math.max(240, keyboard ? layout : visible || layout);
+    if (!height || height === appHeight) return;
+    appHeight = height;
+    document.documentElement.style.setProperty('--app-h', `${height}px`);
+    handleResize();
+  }
+  syncAppHeight();
+  window.addEventListener('resize', syncAppHeight);
+  window.addEventListener('orientationchange', syncAppHeight);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncAppHeight);
+    window.visualViewport.addEventListener('scroll', syncAppHeight);
+  }
+  if (window.ResizeObserver) {
+    try { new ResizeObserver(syncAppHeight).observe(document.documentElement); } catch (error) { /* sans gravité */ }
+  }
+
   /* Un clic sur une vignette du butin ouvre la carte en grand. */
   on(recapSlots, 'click', (event) => {
     const slot = event.target.closest('.slot');
