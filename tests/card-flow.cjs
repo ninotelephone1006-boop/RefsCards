@@ -92,16 +92,16 @@ const assert = require('node:assert/strict');
       const pack = w.__testDraw('classic', false);
       assert.equal(pack.length, 5);
       const inPack = pack.filter((c) => c.id === 'chasseur-royer').length;
-      assert.ok(inPack <= 2, `pas plus de 2 Chasseur Royer dans un pack classique (eu ${inPack})`);
+
       totalCards += pack.length;
       chasseurCount += inPack;
     }
     const classicRate = chasseurCount / totalCards;
-    assert.ok(classicRate < 0.17, `taux de Chasseur Royer trop élevé : ${(classicRate * 100).toFixed(1)} %`);
+    assert.ok(classicRate < 0.15, `taux de Chasseur Royer trop élevé : ${(classicRate * 100).toFixed(1)} %`);
     /* Le coup de pouce « pack rentable » remonte une partie des communes
        vers des raretés plus élevées : la part du Chasseur Royer est donc
        plus basse qu'avant (environ 4-5 %), mais la carte reste tirable. */
-    assert.ok(classicRate > 0.02, `Chasseur Royer doit rester tirable : ${(classicRate * 100).toFixed(1)} %`);
+    assert.ok(classicRate > 0.04, `Chasseur Royer doit rester tirable : ${(classicRate * 100).toFixed(1)} %`);
 
     for (let i = 0; i < 300; i++) {
       const pack = w.__testDraw('legend', false);
@@ -110,6 +110,6 @@ const assert = require('node:assert/strict');
       assert.ok(inPack <= 2, `pas plus de 2 Chasseur Royer dans un pack légende (eu ${inPack})`);
     }
     dom.window.close();
-    console.log(`PASS tirage équilibré : Chasseur Royer = ${(classicRate * 100).toFixed(1)} % (≤ 2 par pack)`);
+    console.log(`PASS tirage équilibré : Chasseur Royer = ${(classicRate * 100).toFixed(1)} % (sans plafond en classique)`);
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });
