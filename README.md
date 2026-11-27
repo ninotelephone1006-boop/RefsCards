@@ -343,12 +343,12 @@ Le lecteur est utilisé partout : révélation, récap miniature, collection, in
 | `mythic` | Mythique | 3,5 % | 240 🪙 | gold |
 | `legendary` | Légendaire | 2,5 % | 340 🪙 | gold |
 | `divine` | Divine | 1,5 % | 520 🪙 | gold |
-| `secret` | Secrète | 0,5 % | 900 🪙 | gold |
+| `secret` | Secrète | 0,55 % | 900 🪙 | gold |
 | `ultrasecret` | Ultra Secrète | 0,3 % | 1400 🪙 | gold |
 | `hypersecret` | Hyper Secrète | 0,2 % | 2200 🪙 | gold |
-| `unique` | Unique | 0,1 % (1/1000) | 5000 🪙 | gold |
+| `unique` | Unique | 0,05 % (1/2000) · 0,5 % dans le Pack Ultra Rare (1/200) | 5000 🪙 | gold |
 
-Le tirage est pondéré par `weight` dans `RARITIES` (`app.js`) : si une rareté ne contient aucune carte, son poids est simplement ignoré et les autres se partagent le tirage. La fusion remonte la chaîne `next` (une Commune fusionne vers une Inhabituelle, etc.), la Unique étant au sommet. Les couleurs de cadre, de badge et de lueur viennent aussi de `RARITIES`.
+Les tables par pack vivent dans `PACK_TABLES` (`app.js`) : la Unique est à **1 chance sur 2000** dans les packs classiques (Classique, Légende, Vidéo) et à **1 chance sur 200** dans le Pack Ultra Rare, alors qu'elle était à 1/1000 partout auparavant. Le tirage est pondéré par `weight` dans `RARITIES` (`app.js`) : si une rareté ne contient aucune carte, son poids est simplement ignoré et les autres se partagent le tirage. La fusion remonte la chaîne `next` (une Commune fusionne vers une Inhabituelle, etc.), la Unique étant au sommet. Les couleurs de cadre, de badge et de lueur viennent aussi de `RARITIES`.
 
 L'image `assets/packet.png` fournie ici est un visuel temporaire créé pour le prototype : remplacez-la par votre propre image en conservant le même chemin. Le Pack Vidéo utilise `assets/packetvideo.png` : remplacez ce fichier par votre visuel en gardant le même chemin.
 
