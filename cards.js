@@ -656,6 +656,69 @@ const cardsDatabase = [
     emoji: '😛',
     image: 'assets/Cartes/sussy-fagar.png',
     color: '#fef08a'
+  },
+  {
+    id: 'lonely-fagarr',
+    name: 'Lonely Fagarr',
+    description: '',
+    rarity: 'common',
+    emoji: '🥀',
+    image: 'assets/Cartes/lonely-fagarr.jpg',
+    color: '#e6ebdf'
+  },
+  {
+    id: 'bierry-intellectuel',
+    name: 'la bierry intellectuel',
+    description: '',
+    rarity: 'ultraepic',
+    emoji: '📖',
+    image: 'assets/Cartes/bierry-intellectuel.jpg',
+    color: '#ff8ccb'
+  },
+  {
+    id: 'chiasse-bierry',
+    name: 'chiasse bierry',
+    description: '',
+    rarity: 'superrare',
+    emoji: '💩',
+    image: 'assets/Cartes/chiasse-bierry.jpg',
+    color: '#67e0d0'
+  },
+  {
+    id: 'saut-de-mathis',
+    name: 'le saut de mathis',
+    description: "c'est pas comme ça qu'on imagine la vie",
+    rarity: 'hypersecret',
+    emoji: '🪟',
+    image: 'assets/Cartes/saut-de-mathis.jpg',
+    color: '#fb7185'
+  },
+  {
+    id: 'babouin-mathis',
+    name: 'Babouin Mathis',
+    description: '',
+    rarity: 'divine',
+    emoji: '🐒',
+    image: 'assets/Cartes/babouin-mathis.jpg',
+    color: '#a7f3ff'
+  },
+  {
+    id: 'yanou-cris-staline',
+    name: 'Yanou cris staline',
+    description: '',
+    rarity: 'mythic',
+    emoji: '💧',
+    image: 'assets/Cartes/yanou-cris-staline.jpg',
+    color: '#ffa469'
+  },
+  {
+    id: 'rexy-soyer',
+    name: 'rexy soyer',
+    description: '',
+    rarity: 'ultraepic',
+    emoji: '😬',
+    image: 'assets/Cartes/rexy-soyer.jpg',
+    color: '#ff8ccb'
   }
 ];
 
