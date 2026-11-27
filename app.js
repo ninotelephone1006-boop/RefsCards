@@ -113,20 +113,23 @@
     'chapeau-noel': 'assets/deco/chapeau-noel.png',
     'chapeau-cowboy': 'assets/deco/chapeau-cowboy.png',
     'chapeau-sombrero': 'assets/deco/chapeau-sombrero.png',
-    'chapeau-beret': 'assets/deco/chapeau-beret.png'
+    'chapeau-beret': 'assets/deco/chapeau-beret.png',
+    'chapeau-onepiece': 'assets/deco/chapeau-onepiece.png'
   };
   const DECO_PRICES = {
     'chapeau-noel': 1500,
     'chapeau-cowboy': 1500,
     'chapeau-sombrero': 1500,
-    'chapeau-beret': 1500
+    'chapeau-beret': 1500,
+    'chapeau-onepiece': 1500
   };
   const DECO_TYPES = Object.keys(DECO_IMAGES);
   const DECO_LABELS = {
     'chapeau-noel': 'Chapeau de Noël',
     'chapeau-cowboy': 'Chapeau de cowboy',
     'chapeau-sombrero': 'Sombrero mexicain',
-    'chapeau-beret': 'Béret rouge'
+    'chapeau-beret': 'Béret rouge',
+    'chapeau-onepiece': 'Chapeau One Piece'
   };
   function isDecoType(id) { return DECO_TYPES.indexOf(id) >= 0; }
 
