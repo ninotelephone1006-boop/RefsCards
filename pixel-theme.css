@@ -1,0 +1,50 @@
+/* Refs Cards pixel edition — palette and stepped silhouettes inspired by RF. */
+:root {
+  --bg: #061070; --bg-2: #071b91; --panel: #091c8d;
+  --line: #3856da; --line-soft: #263eb9; --white: #fffdea;
+  --muted: #b9caff; --lime: #ffed00; --lime-dim: #ffb900; --gold: #ffda00;
+}
+html, body { background: #061070; }
+.app { background: #0719a2; }
+.bg-grid { inset: 0; background-image: linear-gradient(#6d9fff20 2px, transparent 2px), linear-gradient(90deg,#6d9fff20 2px,transparent 2px); background-size: 32px 32px; mask-image: none; -webkit-mask-image: none; opacity: .45; }
+.bg-glow { background: radial-gradient(circle,#123cf4 0%,transparent 65%); filter: none; }
+.hud { background: #061070; border-bottom: 3px solid #02073e; box-shadow: 0 3px 0 #426bff; }
+.brand-logo, .loading-logo, .game-logo { border-radius: 0; image-rendering: pixelated; box-shadow: 4px 4px 0 #02073e; }
+.brand-name, .loading-name { color: #fff; text-shadow: 2px 2px 0 #02073e; }
+.brand-name span, .loading-name span { color: #ffed00; }
+.season { color: #ffed00; }
+.icon-btn { border-radius: 0; border: 2px solid #5178ff; background: #1029ad; color: #ffed00; box-shadow: 2px 2px 0 #02073e; }
+.icon-btn:hover { background: #254cff; color: #fff; border-color: #ffed00; }
+.tabbar { background: #050e66; border-top: 3px solid #02073e; box-shadow: 0 -3px 0 #4c73ff; }
+.tab { color: #a9bfff; font-weight: 800; letter-spacing: 0; }
+.tab::before { inset: 4px 8%; border-radius: 0; background: #173abf; }
+.tab:hover { color: #fff; }
+.tab.is-active { color: #ffed00; }
+.tab.is-active svg { color: #ffed00; filter: drop-shadow(2px 2px 0 #02073e); }
+.tab-ind::before { width: 65%; height: 4px; border-radius: 0; background: #ffed00; box-shadow: 0 2px 0 #ff9d00; }
+.tab-badge { border-radius: 0; background: #ffed00; box-shadow: 2px 2px 0 #02073e; }
+.pixel-icon { image-rendering: pixelated; }
+.auth-screen, .loading-screen { background: #0719a2; background-image: linear-gradient(#7296ff20 2px,transparent 2px),linear-gradient(90deg,#7296ff20 2px,transparent 2px); background-size: 32px 32px; }
+.auth-card { background: #0a218e; border: 3px solid #ffdf00; border-radius: 0; box-shadow: 6px 6px 0 #02073e, inset 0 0 0 3px #3153da; }
+.auth-card .brand-logo { border-radius: 0; }
+.auth-card .kicker, .kicker, .auth-card h1 em, .pack-head h1 em, .reveal-head h2 em { color: #ffed00; }
+.auth-intro, .auth-free { color: #d3dfff; }
+.google-btn { border: 3px solid #02073e; border-radius: 0; box-shadow: 4px 4px 0 #02073e; }
+.loading-bar, .loading-bar i { border-radius: 0; }
+.loading-bar i { background: #ffed00; }
+/* Panels retain the original layout, while sharing the arcade cabinet frame. */
+.sheet-dialog, .market-block, .quest-card, .quest-toolbar, .friends-block, .requests-block, .admin-panel, .notif-settings {
+  background: #0a218b; border: 2px solid #5275ff; border-radius: 0; box-shadow: 4px 4px 0 #02073e;
+}
+.sheet-dialog h3, .quest-title, .coll-title h2 { color: #fffdea; }
+.quest-desc, .quest-toolbar-note, .coll-empty, .sheet-sub { color: #c8d6ff; }
+.buy-btn, .buy-btn.is-free, .next-card, .ghost-btn.primary, .mini-btn.primary, .quest-claim, .quest-claim-all {
+  background: #ffdf00; color: #07105e; border: 2px solid #02073e; border-radius: 0; box-shadow: 4px 4px 0 #02073e, inset 0 -4px 0 #ff9d00; text-shadow: none;
+}
+.buy-btn:hover:not(:disabled), .next-card:hover, .ghost-btn.primary:hover, .mini-btn.primary:hover { background: #fff45a; color: #07105e; }
+.buy-btn:disabled, .quest-claim:disabled, .quest-claim-all:disabled { background: #293d9a; color: #a2b4ea; box-shadow: none; }
+.ghost-btn, .mini-btn, .coll-fusion, .coll-sort-field, .coll-sort-dir { border-radius: 0; border-color: #6585ff; }
+.coll-bar, .quest-bar { border-radius: 0; background: #020d61; }
+.coll-bar i, .quest-bar i { background: #ffdf00; }
+.toast, .update-banner { border-radius: 0; background: #0a218b; border: 2px solid #ffdf00; box-shadow: 4px 4px 0 #02073e; }
+button:focus-visible, a:focus-visible, [role='button']:focus-visible { outline: 3px solid #ffed00; outline-offset: 3px; }
