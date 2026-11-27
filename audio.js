@@ -16,17 +16,33 @@
    muette : chaque cue déclare sa fenêtre utile (`in`/`out`), mesurée sur le
    décodage réel, pour que le son parte immédiatement.
 
-   API publique inchangée (app.js l'appelle via le proxy SFX) :
-     unlock, muted, setMuted, tearStart, tearUpdate, tearStop, rip, pop,
-     whoosh, deal, tick, snap, coin, chaChing, ultraOpen, packOpen, rarity.
+   API publique (app.js l'appelle via le proxy SFX) :
+     unlock, gesture, muted, setMuted, state, ios, tearStart, tearUpdate,
+     tearStop, rip, pop, whoosh, deal, tick, snap, coin, chaChing,
+     ultraOpen, packOpen, rarity.
    Si le navigateur n'a pas d'AudioContext (ou si un fichier manque), le jeu
    continue sans bruitage : aucune fonction ne lève d'exception.
+
+   iPhone / iPad (Safari) — trois pièges qui rendaient le jeu muet :
+   1. Safari ne compte pas `pointerdown` comme geste d'activation : un
+      AudioContext créé là reste « suspended ». `gesture()` est donc branché
+      sur touchend / pointerup / click / keydown, et le contexte est repris à
+      chaque geste tant qu'il ne tourne pas.
+   2. Après un appel, un verrouillage ou un changement d'app, iOS laisse le
+      contexte dans l'état « interrupted » (qui n'est ni « running » ni
+      « suspended ») : il est repris au retour dans le jeu et au geste suivant.
+   3. Le bouton silencieux coupe le canal « ambient » du Web Audio. Sur les
+      Safari qui exposent navigator.audioSession (iOS 17+), on demande le canal
+      « playback » ; ailleurs, une boucle <audio playsinline> de silence pur
+      (0,12 s de WAV en base64, aucun fichier à télécharger) est lancée dans le
+      geste : iOS la considère comme un média et fait basculer la page sur le
+      canal média, donc les bruitages sortent même avec le bouton silencieux.
    ========================================================================== */
 const Sound = (() => {
   'use strict';
 
   const SOUND_DIR = 'assets/sounds/';
-  const SOUND_VERSION = '2026.11.26-1';   // cache-busting, comme les ?v= des scripts
+  const SOUND_VERSION = '2026.11.27-1';   // cache-busting, comme les ?v= des scripts
 
   /* -------------------------------------------------------------- banque
      Clé = nom du fichier sur GitHub (sans .mp3). `in`/`out` = fenêtre utile
@@ -67,6 +83,8 @@ const Sound = (() => {
   let lastTick = 0;
   let lastCrackle = 0;
   let preloadTimer = null;
+  let silentEl = null;         // boucle muette <audio> (canal média iOS)
+  let sessionWanted = false;   // navigator.audioSession = « playback » demandé
 
   const buffers = new Map();   // nom → AudioBuffer décodé
   const pending = new Map();   // nom → Promise<AudioBuffer|null>
@@ -80,6 +98,41 @@ const Sound = (() => {
   const now = () => (ac ? ac.currentTime : 0);
   const rand = (a, b) => a + Math.random() * (b - a);
   const url = (name) => `${SOUND_DIR}${name}.mp3?v=${SOUND_VERSION}`;
+
+  /* iPhone / iPad, y compris Firefox et Chrome iOS (tous WebKit). */
+  const IOS = (() => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    if (/iPad|iPhone|iPod/.test(ua)) return true;
+    // iPadOS 13+ se présente comme un Mac de bureau : on reconnaît l'écran tactile.
+    return /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;
+  })();
+
+  /* 0,12 s de silence (WAV 8 kHz mono, 8 bits) intégré en base64 : aucune
+     requête réseau, aucune mise en cache à gérer. Joué en boucle par un
+     <audio playsinline>, il maintient la page sur le canal média d'iOS.
+     L'élément N'EST PAS muet et garde son volume à 1 : iOS n'accorde le canal
+     « playback » qu'à un média réellement audible — c'est le fichier lui-même
+     qui ne contient que du silence. */
+  const SILENT_WAV = 'data:audio/wav;base64,'
+    + 'UklGRuQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YcADAACAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA'
+    + 'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIA=';
 
   /* ---------------------------------------------------------------- setup */
 
@@ -97,6 +150,69 @@ const Sound = (() => {
     comp.connect(ac.destination);
   }
 
+  /* Canal « playback » : les bruitages sortent même avec le bouton silencieux
+     de l'iPhone, comme une vidéo. Safari 16.4+ expose navigator.audioSession ;
+     ailleurs, la boucle muette plus bas fait le même travail. */
+  function requestSession() {
+    if (sessionWanted) return;
+    const session = typeof navigator !== 'undefined' && navigator.audioSession;
+    if (!session) return;
+    try {
+      session.type = 'playback';
+      sessionWanted = true;
+    } catch (err) {
+      /* API refusée : la boucle muette prend le relais */
+    }
+  }
+
+  /* Filet pour les Safari sans navigator.audioSession (iOS < 17) : lancer un
+     média dans le geste fait basculer la page sur le canal média. L'élément
+     est réutilisé à chaque geste ; il reste audible aux yeux d'iOS (canal
+     playback) mais ne diffuse que du silence. */
+  function playSilentLoop() {
+    if (!IOS) return;
+    try {
+      if (!silentEl) {
+        silentEl = document.createElement('audio');
+        silentEl.setAttribute('playsinline', '');
+        silentEl.setAttribute('webkit-playsinline', '');
+        silentEl.setAttribute('aria-hidden', 'true');
+        silentEl.loop = true;
+        silentEl.preload = 'auto';
+        silentEl.muted = false;
+        silentEl.volume = 1;     // audible pour iOS : c'est un WAV de silence pur
+        silentEl.src = SILENT_WAV;
+        // Hors flux : ni clic, ni tabulation, ni lecteur visible.
+        silentEl.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none';
+        (document.body || document.documentElement).append(silentEl);
+      }
+      if (silentEl.paused) {
+        const played = silentEl.play();
+        if (played && typeof played.catch === 'function') played.catch(() => {});
+      }
+    } catch (err) {
+      /* le jeu continue sans son plutôt que de planter */
+    }
+  }
+
+  /* Un échantillon muet joué à l'intérieur du geste : Safari(iOS) considère
+     alors le contexte comme réellement activé. Volontairement sans await :
+     attendre la promesse de resume() ferait sortir du geste. */
+  function nudge() {
+    if (!ac || ac.state === 'closed') return;
+    try {
+      const src = ac.createBufferSource();
+      src.buffer = ac.createBuffer(1, 1, 22050);
+      src.connect(ac.destination);
+      src.start(0);
+      src.onended = () => {
+        try { src.disconnect(); } catch (err) { /* ignore */ }
+      };
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
   function unlock() {
     if (!ac) {
       const Ctx = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
@@ -110,12 +226,34 @@ const Sound = (() => {
       preload(FIRST_LOAD);
       scheduleRest();
     }
-    if (ac.state === 'suspended') ac.resume().catch(() => {});
+    if (ac.state !== 'running' && ac.state !== 'closed') {
+      try {
+        const resumed = ac.resume();
+        if (resumed && typeof resumed.catch === 'function') resumed.catch(() => {});
+      } catch (err) {
+        /* ignore */
+      }
+      nudge();
+    }
     return ac;
+  }
+
+  /* Appelé par app.js sur chaque geste (touchend, pointerup, click, keydown) :
+     c'est ce qui débloque vraiment Safari iOS, où pointerdown ne compte pas.
+     Idempotent et sans effet audible une fois le contexte lancé. */
+  function gesture() {
+    requestSession();
+    playSilentLoop();
+    return unlock();
   }
 
   function ready() {
     return !!ac && ac.state !== 'closed' && !muted;
+  }
+
+  /* État lisible du moteur (diagnostic + bouton son sur iPhone). */
+  function state() {
+    return ac ? ac.state : 'none';
   }
 
   /* ------------------------------------------------------- chargement mp3 */
@@ -204,6 +342,10 @@ const Sound = (() => {
 
   /* opts : { delay, gain, rate, pan, panTo, panTime } */
   function play(name, opts) {
+    /* Un son demandé alors que le contexte est encore « suspended » ou
+       « interrupted » (Safari iOS après un verrouillage) serait perdu :
+       on essaie d'abord de le réveiller, sans bloquer l'appelant. */
+    if (ac && ac.state !== 'running' && ac.state !== 'closed') unlock();
     if (!ready()) return;
     const cue = CUES[name];
     if (!cue) return;
@@ -263,6 +405,7 @@ const Sound = (() => {
   let tearWanted = false;
   let tearIntensity = 0;
   let tearPan = 0;
+  let tearNudged = false;      // un seul réveil du contexte par déchirure
 
   function applyTear() {
     if (!tear || !ac) return;
@@ -274,6 +417,7 @@ const Sound = (() => {
   }
 
   function tearStart() {
+    tearNudged = false;
     if (!ready() || tear || tearWanted) return;
     tearWanted = true;
     tearIntensity = 0;
@@ -305,6 +449,13 @@ const Sound = (() => {
   function tearUpdate(intensity, panValue) {
     tearIntensity = clamp(intensity || 0, 0, 1);
     if (typeof panValue === 'number') tearPan = panValue;
+    /* Le doigt bouge (geste réel) : si la boucle n'a pas pu démarrer faute de
+       contexte actif, on la relance une fois le contexte réveillé. */
+    if (tearWanted && !tear && !tearNudged) {
+      tearNudged = true;
+      unlock();
+      tearStart();
+    }
     if (!tear || !ac) return;
     applyTear();
 
@@ -322,6 +473,7 @@ const Sound = (() => {
 
   function tearStop() {
     tearWanted = false;
+    tearNudged = false;
     if (!tear) return;
     const ref = tear;
     tear = null;
@@ -363,6 +515,8 @@ const Sound = (() => {
 
   /* Survol / petit clic : clic d'interface accéléré, très discret. */
   function tick() {
+    // Comme play() : un tick demandé pendant une interruption réveille le son.
+    if (ac && ac.state !== 'running' && ac.state !== 'closed') unlock();
     if (!ready()) return;
     const t = performance.now();
     if (t - lastTick < 55) return;
@@ -486,11 +640,22 @@ const Sound = (() => {
 
   return {
     unlock,
+    gesture,
+    state,
+    get ios() { return IOS; },
     get muted() { return muted; },
     setMuted(value) {
       muted = !!value;
       if (master) master.gain.setTargetAtTime(muted ? 0 : 0.9, now(), 0.05);
       if (muted) tearStop();
+      else {
+        // Réactiver le son est aussi un geste : on en profite pour reprendre
+        // le contexte (appel, verrouillage) et redemander le canal « playback ».
+        requestSession();
+        playSilentLoop();
+        unlock();
+        tick();
+      }
     },
     /* Liste des bruitages GitHub utilisés (debug + tests). */
     get cues() { return Object.keys(CUES); },
