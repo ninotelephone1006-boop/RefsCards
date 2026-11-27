@@ -181,6 +181,22 @@ async function boot() {
   await wait(1200);
   assert.equal(store.playerProfiles.me.deco, '', 'retrait publié dans le profil public');
 
+  /* 8. Cohérence du catalogue Déco (dont Chapeau One Piece) : chaque carte du
+        Shop a son option dans l'éditeur admin et son fichier image sur disque,
+        et l'achat / équipement de chapeau-onepiece affiche bien son visuel. */
+  const shopDecoIds = [...doc.querySelectorAll('.deco-card[data-deco]')].map((n) => n.getAttribute('data-deco'));
+  const editorDecoIds = [...doc.querySelectorAll('#admin-deco-select option')].map((n) => n.value);
+  assert.ok(shopDecoIds.includes('chapeau-onepiece'), 'chapeau-onepiece présent dans le Shop');
+  assert.deepEqual(editorDecoIds, shopDecoIds, 'l’éditeur admin liste exactement les mêmes chapeaux que le Shop');
+  for (const id of shopDecoIds) {
+    assert.ok(fs.existsSync(`assets/deco/${id}.png`), `assets/deco/${id}.png doit exister`);
+  }
+  doc.getElementById('deco-toggle-chapeau-onepiece').click();
+  await wait(900);
+  assert.equal(store.playerSaves.me.decoEquipped, 'chapeau-onepiece');
+  assert.equal(doc.querySelector('.account-avatar-slot > .avatar-deco').getAttribute('src'),
+    'assets/deco/chapeau-onepiece.png', 'le chapeau One Piece s’affiche dans le HUD');
+
   w.close();
   console.log('PASS déco partout : HUD, Compte, amis, fiche ami, profil public, équiper/retirer');
 })().catch((error) => { console.error(error); process.exitCode = 1; });
