@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let allQuestIds = [];
+let allQuestRecords = [];
 
 function makeStore(save) {
   return {
@@ -138,7 +139,13 @@ const freshSave = () => ({
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
     const Q = vm.runInContext('RefsQuests', context);
-    allQuestIds = Q.QUESTS.map((q) => q.id);
+    allQuestRecords = Q.QUESTS.map((q) => ({
+      id: q.id,
+      metric: q.metric,
+      step: Q.chainInfo(q).step,
+      total: Q.chainInfo(q).total
+    }));
+    allQuestIds = allQuestRecords.map((q) => q.id);
     assert.equal(Q.QUESTS.length, 310, 'exactement 310 quêtes');
     assert.equal(Q.ACHIEVEMENTS.length, 28, 'exactement 28 succès');
     assert.equal(new Set(Q.QUESTS.map((q) => q.id)).size, 310, 'ids de quêtes uniques');
@@ -473,10 +480,16 @@ const freshSave = () => ({
     console.log('PASS quêtes par catégorie : choix hors ordre, pop, notifications uniques, anti-double gain, sauvegarde');
   }
 
-  /* Fin de liste : deux dernières actives, puis écran terminé. */
+  /* Fin de liste : les deux dernières chaînes actives, puis écran terminé. */
   {
+    const finalQuestByMetric = new Map();
+    for (const quest of allQuestRecords) {
+      if (quest.step === quest.total) finalQuestByMetric.set(quest.metric, quest.id);
+    }
+    const pendingIds = new Set(Array.from(finalQuestByMetric.values()).slice(-2));
+    assert.equal(pendingIds.size, 2, 'deux chaînes distinctes ont une dernière étape');
     const save = freshSave();
-    save.quests = allQuestIds.slice(0, -2);
+    save.quests = allQuestIds.filter((id) => !pendingIds.has(id));
     const { w, doc } = await boot(save);
     const tabs = [...doc.querySelectorAll('.quest-cat')];
     const visibleQuests = () => tabs.reduce((sum, tab) => {
