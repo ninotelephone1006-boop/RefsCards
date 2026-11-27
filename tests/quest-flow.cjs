@@ -1,6 +1,6 @@
 // Run with NODE_PATH pointing to a local jsdom installation: node tests/quest-flow.cjs
 // Vérifie le système de quêtes / succès / niveau / notifications :
-// - quests.js : 260 quêtes (dont des récompenses en PACKS, sans pièces), 28 succès, progression à vie (rétroactive), XP.
+// - quests.js : 310 quêtes (dont des récompenses en PACKS, sans pièces), 28 succès, progression à vie (rétroactive), XP.
 // - intégration : onglet Quêtes, une quête active par chaîne, réclamation libre, récompenses (pièces + XP), remplacement automatique, badges,
 //   succès qui se débloquent, panneau de notifications et persistance.
 const { JSDOM } = require('jsdom');
@@ -132,16 +132,16 @@ const freshSave = () => ({
 });
 
 (async () => {
-  /* ---------- 1. Données pures : 260 quêtes, 28 succès, XP, rétroactivité. ---------- */
+  /* ---------- 1. Données pures : 310 quêtes, 28 succès, XP, rétroactivité. ---------- */
   {
     const dom = new JSDOM('<!DOCTYPE html><body></body>', { url: 'https://refs-cards.test/', runScripts: 'outside-only' });
     const context = dom.getInternalVMContext();
     vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
     const Q = vm.runInContext('RefsQuests', context);
     allQuestIds = Q.QUESTS.map((q) => q.id);
-    assert.equal(Q.QUESTS.length, 260, 'exactement 260 quêtes');
+    assert.equal(Q.QUESTS.length, 310, 'exactement 310 quêtes');
     assert.equal(Q.ACHIEVEMENTS.length, 28, 'exactement 28 succès');
-    assert.equal(new Set(Q.QUESTS.map((q) => q.id)).size, 260, 'ids de quêtes uniques');
+    assert.equal(new Set(Q.QUESTS.map((q) => q.id)).size, 310, 'ids de quêtes uniques');
     assert.equal(new Set(Q.ACHIEVEMENTS.map((a) => a.id)).size, 28, 'ids de succès uniques');
     assert.ok(Q.QUESTS.every((q) => q.title && q.desc && q.metric && q.target >= 1 && q.reward),
       'chaque quête a un titre, un objectif et une récompense');
@@ -194,7 +194,7 @@ const freshSave = () => ({
     assert.equal(lvl(250).into, 150);
     assert.equal(lvl(300).level, 3);
     dom.window.close();
-    console.log('PASS données : 260 quêtes (dont récompenses en packs), 28 succès, progression rétroactive et niveaux cohérents');
+    console.log('PASS données : 310 quêtes (dont récompenses en packs), 28 succès, progression rétroactive et niveaux cohérents');
   }
 
   /* ---------- 2. Page Quêtes : onglet, quête active, verrouillage. ---------- */
@@ -209,7 +209,7 @@ const freshSave = () => ({
     doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
     assert.equal(doc.getElementById('app').dataset.tab, 'quests');
-    assert.equal(doc.getElementById('quests-count').textContent, '0 / 260 terminées · 16 en cours');
+    assert.equal(doc.getElementById('quests-count').textContent, '0 / 310 terminées · 16 en cours');
     assert.equal(doc.getElementById('level-value').textContent, '1');
     assert.equal(doc.getElementById('ach-count').textContent, '0 / 28');
     const claim = doc.querySelector('.quest-claim');
@@ -252,7 +252,7 @@ const freshSave = () => ({
     await wait(60);
     assert.equal(hook.state.coins, 100, '100 pièces de quête, le niveau ne crédite pas');
     assert.equal(hook.questState.xp, 150, '50 (quête) + 50 (a01) + 50 (a26 niveau 2) = 150 XP');
-    assert.deepEqual(doc.getElementById('quests-count').textContent, '1 / 260 terminées · 16 en cours');
+    assert.deepEqual(doc.getElementById('quests-count').textContent, '1 / 310 terminées · 16 en cours');
     assert.equal(doc.querySelector('.quest-title').textContent, 'Booster offert', 'étape suivante de la chaîne Boosters');
     assert.equal(doc.querySelectorAll('.quest-done-row').length, 1, 'quête 1 dans les terminées');
     assert.equal(doc.querySelector('.quest-claim').disabled, true, 'étape suivante pas encore réclamable (1 booster sur 2)');
@@ -303,7 +303,7 @@ const freshSave = () => ({
        récompense disponible tout de suite. */
     assert.equal(doc.querySelector('.quest-claim').disabled, false, 'quête 1 rétroactive : réclamable sans rien refaire');
     assert.ok(doc.querySelector('.quest-card').classList.contains('is-ready'), 'carte marquée « prête »');
-    assert.match(doc.getElementById('quests-count').textContent, /0 \/ 260 terminées · 16 en cours · récompense prête/);
+    assert.match(doc.getElementById('quests-count').textContent, /0 \/ 310 terminées · 16 en cours · récompense prête/);
     assert.equal(doc.getElementById('tab-badge-quests').hidden, false, 'badge de l’onglet allumé');
 
     /* Réclamation : +100 🪙, puis l'étape suivante (« 2 boosters », récompense
@@ -427,7 +427,7 @@ const freshSave = () => ({
     assert.equal(hook2.questState.baseline, undefined, 'aucun baseline à restaurer');
     second.doc.querySelector('[data-tab="quests"]').click();
     await wait(30);
-    assert.equal(second.doc.getElementById('quests-count').textContent, '1 / 260 terminées · 16 en cours', 'progression conservée');
+    assert.equal(second.doc.getElementById('quests-count').textContent, '1 / 310 terminées · 16 en cours', 'progression conservée');
     assert.equal(second.doc.querySelector('.quest-title').textContent, 'Booster offert', 'pas de retour en arrière');
     assert.ok(hook2.questState.notifications.length >= 1, 'notifications rechargées');
     second.w.close();

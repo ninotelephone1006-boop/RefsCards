@@ -496,6 +496,283 @@ const RefsQuests = (() => {
     metric: 'packsOpened', target: 1000, reward: { coins: 0, xp: 200, packs: { ultra: 1 } }
   });
 
+  /* ---- Saison 4 : 50 quêtes supplémentaires (q272 → q321), toutes faisables
+     à ce stade du jeu (la collection complète s'adapte au nombre réel de
+     cartes dans cardsDatabase, 59 actuellement). ---- */
+  const TOTAL_UNIQUE_CARDS = (typeof cardsDatabase !== 'undefined' && Array.isArray(cardsDatabase) && cardsDatabase.length)
+    ? cardsDatabase.length
+    : 59;
+
+  QUESTS.push(
+    /* Collection de cartes différentes (jusqu'à toutes les cartes du jeu) */
+    {
+      id: 'q272', icon: '📚', title: 'Grand collectionneur',
+      desc: 'Possède 33 cartes différentes.',
+      metric: 'unique', target: 33, reward: { coins: 1500, xp: 800, packs: { rare: 2 } }
+    },
+    {
+      id: 'q273', icon: '🗂️', title: 'Album bien rempli',
+      desc: 'Possède 36 cartes différentes.',
+      metric: 'unique', target: 36, reward: { coins: 0, xp: 900, packs: { legend: 2 } }
+    },
+    {
+      id: 'q274', icon: '🃏', title: 'Quarante visages',
+      desc: 'Possède 40 cartes différentes.',
+      metric: 'unique', target: 40, reward: { coins: 2000, xp: 1000, packs: { video: 1, legend: 1 } }
+    },
+    {
+      id: 'q275', icon: '🧭', title: 'Chasseur d’inédits',
+      desc: 'Possède 44 cartes différentes.',
+      metric: 'unique', target: 44, reward: { coins: 0, xp: 1200, packs: { legend: 2, video: 1 } }
+    },
+    {
+      id: 'q276', icon: '🏛️', title: 'Presque au bout',
+      desc: 'Possède 48 cartes différentes.',
+      metric: 'unique', target: 48, reward: { coins: 3000, xp: 1400, packs: { legend: 3 } }
+    },
+    {
+      id: 'q277', icon: '🌟', title: 'Dernière ligne droite',
+      desc: 'Possède 52 cartes différentes.',
+      metric: 'unique', target: 52, reward: { coins: 0, xp: 1600, packs: { video: 2, legend: 2 } }
+    },
+    {
+      id: 'q278', icon: '👑', title: 'Collection complète',
+      desc: `Possède toutes les ${TOTAL_UNIQUE_CARDS} cartes différentes du jeu.`,
+      metric: 'unique', target: TOTAL_UNIQUE_CARDS, reward: { coins: 5000, xp: 2500, packs: { ultra: 1, legend: 2 } }
+    },
+
+    /* Boosters ouverts (paliers intermédiaires jusqu'à 900) */
+    {
+      id: 'q279', icon: '📦', title: 'Déchireur acharné',
+      desc: 'Ouvre 325 boosters.',
+      metric: 'packsOpened', target: 325, reward: { coins: 0, xp: 1300, packs: { rare: 3 } }
+    },
+    {
+      id: 'q280', icon: '📦', title: 'Demi-millier dépassé',
+      desc: 'Ouvre 550 boosters.',
+      metric: 'packsOpened', target: 550, reward: { coins: 2500, xp: 1600, packs: { legend: 2 } }
+    },
+    {
+      id: 'q281', icon: '📦', title: 'Six cents boosters',
+      desc: 'Ouvre 600 boosters.',
+      metric: 'packsOpened', target: 600, reward: { coins: 0, xp: 1700, packs: { video: 2 } }
+    },
+    {
+      id: 'q282', icon: '📦', title: 'Sept cents boosters',
+      desc: 'Ouvre 700 boosters.',
+      metric: 'packsOpened', target: 700, reward: { coins: 3000, xp: 1850, packs: { legend: 3 } }
+    },
+    {
+      id: 'q283', icon: '📦', title: 'Huit cents boosters',
+      desc: 'Ouvre 800 boosters.',
+      metric: 'packsOpened', target: 800, reward: { coins: 0, xp: 2000, packs: { legend: 2, video: 2 } }
+    },
+    {
+      id: 'q284', icon: '📦', title: 'Aux portes des mille',
+      desc: 'Ouvre 900 boosters.',
+      metric: 'packsOpened', target: 900, reward: { coins: 4000, xp: 2200, packs: { legend: 3, video: 1 } }
+    },
+
+    /* Cartes en tout (doublons compris) */
+    {
+      id: 'q285', icon: '🃏', title: 'Montagne de cartes',
+      desc: 'Possède 1 200 cartes en tout (doublons compris).',
+      metric: 'total', target: 1200, reward: { coins: 2000, xp: 1500, packs: { rare: 3 } }
+    },
+    {
+      id: 'q286', icon: '🃏', title: 'Archives géantes',
+      desc: 'Possède 1 500 cartes en tout (doublons compris).',
+      metric: 'total', target: 1500, reward: { coins: 0, xp: 1700, packs: { legend: 3 } }
+    },
+    {
+      id: 'q287', icon: '🃏', title: 'Deux mille exemplaires',
+      desc: 'Possède 2 000 cartes en tout (doublons compris).',
+      metric: 'total', target: 2000, reward: { coins: 3500, xp: 1900, packs: { legend: 2, video: 1 } }
+    },
+    {
+      id: 'q288', icon: '🃏', title: 'Coffre-fort plein',
+      desc: 'Possède 2 500 cartes en tout (doublons compris).',
+      metric: 'total', target: 2500, reward: { coins: 0, xp: 2100, packs: { legend: 3, video: 2 } }
+    },
+    {
+      id: 'q289', icon: '🃏', title: 'Trois mille cartes',
+      desc: 'Possède 3 000 cartes en tout (doublons compris).',
+      metric: 'total', target: 3000, reward: { coins: 5000, xp: 2300, packs: { legend: 4 } }
+    },
+    {
+      id: 'q290', icon: '🏛️', title: 'Bibliothèque infinie',
+      desc: 'Possède 5 000 cartes en tout (doublons compris).',
+      metric: 'total', target: 5000, reward: { coins: 0, xp: 2600, packs: { ultra: 1, legend: 2 } }
+    },
+
+    /* Cartes shiny */
+    {
+      id: 'q291', icon: '✦', title: 'Six étincelles',
+      desc: 'Possède 6 cartes shiny.',
+      metric: 'shiny', target: 6, reward: { coins: 0, xp: 900, packs: { rare: 2 } }
+    },
+    {
+      id: 'q292', icon: '✦', title: 'Huit étincelles',
+      desc: 'Possède 8 cartes shiny.',
+      metric: 'shiny', target: 8, reward: { coins: 1500, xp: 1100, packs: { legend: 1 } }
+    },
+    {
+      id: 'q293', icon: '✦', title: 'Douzaine brillante',
+      desc: 'Possède 12 cartes shiny.',
+      metric: 'shiny', target: 12, reward: { coins: 0, xp: 1400, packs: { legend: 2, video: 1 } }
+    },
+    {
+      id: 'q294', icon: '✦', title: 'Constellation shiny',
+      desc: 'Possède 18 cartes shiny.',
+      metric: 'shiny', target: 18, reward: { coins: 2500, xp: 1700, packs: { legend: 3 } }
+    },
+
+    /* Raretés (exemplaires possédés) */
+    {
+      id: 'q295', icon: '🔵', title: 'Raretés en pagaille',
+      desc: 'Possède 250 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 250, reward: { coins: 2000, xp: 1500, packs: { rare: 3 } }
+    },
+    {
+      id: 'q296', icon: '🔵', title: 'Déluge de Rares',
+      desc: 'Possède 350 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 350, reward: { coins: 0, xp: 1700, packs: { legend: 3 } }
+    },
+    {
+      id: 'q297', icon: '🔵', title: 'Cinq cents Rares',
+      desc: 'Possède 500 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 500, reward: { coins: 3500, xp: 2000, packs: { legend: 2, video: 1 } }
+    },
+    {
+      id: 'q298', icon: '🔵', title: 'Océan de raretés',
+      desc: 'Possède 750 cartes Rares ou plus.',
+      metric: 'rarePlus', target: 750, reward: { coins: 0, xp: 2300, packs: { legend: 4 } }
+    },
+    {
+      id: 'q299', icon: '🟣', title: 'Tempête épique',
+      desc: 'Possède 125 cartes Épiques ou plus.',
+      metric: 'epicPlus', target: 125, reward: { coins: 2000, xp: 1600, packs: { legend: 2 } }
+    },
+    {
+      id: 'q300', icon: '🟣', title: 'Cent cinquante Épiques',
+      desc: 'Possède 150 cartes Épiques ou plus.',
+      metric: 'epicPlus', target: 150, reward: { coins: 0, xp: 1800, packs: { legend: 2, video: 1 } }
+    },
+    {
+      id: 'q301', icon: '🟣', title: 'Deux cents Épiques',
+      desc: 'Possède 200 cartes Épiques ou plus.',
+      metric: 'epicPlus', target: 200, reward: { coins: 3500, xp: 2000, packs: { legend: 3 } }
+    },
+    {
+      id: 'q302', icon: '🟣', title: 'Empire épique',
+      desc: 'Possède 300 cartes Épiques ou plus.',
+      metric: 'epicPlus', target: 300, reward: { coins: 0, xp: 2300, packs: { legend: 3, video: 2 } }
+    },
+    {
+      id: 'q303', icon: '👑', title: 'Soixante Légendaires',
+      desc: 'Possède 60 cartes Légendaires ou plus.',
+      metric: 'legendaryPlus', target: 60, reward: { coins: 3000, xp: 1900, packs: { legend: 2 } }
+    },
+    {
+      id: 'q304', icon: '👑', title: 'Panthéon doré',
+      desc: 'Possède 75 cartes Légendaires ou plus.',
+      metric: 'legendaryPlus', target: 75, reward: { coins: 0, xp: 2100, packs: { legend: 3, video: 1 } }
+    },
+    {
+      id: 'q305', icon: '👑', title: 'Cent Légendaires',
+      desc: 'Possède 100 cartes Légendaires ou plus.',
+      metric: 'legendaryPlus', target: 100, reward: { coins: 5000, xp: 2500, packs: { ultra: 1 } }
+    },
+
+    /* Packs achetés dans le Shop */
+    {
+      id: 'q306', icon: '🛍️', title: 'Client VIP',
+      desc: 'Achète 175 packs dans le Shop.',
+      metric: 'packsBought', target: 175, reward: { coins: 0, xp: 1500, packs: { rare: 3 } }
+    },
+    {
+      id: 'q307', icon: '🛍️', title: 'Deux cents achats',
+      desc: 'Achète 200 packs dans le Shop.',
+      metric: 'packsBought', target: 200, reward: { coins: 2500, xp: 1700, packs: { legend: 2 } }
+    },
+    {
+      id: 'q308', icon: '🛍️', title: 'Roi du Shop',
+      desc: 'Achète 250 packs dans le Shop.',
+      metric: 'packsBought', target: 250, reward: { coins: 0, xp: 1900, packs: { legend: 3 } }
+    },
+    {
+      id: 'q309', icon: '🛍️', title: 'Trois cents packs achetés',
+      desc: 'Achète 300 packs dans le Shop.',
+      metric: 'packsBought', target: 300, reward: { coins: 4000, xp: 2200, packs: { legend: 2, video: 2 } }
+    },
+
+    /* Fusions */
+    {
+      id: 'q310', icon: '⚗️', title: 'Maître de la forge',
+      desc: 'Réalise 175 fusions.',
+      metric: 'fusions', target: 175, reward: { coins: 2000, xp: 1600, packs: { rare: 3 } }
+    },
+    {
+      id: 'q311', icon: '⚗️', title: 'Deux cents fusions',
+      desc: 'Réalise 200 fusions.',
+      metric: 'fusions', target: 200, reward: { coins: 0, xp: 1850, packs: { legend: 3 } }
+    },
+    {
+      id: 'q312', icon: '⚗️', title: 'Grand alchimiste',
+      desc: 'Réalise 250 fusions.',
+      metric: 'fusions', target: 250, reward: { coins: 3500, xp: 2100, packs: { legend: 2, video: 2 } }
+    },
+
+    /* Marché */
+    {
+      id: 'q313', icon: '🏷️', title: 'Vingt-cinq ventes',
+      desc: 'Encaisse 25 ventes sur le marché.',
+      metric: 'marketSales', target: 25, reward: { coins: 0, xp: 900, packs: { rare: 2 } }
+    },
+    {
+      id: 'q314', icon: '🏷️', title: 'Empire commercial',
+      desc: 'Encaisse 200 ventes sur le marché.',
+      metric: 'marketSales', target: 200, reward: { coins: 4000, xp: 2000, packs: { legend: 3 } }
+    },
+    {
+      id: 'q315', icon: '🛒', title: 'Douze trouvailles',
+      desc: 'Achète 12 cartes sur le marché.',
+      metric: 'marketBuys', target: 12, reward: { coins: 0, xp: 750, packs: { rare: 2 } }
+    },
+    {
+      id: 'q316', icon: '🛒', title: 'Collectionneur du marché',
+      desc: 'Achète 125 cartes sur le marché.',
+      metric: 'marketBuys', target: 125, reward: { coins: 3000, xp: 1900, packs: { legend: 2, video: 1 } }
+    },
+
+    /* Quêtes terminées & niveaux */
+    {
+      id: 'q317', icon: '🏆', title: 'Héros des quêtes',
+      desc: 'Termine 275 quêtes.',
+      metric: 'questsDone', target: 275, reward: { coins: 3000, xp: 2000, packs: { legend: 3 } }
+    },
+    {
+      id: 'q318', icon: '🏆', title: 'Trois cents quêtes',
+      desc: 'Termine 300 quêtes.',
+      metric: 'questsDone', target: 300, reward: { coins: 5000, xp: 2500, packs: { ultra: 1, video: 2 } }
+    },
+    {
+      id: 'q319', icon: '⭐', title: 'Niveau 55',
+      desc: 'Atteins le niveau 55.',
+      metric: 'level', target: 55, reward: { coins: 0, xp: 0, packs: { legend: 3 } }
+    },
+    {
+      id: 'q320', icon: '⭐', title: 'Niveau 60',
+      desc: 'Atteins le niveau 60.',
+      metric: 'level', target: 60, reward: { coins: 0, xp: 0, packs: { legend: 2, video: 2 } }
+    },
+    {
+      id: 'q321', icon: '🌟', title: 'Niveau 65',
+      desc: 'Atteins le niveau 65.',
+      metric: 'level', target: 65, reward: { coins: 0, xp: 0, packs: { ultra: 1, legend: 2 } }
+    }
+  );
+
   /* ------------------------------------------------------------ les 30 succès
      Non séquentiels : chacun se débloquera dès que sa condition sera vraie,
      y compris rétroactivement pour un joueur qui a déjà beaucoup progressé. */

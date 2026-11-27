@@ -9553,13 +9553,13 @@
 
   /* Toutes les métriques mesurables, calculées depuis l'état du jeu. */
   function questCtx() {
-    const owned = CardMutations.owned(collectionIds());
     const uniqueIds = new Set();
     let rarePlus = 0;
     let epicPlus = 0;
     let legendaryPlus = 0;
     let shiny = 0;
-    for (const card of owned) {
+    for (const card of state.collection) {
+      if (!card) continue;
       uniqueIds.add(card.baseId || card.id);
       const info = RARITIES[card.rarity];
       if (!info) continue;
@@ -9578,7 +9578,7 @@
       marketBuys: Math.max(0, Number(state.marketBuys) || 0),
       friends: friends.length,
       unique: uniqueIds.size,
-      total: owned.length,
+      total: state.collection.length,
       rarePlus,
       epicPlus,
       legendaryPlus,
