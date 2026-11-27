@@ -858,41 +858,58 @@ const RefsQuests = (() => {
     { id: 'wealth', icon: '💰', label: 'Fortune', metrics: ['coins'] }
   ];
 
+  const CATEGORY_BY_METRIC = new Map();
+  const QUEST_CHAINS = new Map();
+  const QUEST_INDEX_BY_ID = new Map();
+  for (const category of CATEGORIES) {
+    for (const metric of category.metrics) CATEGORY_BY_METRIC.set(metric, category.id);
+  }
+  for (const quest of QUESTS) {
+    if (!QUEST_CHAINS.has(quest.metric)) QUEST_CHAINS.set(quest.metric, []);
+    QUEST_CHAINS.get(quest.metric).push(quest);
+  }
+  for (const chain of QUEST_CHAINS.values()) {
+    chain.sort((a, b) => a.target - b.target || a.id.localeCompare(b.id));
+    chain.forEach((quest, index) => QUEST_INDEX_BY_ID.set(quest.id, index));
+  }
+
   function categoryOf(quest) {
-    const cat = CATEGORIES.find((c) => c.metrics.indexOf(quest && quest.metric) >= 0);
-    return cat ? cat.id : CATEGORIES[0].id;
+    return CATEGORY_BY_METRIC.get(quest && quest.metric) || CATEGORIES[0].id;
   }
 
   function chainOf(quest) {
-    return QUESTS.filter((q) => q.metric === quest.metric)
-      .sort((a, b) => a.target - b.target || a.id.localeCompare(b.id));
+    return QUEST_CHAINS.get(quest && quest.metric) || [];
   }
 
   /* { step, total } d'une quête dans sa chaîne. */
   function chainInfo(quest) {
     const chain = chainOf(quest);
-    return { step: chain.findIndex((q) => q.id === quest.id) + 1, total: chain.length };
+    const index = QUEST_INDEX_BY_ID.get(quest && quest.id);
+    return { step: index === undefined ? 0 : index + 1, total: chain.length };
   }
 
   /* Étape suivante de la chaîne (annoncée, jamais cachée), ou null. */
   function nextInChain(quest, completedIds) {
     const done = new Set(Array.isArray(completedIds) ? completedIds : []);
     const chain = chainOf(quest);
-    const i = chain.findIndex((q) => q.id === quest.id);
-    return chain.slice(i + 1).find((q) => !done.has(q.id)) || null;
+    const index = QUEST_INDEX_BY_ID.get(quest && quest.id);
+    if (index === undefined) return chain.find((entry) => !done.has(entry.id)) || null;
+    for (let i = index + 1; i < chain.length; i++) {
+      if (!done.has(chain[i].id)) return chain[i];
+    }
+    return null;
   }
 
-  /* Quêtes actives : la première étape non réclamée de chaque chaîne, rangées
-     par catégorie. Les paramètres `quests` / `windowSize` sont ignorés (gardés
-     pour compatibilité). */
+  /* Quêtes actives : première étape non réclamée par chaîne. Les chaînes sont
+     triées une seule fois au chargement, plutôt qu'à chaque rendu du panneau. */
   function activeQuests(completedIds) {
     const done = new Set(Array.isArray(completedIds) ? completedIds : []);
     const active = [];
     for (const cat of CATEGORIES) {
       for (const metric of cat.metrics) {
-        const first = QUESTS.filter((q) => q.metric === metric)
-          .sort((a, b) => a.target - b.target || a.id.localeCompare(b.id))
-          .find((q) => !done.has(q.id));
+        const chain = QUEST_CHAINS.get(metric);
+        if (!chain) continue;
+        const first = chain.find((quest) => !done.has(quest.id));
         if (first) active.push(first);
       }
     }
