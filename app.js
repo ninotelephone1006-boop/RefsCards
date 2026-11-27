@@ -438,6 +438,12 @@
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n);
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  /* L'onglet du jeu est-il au premier plan ? Le temps réel (onSnapshot) et les
+     rechargements d'onglet sont suspendus en arrière-plan : Firestore garde
+     sinon les écouteurs ouverts, et chaque changement chez un autre joueur
+     coûte une lecture qui s'impute au quota gratuit. Le garde-fou `hidden`
+     couvre aussi les tests (DOM sans onglet visible). */
+  const pageVisible = () => typeof document === 'undefined' || document.hidden !== true;
 
   /* Son : si audio.js plante ou manque, le jeu continue sans bruitage. */
   const SFX = new Proxy({}, {
@@ -5006,15 +5012,13 @@
     /* Réglage global des chapeaux : lu (et suivi en temps réel) pour TOUS les
        joueurs, juste après le profil — `creator: true` est alors publié. */
     loadDecoLayouts();
-    loadFriendRequests();
-    subscribeFriendRequests();
     /* Échanges désactivés : seul le marché existe (cartes + packs en vente).
-       Les anciennes propositions trades/ ne sont plus chargées ni proposées. */
-    loadMarket();
-    subscribeMarket();
-    /* Jeux (pile ou face) : défis entre amis en temps réel. */
-    loadFlipGames();
-    subscribeFlipGames();
+       Les anciennes propositions trades/ ne sont plus chargées ni proposées.
+       Le réseau social (amis, marché, cadeaux, défis) n'est branché qu'à
+       l'ouverture de l'onglet « En ligne » : voir openSocialHub(). Ici, on
+       garde seulement de quoi afficher les badges de l'onglet et prévenir
+       hors jeu. */
+    refreshSocial({ includeGlobal: false });
     if (authScreen) authScreen.hidden = true;
     hideLoading();
     gameRegions.forEach((region) => region.removeAttribute('inert'));
@@ -5072,8 +5076,15 @@
     sentGifts = [];
     knownGiftIds = new Set();
     hadGiftSnapshot = false;
+    socialHubOpen = false;
+    socialLive = false;
+    socialDeferred = false;
     unsubscribeMarket();
     unsubscribeFlipGames();
+    if (friendRequestsUnsub) {
+      try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
+      friendRequestsUnsub = null;
+    }
     flipGames = [];
     hadFlipSnapshot = false;
     flipAnimated.clear();
@@ -5318,6 +5329,9 @@
   function setTab(tab) {
     if (app.dataset.tab === tab) return;
     app.dataset.tab = tab;
+    /* On quitte « En ligne » : on ferme ses écoutes temps réel (elles
+       reprendront à la prochaine ouverture, cf. openSocialHub). */
+    if (tab !== 'online' && typeof closeSocialHub === 'function') closeSocialHub();
     tabs.forEach((t) => {
       const on = t.dataset.tab === tab;
       t.classList.toggle('is-active', on);
@@ -5354,12 +5368,9 @@
       updateQuestBadges();
     } else if (tab === 'online') {
       renderOnline();
-      if (onlinePanel === 'leaderboard') loadLeaderboard();
-      loadMarket();
-      loadGlobalMarket();
-      loadFriendRequests();
-      loadFlipGames();
-      if (selectedFriendUid) loadFriendListings(selectedFriendUid);
+      /* Le temps réel n'est branché que sur cet onglet (et seulement s'il
+         reste ouvert) ; le reste du jeu travaille à la demande. */
+      openSocialHub();
     } else if (tab === 'pack') {
       renderPackInventory();
       // Les vues Pack étaient masquées : on remesure tout.
@@ -5838,6 +5849,25 @@
 
   const RULES_HELP = 'Accès Firestore refusé (permission-denied). Vérifie le projet Firebase, la connexion et les règles publiées ; une opération peut aussi être incompatible avec ces règles. Voir la console et le README.';
 
+  /* Quota gratuit Firestore épuisé (plan Spark : 50 000 lectures/jour,
+     20 000 écritures/jour). C'est un refus temporaire, pas une règle
+     mal publiée : les compteurs repartent à minuit heure du Pacifique. */
+  function isQuotaExceeded(error) {
+    if (!error) return false;
+    const code = String(error.code || '').toLowerCase().replace(/_/g, '-');
+    return code === 'resource-exhausted'
+      || /quota exceeded/i.test(String(error.message || ''));
+  }
+
+  const QUOTA_HELP = 'Quota gratuit Firestore atteint (50 000 lectures ou 20 000 écritures par jour). L’action est refusée jusqu’à la remise à zéro, à minuit heure du Pacifique (environ 9 h en France).';
+
+  /* Message adapté à l'erreur : quota épuisé, règles refusées, ou texte fourni. */
+  function cloudErrorHelp(error, fallback) {
+    if (isQuotaExceeded(error)) return QUOTA_HELP;
+    if (isPermissionDenied(error)) return RULES_HELP;
+    return (error && error.message) || fallback;
+  }
+
   /* Journalise l'erreur cloud et, la première fois qu'un refus de règles
      survient durant la session, affiche un toast explicite. Renvoie true
      quand il s'agissait d'un refus de règles (pour adapter le message). */
@@ -5849,6 +5879,14 @@
         showToast(`Accès cloud refusé : ${context}. Voir la console et le README.`);
       }
       return true;
+    }
+    if (isQuotaExceeded(error)) {
+      console.warn(`${context}: quota gratuit Firestore atteint (resource-exhausted).`, error);
+      if (!rulesHelpShown) {
+        rulesHelpShown = true;
+        showToast(`Quota Firebase du jour atteint : ${context}. Le jeu repart à minuit heure du Pacifique.`);
+      }
+      return false;
     }
     console.warn(`${context}:`, error);
     return false;
@@ -6836,6 +6874,9 @@
     }
     hadRequests = true;
     renderOnline();
+    /* Une acceptation d'ami ouvre des ventes/cadeaux : on relit le petit
+       marché (mes annonces, cadeaux, offres) pour que les badges suivent. */
+    if (fresh.length && socialLive) refreshSocialLive();
   }
 
   async function updateFriendRequest(id, patch) {
@@ -7211,8 +7252,13 @@
   }));
   setShopTab('packs');
 
-  function renderOnline() {
+  /* `staleFriendListings` : l'appelant sait que les ventes de l'ami ont pu
+     changer (retour sur l'onglet, action). Les redessins internes (profil
+     d'un ami qui arrive, etc.) ne doivent PAS invalider le cache : c'est ce
+     qui provoquait une relecture des annonces à chaque redessin. */
+  function renderOnline({ staleFriendListings = false } = {}) {
     if (!onlineView) return;
+    if (staleFriendListings && selectedFriendUid) friendListingsStale = true;
     renderMarket();
     renderGlobalMarket();
     if (friendsCount) friendsCount.textContent = String(friends.length);
@@ -7220,6 +7266,9 @@
     if (friendsList) {
       const frag = document.createDocumentFragment();
       friends.forEach((uid) => {
+        /* Profil déjà connu : on garde la version en cache (elle est
+           rafraîchie à l'ouverture de la fiche, sur demande). Recharger
+           chaque profil à chaque redessin coûtait une lecture par ami. */
         if (!friendProfiles.has(uid)) {
           const owner = currentUser && currentUser.uid;
           fetchFriendProfile(uid).then(() => {
@@ -7549,6 +7598,12 @@
      pseudos, prix et actions apparaissent quand on ouvre une carte. */
   let globalListings = [];
   let globalListingsLoaded = false;
+  /* Durée de fraîcheur du marché global : ouvert puis refermé, puis rouvert
+     moins de 2 minutes après, la liste est réaffichée sans relire Firestore. */
+  const GLOBAL_MARKET_TTL_MS = 2 * 60 * 1000;
+  /* Les ventes affichées sur la fiche d'un ami ont pu changer (achat, retrait
+     entre-temps) : à relire à la prochaine ouverture de la fiche. */
+  let friendListingsStale = true;
   let marketGifts = [];
   let receivedOffers = [];
   let sentOffers = [];
@@ -7947,10 +8002,14 @@
      Chaque requête est indépendante : un refus de règles sur l'une d'elles
      ne doit pas laisser tout le marché vide (c'était le cas avant : une
      requête refusée masquait aussi les ventes et les cadeaux reçus). */
-  async function loadMarket() {
+  /* Chargement manuel du marché (bouton « Actualiser », sous-onglet Récupérer,
+     transactions). `collections` limite les requêtes à celles demandées. */
+  async function loadMarket({ collections } = {}) {
     if (!cloudReady()) return false;
     const uid = currentUser.uid;
+    const wanted = (name) => !collections || collections.includes(name);
     const fetchAll = (collName, field, value, label) => {
+      if (!wanted(collName)) return Promise.resolve(null);
       const coll = cloudDb.collection(collName);
       if (typeof coll.where !== 'function') return Promise.resolve(null);
       return coll.where(field, '==', value).get().then(
@@ -8032,6 +8091,11 @@
             if (marketBusy) return; // la transaction en cours va rafraîchir elle-même
             renderMarket();
             announceIncomingGifts();
+            /* Cadeaux reçus ou offres reçues : on veut aussi le reste (un
+               cadeau peut arriver en même temps qu'une offre). Les requêtes
+               sont groupées par refreshSocialLive (2,5 s), donc une salve de
+               plusieurs documents ne coûte qu'une relecture. */
+            if (collName !== 'marketListings') refreshSocialLive();
           } catch (error) { noteCloudError(label, error); }
         }, (error) => noteCloudError(label, error));
         if (typeof stop === 'function') stops.push(stop);
@@ -8060,6 +8124,15 @@
   function unsubscribeMarket() {
     if (marketUnsub) marketUnsub();
     marketUnsub = null;
+  }
+
+  /* Après une transaction (achat, vente…), l'instantané du marché global et
+     les ventes d'ami affichées ne sont plus fiables : ils doivent être relus
+     à la prochaine ouverture de « En ligne », pas servis depuis le cache de
+     2 minutes. */
+  function invalidateGlobalMarket() {
+    globalListingsLoaded = false;
+    lastGlobalMarketAt = 0;
   }
 
   /* ========================== JEUX : PILE OU FACE ==========================
@@ -8195,10 +8268,16 @@
     playFlipAnimation(game);
   }
 
-  function ingestFlipDocs(list) {
+  /* `oneShot` : relecture ponctuelle (retour dans le jeu, hors onglet En
+     ligne). Elle alimente les badges et les notifications, mais ne déclenche
+     pas une animation de pièce par-dessus un autre écran. */
+  function ingestFlipDocs(list, { oneShot = false } = {}) {
     const map = new Map(flipGames.map((g) => [g.id, g]));
     list.forEach((g) => map.set(g.id, g));
     flipGames = [...map.values()];
+    if (oneShot) {
+      flipGames.forEach((g) => { if (g.status === 'finished') flipAnimated.add(g.id); });
+    }
     if (!hadFlipSnapshot) {
       hadFlipSnapshot = true;
       flipGames.forEach((g) => { if (g.status === 'finished') flipAnimated.add(g.id); });
@@ -8296,10 +8375,11 @@
       flipInfo(FLIP_MESSAGES[action] || '');
       return result;
     } catch (error) {
-      flipInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Action impossible. Réessaie.'));
+      flipInfo(cloudErrorHelp(error, 'Action impossible. Réessaie.'));
       return null;
     } finally {
       overlay.remove();
+      invalidateGlobalMarket();
       if (currentUser && currentUser.uid === uid) gameRegions.forEach((region) => region.removeAttribute('inert'));
       marketBusy = false;
       finishMarket();
@@ -8470,7 +8550,7 @@
     updateOnlineTabCounts();
   }
 
-  async function loadFlipGames() {
+  async function loadFlipGames({ oneShot = false } = {}) {
     if (!cloudReady()) return;
     const uid = currentUser.uid;
     const coll = cloudDb.collection('coinFlips');
@@ -8482,9 +8562,9 @@
       ]);
       if (!currentUser || currentUser.uid !== uid) return;
       ingestFlipDocs([...snapshotDocs(incoming), ...snapshotDocs(outgoing)]
-        .map((d) => ({ id: d.id, ...d.data })));
+        .map((d) => ({ id: d.id, ...d.data })), { oneShot });
       renderFlipGames();
-      maybeAnimateNewFlip();
+      if (!oneShot) maybeAnimateNewFlip();
     } catch (error) {
       noteCloudError('Défis illisibles', error);
     }
@@ -8583,28 +8663,243 @@
     if (globalMarketMessage) globalMarketMessage.textContent = message || '';
   }
 
+  /* ------------------------------------------------- réseau social : coût des lectures
+     Le temps réel (onSnapshot) était branché dès la connexion : 10 écoutes
+     ouvertes en permanence, chacune facturée à chaque changement chez les
+     autres joueurs (un cadeau reçu, une vente, une demande d'ami…) et
+     réalimentée à chaque écriture de ses propres documents (profil public,
+     sauvegardes). C'est ce qui faisait sauter le quota gratuit de 50 000
+     lectures par jour alors que le jeu a peu de joueurs.
+
+     Désormais, tout le réseau social n'est branché QUE quand l'onglet
+     « En ligne » est ouvert, et débranché (écoutes fermées) quand on le
+     quitte ou que l'onglet du navigateur passe en arrière-plan. Les badges de
+     l'onglet et les notifications hors jeu restent alimentés par un appel
+     unique au retour dans le jeu. */
+  let socialHubOpen = false;    // l'onglet « En ligne » est affiché
+  let socialLive = false;       // écoutes temps réel actuellement branchées
+  let socialDeferred = false;   // reste à rafraîchir au retour dans le jeu
+  let socialRefreshTimer = 0;
+  /* Trafic de fond : un changement chez les autres joueurs (cadeau, demande
+     d'ami, vente) est signalé en ~1 s par le temps réel, puis on attend ce
+     délai avant de relire les requêtes : les salves (plusieurs écritures
+     simultanées) restent groupées au lieu de relire à chaque document. */
+  const SOCIAL_REFRESH_DELAY = 2500;
+  /* En arrière-plan (téléphone posé, autre application), on se contente d'un
+     rafraîchissement toutes les quelques minutes, et on suspend le temps réel
+     après SOCIAL_BACKGROUND_STOP_MS. Les notifications hors jeu n'ont pas
+     besoin de la page : elles partent des écoutes actives pendant la partie. */
+  const SOCIAL_BACKGROUND_REFRESH_MS = 4 * 60 * 1000;
+  const SOCIAL_BACKGROUND_STOP_MS = 60 * 1000;
+
+  /* Le classement se recharge par requêtes ponctuelles, sans écoute permanente.
+     Le temps réel est utile quand on est sur le marché, le sous-onglet Amis et
+     Jeux (fiche d'un ami ouverte). */
+  function onlineNeedsLive() {
+    if (!app || app.dataset.tab !== 'online') return false;
+    return onlinePanel === 'market' || onlinePanel === 'friends' || onlinePanel === 'games'
+      || Boolean(selectedFriendUid);
+  }
+
+  async function openSocialHub() {
+    if (!cloudReady()) return;
+    socialHubOpen = true;
+    refreshSocialLive();
+    subscribeSocialLive();
+    try {
+      await refreshSocial();
+    } catch (error) { /* signalé par noteCloudError : l'onglet reste utilisable */ }
+  }
+
+  /* Relit les requêtes (marché, cadeaux, offres, demandes, défis) une seule
+     fois, en groupant les appels rapprochés. */
+  function refreshSocialLive(delay = SOCIAL_REFRESH_DELAY) {
+    window.clearTimeout(socialRefreshTimer);
+    socialRefreshTimer = window.setTimeout(() => {
+      socialRefreshTimer = 0;
+      if (!currentUser || !pageVisible() || !socialLive) return;
+      Promise.all([loadMarket(), loadFriendRequests(), loadFlipGames()])
+        .catch(() => { /* signalé par noteCloudError */ });
+    }, delay);
+  }
+
+  function closeSocialHub() {
+    socialHubOpen = false;
+    teardownSocialLive();
+  }
+
+  /* Charge l'état social une fois (pas de temps réel) : marché, marché
+     global, amis, demandes, défis, classement si affiché. */
+  async function refreshSocial({ includeGlobal = true } = {}) {
+    if (!cloudReady()) return;
+    if (selectedFriendUid) fetchFriendProfile(selectedFriendUid, { force: true }).catch(() => {});
+    const jobs = [loadMarket(), loadFriendRequests(), loadFlipGames()];
+    /* Le marché global est une grosse requête (une lecture par annonce
+       ouverte) : inutile de la faire à la connexion, elle attend l'ouverture
+       de l'onglet « En ligne ». Sa fraîcheur est gérée par GLOBAL_MARKET_TTL_MS. */
+    if (includeGlobal) jobs.push(loadGlobalMarket().catch(() => {}));
+    await Promise.all(jobs);
+    if (onlinePanel === 'leaderboard') loadLeaderboard();
+    if (selectedFriendUid) loadFriendListings(selectedFriendUid);
+  }
+
+  function subscribeSocialLive() {
+    if (socialDeferred) {
+      socialDeferred = false;
+      refreshSocial().catch(() => { /* signalé par noteCloudError */ });
+    }
+    if (!socialHubOpen || socialLive || !cloudReady() || !pageVisible()) return;
+    socialLive = true;
+    subscribeFriendRequests();
+    subscribeMarket();
+    subscribeFlipGames();
+  }
+
+  function teardownSocialLive() {
+    if (!socialLive) return;
+    socialLive = false;
+    unsubscribeMarket();
+    unsubscribeFlipGames();
+    if (friendRequestsUnsub) {
+      try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
+      friendRequestsUnsub = null;
+    }
+  }
+
+  let hiddenSince = 0;
+  let lastBackgroundRefresh = 0;
+
+  /* Relecture ponctuelle, sans temps réel : badges de l'onglet En ligne et
+     notifications hors jeu (défi reçu, demande d'ami). Deux petites requêtes
+     par retour dans le jeu au lieu de 10 écoutes permanentes. */
+  function refreshSocialQuietly({ allowHidden = false } = {}) {
+    if (!cloudReady()) return Promise.resolve();
+    if (!pageVisible() && !allowHidden) return Promise.resolve();
+    return Promise.all([
+      loadFriendRequests(),
+      loadFlipGames({ oneShot: true })
+    ]).catch(() => { /* signalé par noteCloudError */ });
+  }
+
+  /* Retour sur l'onglet (ou dans l'application) : une relecture, puis on
+     rebranche le temps réel seulement si l'écran « En ligne » est affiché. */
+  const RESUME_REFRESH_MIN_GAP_MS = 30 * 1000;
+  let lastResumeRefresh = 0;
+  function onGameResume() {
+    if (!currentUser) return;
+    hiddenSince = 0;
+    stopBackgroundWatch();
+    if (onlineNeedsLive() && socialHubOpen) {
+      subscribeSocialLive();
+      /* `focus` et `visibilitychange` arrivent souvent ensemble, et chaque
+         aller-retour dans la fenêtre relance l'événement : on ne relit qu'une
+         fois par demi-minute. */
+      if (Date.now() - lastResumeRefresh < RESUME_REFRESH_MIN_GAP_MS) return;
+      lastResumeRefresh = Date.now();
+      refreshSocial().catch(() => { /* signalé par noteCloudError */ });
+      return;
+    }
+    teardownSocialLive();
+    if (Date.now() - lastResumeRefresh < RESUME_REFRESH_MIN_GAP_MS) return;
+    lastResumeRefresh = Date.now();
+    refreshSocialQuietly();
+  }
+
+  function onGameHidden() {
+    hiddenSince = Date.now();
+    startBackgroundWatch();
+    if (!socialLive) return;
+    socialDeferred = true;
+    teardownSocialLive();
+  }
+
+  /* Application laissée ouverte en arrière-plan (téléphone posé) : quelques
+     relectures espacées suffisent pour les badges, au lieu de garder 10
+     écoutes ouvertes. La minuterie n'existe que pendant ce temps-là (elle
+     est arrêtée dès le retour dans le jeu). */
+  let backgroundTimer = 0;
+  function startBackgroundWatch() {
+    if (backgroundTimer) return;
+    backgroundTimer = window.setInterval(() => {
+      if (!currentUser || pageVisible() || socialLive) return;
+      if (Date.now() - hiddenSince < SOCIAL_BACKGROUND_STOP_MS) return;
+      if (Date.now() - lastBackgroundRefresh < SOCIAL_BACKGROUND_REFRESH_MS) return;
+      lastBackgroundRefresh = Date.now();
+      refreshSocialQuietly({ allowHidden: true });
+    }, 60 * 1000);
+  }
+  function stopBackgroundWatch() {
+    if (!backgroundTimer) return;
+    window.clearInterval(backgroundTimer);
+    backgroundTimer = 0;
+  }
+
+  on(document, 'visibilitychange', () => {
+    if (document.hidden === true) onGameHidden();
+    else onGameResume();
+  });
+  on(window, 'focus', () => { if (pageVisible()) onGameResume(); });
+
   /* Charge toutes les annonces ouvertes, tous vendeurs confondus. Une seule
      requête (pas de filtre par ami) : c'est ce qui permet de voir le marché
      des joueurs qu'on ne connaît pas encore. Le pseudo du vendeur vient du
      profil public (playerProfiles), mis en cache dans friendProfiles. */
-  async function loadGlobalMarket({ keepMessage = false } = {}) {
+  /* `force` : on relit la page affichée même si une requête vient de partir
+     (bouton Actualiser). Sans `force`, un chargement déjà en cours est
+     réutilisé : ouvrir puis refermer l'onglet ne coûte plus de lectures. */
+  let globalMarketInFlight = null;
+  let lastGlobalMarketAt = 0;
+  /* Lit les annonces ouvertes une seule fois et met à jour `globalListings`.
+     Une requête de marché global = une lecture par annonce ouverte : c'est la
+     plus grosse dépense de lectures du jeu. */
+  let listingsFetch = null;   // requête « annonces ouvertes » en cours, partagée
+  async function fetchGlobalListings({ force = false } = {}) {
+    /* Une seule requête à la fois : le marché global et la fiche d'un ami
+       demandent exactement la même liste. Si l'un des deux est déjà en train
+       de la lire, l'autre l'attend au lieu de repayer une lecture par annonce. */
+    if (listingsFetch && !force) return listingsFetch;
+    const coll = cloudDb.collection('marketListings');
+    if (!coll || typeof coll.where !== 'function') return;
+    const run = (async () => {
+    const snap = await coll.where('status', '==', 'open').get();
+    lastGlobalMarketAt = Date.now();
+    globalListingsLoaded = true;
+    globalListings = snapshotDocs(snap)
+      .map((d) => ({ id: d.id, ...d.data }))
+      .filter((l) => l.status === 'open' && l.sellerUid);
+    /* Les pseudos des vendeurs (profil public) sont lus une fois puis mis en
+       cache dans `friendProfiles` : ce sont des documents, pas des annonces. */
+    await Promise.all([...new Set(globalListings.map((l) => l.sellerUid))]
+      .filter((uid) => !friendProfiles.has(uid))
+      .map((uid) => fetchFriendProfile(uid)));
+    })();
+    listingsFetch = run;
+    try {
+      await run;
+    } finally {
+      if (listingsFetch === run) listingsFetch = null;
+    }
+  }
+
+  async function loadGlobalMarket({ keepMessage = false, force = false } = {}) {
     if (!cloudReady() || !globalMarketList) return;
+    /* Ouverture de l'onglet ou retour dans le jeu : la liste n'est relue que
+       si elle commence à dater (le temps réel du marché global n'existe pas ;
+       un rechargement systématique coûtait une lecture par annonce ouverte à
+       chaque visite, c'est ce qui vidait le quota gratuit). */
+    const now = Date.now();
+    if (!force && globalListingsLoaded && now - lastGlobalMarketAt < GLOBAL_MARKET_TTL_MS) {
+      renderGlobalMarket();
+      return;
+    }
+    if (!force && globalMarketInFlight) return globalMarketInFlight;
     if (!keepMessage) globalMarketInfo('');
     if (!globalListingsLoaded) {
       globalMarketList.replaceChildren(el('p', 'online-empty', 'Chargement du marché global…'));
     }
+    globalMarketInFlight = (async () => {
     try {
-      const coll = cloudDb.collection('marketListings');
-      if (!coll || typeof coll.where !== 'function') return;
-      const snap = await coll.where('status', '==', 'open').get();
-      if (!currentUser) return;
-      globalListings = snapshotDocs(snap)
-        .map((d) => ({ id: d.id, ...d.data }))
-        .filter((l) => l.status === 'open' && l.sellerUid);
-      globalListingsLoaded = true;
-      await Promise.all([...new Set(globalListings.map((l) => l.sellerUid))]
-        .filter((uid) => !friendProfiles.has(uid))
-        .map((uid) => fetchFriendProfile(uid)));
+      await fetchGlobalListings({ force });
       if (!currentUser) return;
       renderGlobalMarket();
     } catch (error) {
@@ -8616,6 +8911,12 @@
             : 'Impossible de charger le marché global. Vérifie ta connexion et réessaie.'));
       }
       noteCloudError('Marché global illisible', error);
+    }
+    })();
+    try {
+      await globalMarketInFlight;
+    } finally {
+      globalMarketInFlight = null;
     }
   }
 
@@ -8947,16 +9248,21 @@
     globalMarketList.replaceChildren(...sections);
   }
 
-  async function loadFriendListings(uid) {
+  async function loadFriendListings(uid, { force = false } = {}) {
     if (!cloudReady() || !friendListings) return;
-    friendListings.replaceChildren(el('p', 'online-empty', 'Chargement des ventes…'));
+    /* Les règles ne rendent publiques que les annonces ouvertes : c'est
+       exactement la requête du marché global. On la partage donc (une lecture
+       par annonce ouverte au lieu d'une par fiche d'ami visitée) et on filtre
+       en mémoire. Le cache est invalidé par les transactions et à chaque
+       retour sur « En ligne ». */
+    const fresh = !force && !friendListingsStale && globalListingsLoaded
+      && (Date.now() - lastGlobalMarketAt) < GLOBAL_MARKET_TTL_MS;
+    friendListingsStale = false;
+    if (!fresh) friendListings.replaceChildren(el('p', 'online-empty', 'Chargement des ventes…'));
     try {
-      // Les règles ne rendent publiques que les annonces ouvertes. Une requête
-      // par vendeur seul pourrait inclure ses ventes terminées et est refusée,
-      // même si on filtre les résultats après coup. Évite un index composite.
-      const snap = await cloudDb.collection('marketListings').where('status', '==', 'open').get();
+      if (!fresh) await fetchGlobalListings();
       if (selectedFriendUid !== uid) return;
-      const listings = snapshotDocs(snap).map((d) => ({ id: d.id, ...d.data })).filter((l) => l.status === 'open' && l.sellerUid === uid);
+      const listings = globalListings.filter((l) => l.status === 'open' && l.sellerUid === uid);
       const groups = groupListings(listings);
       friendListings.replaceChildren(...(groups.length ? groups.map((group) => {
         const row = el('div', 'trade-row');
@@ -9060,7 +9366,7 @@
       });
       marketInfo('Offre envoyée ! Retrouve-la dans « Récupérer ».');
       await loadMarket();
-    } catch (error) { marketInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Offre impossible.')); }
+    } catch (error) { marketInfo(cloudErrorHelp(error, 'Offre impossible.')); }
   }
 
   async function respondOffer(offer, response, price) {
@@ -9081,7 +9387,7 @@
       });
       marketInfo(response === 'accept' ? 'Offre acceptée : l’acheteur peut confirmer son achat.' : response === 'counter' ? 'Contre-offre envoyée.' : 'Offre refusée.');
       await loadMarket();
-    } catch (error) { marketInfo(isPermissionDenied(error) ? RULES_HELP : (error.message || 'Réponse impossible.')); }
+    } catch (error) { marketInfo(cloudErrorHelp(error, 'Réponse impossible.')); }
   }
 
   function renderOffers() {
@@ -9331,15 +9637,15 @@
         save();
       }
       await loadMarket();
-      if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
-      if (fromGlobal) await loadGlobalMarket({ keepMessage: true });
+      if (selectedFriendUid) await loadFriendListings(selectedFriendUid, { force: true });
+      if (fromGlobal) await loadGlobalMarket({ keepMessage: true, force: true });
     } catch (error) {
       if (lastResult) applyResult(lastResult);
-      const baseMsg = isPermissionDenied(error) ? RULES_HELP : (error.message || 'Transaction impossible. Réessaie.');
+      const baseMsg = cloudErrorHelp(error, 'Transaction impossible. Réessaie.');
       report(doneCount > 0 && targetCount > 1 ? `${doneCount} / ${targetCount} traitée${doneCount > 1 ? 's' : ''} : ${baseMsg}` : baseMsg);
       await loadMarket();
-      if (selectedFriendUid) await loadFriendListings(selectedFriendUid);
-      if (fromGlobal) await loadGlobalMarket({ keepMessage: true });
+      if (selectedFriendUid) await loadFriendListings(selectedFriendUid, { force: true });
+      if (fromGlobal) await loadGlobalMarket({ keepMessage: true, force: true });
     } finally {
       overlay.remove();
       if (currentUser && currentUser.uid === uid) gameRegions.forEach((region) => region.removeAttribute('inert'));
@@ -9418,10 +9724,10 @@
   });
   on($('market-refresh'), 'click', () => {
     loadMarket();
-    loadGlobalMarket();
-    if (selectedFriendUid) loadFriendListings(selectedFriendUid);
+    loadGlobalMarket({ force: true });
+    if (selectedFriendUid) loadFriendListings(selectedFriendUid, { force: true });
   });
-  on(globalMarketRefresh, 'click', () => loadGlobalMarket());
+  on(globalMarketRefresh, 'click', () => loadGlobalMarket({ force: true }));
   on(globalMarketSearch, 'input', () => renderGlobalMarket());
   on(globalMarketSort, 'change', () => renderGlobalMarket());
 
@@ -10381,7 +10687,10 @@
     }, delay);
   }
   on(document, 'visibilitychange', () => {
-    if (document.visibilityState === 'visible' && currentUser) renderPush();
+    if (document.visibilityState === 'visible' && currentUser) {
+      renderPush();
+      if (typeof onGameResume === 'function') onGameResume();
+    }
   });
 
   if (notifSheet) {
