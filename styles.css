@@ -4926,3 +4926,217 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
   .deco-gift-coin-orb{width:44px;height:44px;font-size:24px}
 }
 
+
+
+/* ==========================================================================
+   ANIMATIONS PREMIUM — couche additive (à garder en fin de fichier)
+   - Mouvement via translate / scale / rotate : elles se cumulent avec les
+     `transform` existants (pile, flip, parallaxe) sans les écraser.
+   - Rien ne s'applique si l'appareil demande de réduire les animations.
+   - Pour tout annuler : supprimer ce bloc.
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+
+:root{
+  --rf-spring:cubic-bezier(.3,1.7,.4,1);
+  --rf-smooth:cubic-bezier(.16,1,.3,1);
+}
+
+/* ---------- Changements de page et titres ---------- */
+.view.view-in{animation:rf-view-in .56s var(--rf-smooth) both}
+@keyframes rf-view-in{
+  0%{opacity:0;transform:translateY(30px) scale(.955)}
+  100%{opacity:1;transform:none}
+}
+.pack-head > *,.reveal-head > *{animation-name:rf-title-in;animation-timing-function:var(--rf-spring)}
+@keyframes rf-title-in{
+  0%{opacity:0;transform:translateY(22px) scale(.9)}
+  100%{opacity:1;transform:none}
+}
+
+/* ---------- Booster au repos : il appelle le doigt ---------- */
+.pack:not(.is-ripped):not(.is-pack-ripped):not(.is-dragging){animation:rf-beckon 4.8s ease-in-out 1.6s infinite}
+@keyframes rf-beckon{
+  0%,68%,100%{rotate:0deg;scale:1;translate:0 0}
+  72%{rotate:-3.5deg;scale:1.035;translate:0 -5px}
+  76%{rotate:3deg;scale:1.045;translate:0 -7px}
+  80%{rotate:-2deg;scale:1.03}
+  84%{rotate:1deg;scale:1.012;translate:0 -1px}
+  88%{rotate:0deg;scale:.99;translate:0 2px}
+  93%{scale:1;translate:0 0}
+}
+.pack:not(.is-ripped):active{scale:.97}
+.pack-halo{animation:halo-breathe 5s ease-in-out infinite,rf-halo 4.8s ease-in-out 1.6s infinite}
+@keyframes rf-halo{0%,68%,100%{scale:1}77%{scale:1.2}90%{scale:.98}}
+
+/* ---------- Pile de cartes ---------- */
+@media (hover:hover){
+  .card.is-top:not(.is-flipped):not(.is-charging):not(.is-flying):hover{translate:0 -10px;scale:1.025}
+}
+.card{transition:transform .55s var(--rf-smooth),filter .4s ease,translate .3s var(--rf-spring),scale .3s var(--rf-spring)}
+.card.is-flying{transition:transform .62s cubic-bezier(.55,-.12,.25,1),opacity .55s ease .12s}
+.card.is-incoming .card-inner{animation:rf-incoming .62s var(--rf-smooth)}
+@keyframes rf-incoming{
+  0%{scale:.88;translate:0 26px}
+  55%{scale:1.045;translate:0 -7px}
+  78%{scale:.99;translate:0 2px}
+  100%{scale:1;translate:0 0}
+}
+
+/* ---------- Révélation : l'impact monte avec la rareté ---------- */
+/* :not(.is-fanned) laisse intact le mode « Ouvrir tout le pack ». */
+.card.is-top.is-flipped:not(.is-flying):not(.is-fanned){animation:rf-land .66s var(--rf-smooth) .3s}
+.card[data-fx='rare'].is-top.is-flipped:not(.is-flying):not(.is-fanned){animation:rf-land-rare .78s var(--rf-smooth) .3s}
+.card[data-fx='epic'].is-top.is-flipped:not(.is-flying):not(.is-fanned){animation:rf-land-epic .95s var(--rf-smooth) .3s}
+.card[data-fx='gold'].is-top.is-flipped:not(.is-flying):not(.is-fanned){
+  animation:rf-land-gold 1.2s var(--rf-smooth) .3s,rf-levitate 3.4s ease-in-out 1.5s infinite}
+@keyframes rf-land{
+  0%{translate:0 8px;scale:1.06}
+  45%{translate:0 -7px;scale:.985}
+  72%{translate:0 2px;scale:1.01}
+  100%{translate:0 0;scale:1}
+}
+@keyframes rf-land-rare{
+  0%{translate:0 10px;scale:1.1;rotate:0deg}
+  36%{translate:0 -12px;scale:.975;rotate:-2deg}
+  62%{translate:0 3px;scale:1.025;rotate:1.2deg}
+  100%{translate:0 0;scale:1;rotate:0deg}
+}
+@keyframes rf-land-epic{
+  0%{translate:0 14px;scale:1.17;rotate:0deg}
+  28%{translate:0 -18px;scale:.955;rotate:-3.5deg}
+  50%{translate:0 5px;scale:1.055;rotate:2.5deg}
+  72%{translate:0 -3px;scale:.99;rotate:-1deg}
+  100%{translate:0 0;scale:1;rotate:0deg}
+}
+@keyframes rf-land-gold{
+  0%{translate:0 20px;scale:1.25;rotate:0deg}
+  22%{translate:0 -26px;scale:.93;rotate:-5deg}
+  40%{translate:0 8px;scale:1.09;rotate:3.5deg}
+  58%{translate:0 -8px;scale:.975;rotate:-2deg}
+  76%{translate:0 2px;scale:1.018;rotate:.8deg}
+  100%{translate:0 0;scale:1;rotate:0deg}
+}
+@keyframes rf-levitate{0%,100%{translate:0 0}50%{translate:0 -8px}}
+
+/* Onde de choc autour du halo, au moment où la face apparaît. */
+.card[data-fx='epic'].is-top.is-flipped::before{animation:rf-shock .9s var(--rf-smooth) .35s,aura 2.4s ease-in-out 1.25s infinite}
+.card[data-fx='gold'].is-top.is-flipped::before{animation:rf-shock 1.15s var(--rf-smooth) .35s,aura 1.8s ease-in-out 1.5s infinite}
+@keyframes rf-shock{0%{scale:.6;opacity:1}55%{scale:1.5;opacity:.95}100%{scale:1}}
+
+/* Balayage lumineux : double passage sur les cartes dorées. */
+.card[data-fx='gold'].is-flipped:not(.is-fanned) .card-front::after{animation:front-sweep .85s ease-out .45s 2 both}
+.card.is-flipped .cf-badge{animation:rf-stamp .65s var(--rf-smooth) .46s backwards}
+@keyframes rf-stamp{
+  0%{opacity:0;scale:2.8;rotate:-14deg}
+  55%{opacity:1;scale:.86;rotate:3deg}
+  78%{scale:1.1;rotate:-1deg}
+  100%{scale:1;rotate:0deg}
+}
+.card.is-flipped .cf-name{animation:rf-text-up .55s var(--rf-smooth) .58s backwards}
+.card.is-flipped .cf-desc{animation:rf-text-up .6s var(--rf-smooth) .7s backwards}
+@keyframes rf-text-up{from{opacity:0;translate:0 16px}}
+
+/* ---------- Récap du butin ---------- */
+.slot.is-filled{animation:rf-slot .7s var(--rf-smooth),rf-slot-ring .85s ease-out .15s}
+@keyframes rf-slot{
+  0%{scale:.2;rotate:-22deg;translate:0 -26px}
+  52%{scale:1.24;rotate:6deg;translate:0 0}
+  76%{scale:.93;rotate:-2deg}
+  100%{scale:1;rotate:0deg}
+}
+@keyframes rf-slot-ring{
+  0%{box-shadow:0 0 0 0 var(--slot-color,#b388ff),0 0 26px 6px var(--slot-color,#b388ff)}
+  100%{box-shadow:0 0 0 13px transparent,0 0 14px -2px var(--slot-color,transparent)}
+}
+
+/* ---------- Barre de navigation ---------- */
+.tab-ind{transition:transform .55s var(--rf-spring)}
+.tab.is-active:not(.is-bump) svg{animation:rf-jelly .65s ease-out}
+@keyframes rf-jelly{
+  0%{scale:.65;translate:0 5px}
+  35%{scale:1.28 .85;translate:0 -6px;rotate:-9deg}
+  55%{scale:.9 1.14;translate:0 -2px;rotate:6deg}
+  75%{scale:1.07 .95;translate:0 0;rotate:-2deg}
+  100%{scale:1;translate:0 0;rotate:0deg}
+}
+.tab.is-active span{animation:rf-text-up .4s var(--rf-smooth) backwards}
+
+/* ---------- Boutons : réaction au toucher ---------- */
+:is(.next-card,.buy-btn,.ghost-btn,.shop-buy,.shop-open,.mini-btn,.free-claim,.quest-claim,.open-all,.chip,.inspect-sell,.sheet-x){
+  transition:transform .2s var(--rf-spring),scale .45s var(--rf-spring),filter .2s,box-shadow .25s,background .25s,border-color .2s,color .2s,opacity .2s}
+:is(.next-card,.buy-btn,.ghost-btn,.shop-buy,.shop-open,.mini-btn,.free-claim,.quest-claim,.open-all,.chip,.inspect-sell,.sheet-x):not(:disabled):active{
+  scale:.9;transition-duration:.2s,.08s}
+
+/* ---------- Collection et statistiques ----------
+   `backwards` : une fois l'entrée terminée, le survol et l'appui reprennent la main. */
+.coll-grid > *,.coll-grid > .coll-tile:not(.is-locked),.stats-grid > *{
+  animation:rf-tile .62s var(--rf-smooth) backwards;
+  animation-delay:calc(min(var(--i,0),24) * 34ms)}
+@keyframes rf-tile{
+  0%{opacity:0;translate:0 34px;scale:.7;rotate:-5deg}
+  62%{opacity:1;translate:0 -5px;scale:1.045;rotate:1.2deg}
+  100%{opacity:1;translate:0 0;scale:1;rotate:0deg}
+}
+
+/* ---------- Boutique ---------- */
+.shop-card{animation:rf-rise .65s var(--rf-smooth) backwards}
+.shop-card:nth-child(2){animation-delay:.08s}
+.shop-card:nth-child(3){animation-delay:.16s}
+.shop-card:nth-child(4){animation-delay:.24s}
+.shop-card:nth-child(n+5){animation-delay:.32s}
+@keyframes rf-rise{
+  0%{opacity:0;translate:0 42px;scale:.92}
+  68%{opacity:1;translate:0 -4px;scale:1.012}
+  100%{opacity:1;translate:0 0;scale:1}
+}
+.shop-card .shop-img{animation:rf-float 4.2s ease-in-out infinite}
+.shop-card:nth-child(even) .shop-img{animation-delay:-2.1s}
+@keyframes rf-float{0%,100%{translate:0 0;rotate:-1.2deg}50%{translate:0 -7px;rotate:1.2deg}}
+
+/* ---------- Quêtes ---------- */
+.quest-card:not(.is-claiming),.quest-card.is-new:not(.is-claiming){
+  opacity:1;animation:rf-rise .62s var(--rf-smooth) backwards;animation-delay:calc(var(--i,0) * 75ms)}
+.quest-card.is-ready:not(.is-claiming){
+  opacity:1;
+  animation:rf-rise .62s var(--rf-smooth) backwards,ready-border 4s linear infinite,rf-ready 3.2s ease-in-out 1.2s infinite;
+  animation-delay:calc(var(--i,0) * 75ms),0s,1.2s}
+@keyframes rf-ready{
+  0%,72%,100%{scale:1;rotate:0deg}
+  77%{scale:1.025;rotate:-.7deg}
+  82%{scale:1.03;rotate:.7deg}
+  87%{scale:1.012;rotate:-.3deg}
+  93%{scale:1;rotate:0deg}
+}
+.quest-card.is-claiming{animation:rf-claim .6s var(--rf-smooth)}
+@keyframes rf-claim{0%{scale:1}30%{scale:.94}62%{scale:1.05}100%{scale:1}}
+.quest-spark{width:9px;height:9px;animation-duration:.75s}
+
+/* ---------- Fenêtres, fiche de carte, messages ---------- */
+.sheet.is-open .sheet-dialog{animation:rf-sheet .6s var(--rf-smooth) backwards}
+@keyframes rf-sheet{
+  0%{translate:0 70px;scale:.86}
+  58%{translate:0 -8px;scale:1.018}
+  100%{translate:0 0;scale:1}
+}
+.inspect.is-open .inspect-dialog{animation:rf-inspect .72s var(--rf-smooth) both}
+@keyframes rf-inspect{
+  0%{opacity:0;transform:perspective(900px) translateY(60px) rotateY(-75deg) scale(.6)}
+  60%{opacity:1;transform:perspective(900px) translateY(-8px) rotateY(10deg) scale(1.035)}
+  80%{transform:perspective(900px) translateY(2px) rotateY(-3deg) scale(.995)}
+  100%{opacity:1;transform:none}
+}
+.toast.show{animation:rf-toast .55s var(--rf-smooth)}
+@keyframes rf-toast{0%{scale:.6}55%{scale:1.08}78%{scale:.97}100%{scale:1}}
+
+/* ---------- Porte-monnaie ---------- */
+.wallet.bump{animation:rf-wallet .7s var(--rf-smooth)}
+@keyframes rf-wallet{
+  0%{scale:1;filter:brightness(1)}
+  30%{scale:1.24;rotate:-4deg;filter:brightness(1.6)}
+  55%{scale:.94;rotate:3deg}
+  78%{scale:1.05;rotate:-1deg}
+  100%{scale:1;rotate:0deg;filter:brightness(1)}
+}
+
+} /* fin : prefers-reduced-motion: no-preference */
