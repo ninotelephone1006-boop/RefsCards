@@ -1727,9 +1727,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .inspect-dialog {
   position: relative;
   z-index: 1;
-  height: min(86vh, 660px);
-  aspect-ratio: 5 / 7;
-  max-width: min(92vw, 460px);
+  width: clamp(150px, calc(71.43vh - 164px), 460px);
+  max-width: 92vw;
   opacity: 0;
   transform: translateY(16px) scale(0.94);
   transition: opacity 0.3s var(--ease-out), transform 0.36s var(--ease-spring);
@@ -1756,8 +1755,9 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
 .inspect-sell[hidden] { display: none; }
 
 .inspect-card {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 7;
   border-radius: 18px;
   container-type: inline-size;
   overflow: hidden;
@@ -3408,6 +3408,7 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .inspect.is-open .inspect-dialog{animation:insp-spring .55s cubic-bezier(.2,1.4,.35,1) both}
 .insp-count{display:flex;justify-content:center;gap:10px;margin-top:14px;animation:insp-rise .45s cubic-bezier(.2,1.3,.4,1) both}
 .insp-odds{margin:12px 0 0;color:#fff0aa;font-size:13px;font-weight:700;text-align:center;text-shadow:0 0 12px #f7dd8455;animation:insp-rise .45s cubic-bezier(.2,1.3,.4,1) both}
+.insp-drop-odds{margin:5px 0 0;color:#e6ebdf;font-size:12px;font-weight:700;text-align:center}
 .ic-cell{min-width:92px;padding:8px 14px;border-radius:14px;background:#1a1226e6;border:1px solid #ffffff33;text-align:center;color:#fff}
 .ic-cell b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
 .ic-cell small{font-size:11px;letter-spacing:.06em;opacity:.85}

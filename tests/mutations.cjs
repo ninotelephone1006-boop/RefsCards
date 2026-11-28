@@ -10,6 +10,7 @@ w.matchMedia = () => ({ matches: true, addEventListener() {} });
 const noop = () => {};
 w.HTMLCanvasElement.prototype.getContext = () => new Proxy({}, { get: () => noop, set: () => true });
 w.Sound = new Proxy({}, { get: () => noop });
+w.HTMLMediaElement.prototype.play = () => Promise.resolve();
 const context = dom.getInternalVMContext();
 vm.runInContext(fs.readFileSync('cards.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('quests.js', 'utf8'), context);
@@ -32,7 +33,7 @@ vm.runInContext(`
 `, context);
 vm.runInContext(fs.readFileSync('app.js', 'utf8').replace(/\}\)\(\);\s*$/, `
   window.testMutations = { state, applySave, renderCollection, countMap, fusableEntries,
-    statsFor, cardFrame, drawPack, collectionIds, openInspect,
+    statsFor, cardFrame, drawPack, collectionIds, openInspect, packPool, slotRarityShares, packSlotsFor,
     shinyRate: card => CardMutations.definitions.find(m => m.id === 'shiny').rates[card.rarity] };
 })();`), context);
 const api = w.testMutations;
@@ -54,6 +55,26 @@ const shinyRate = api.shinyRate(inspectedCard);
 assert.match(w.document.querySelector('.insp-odds').textContent,
   new RegExp(`1 sur ${Math.round(1 / shinyRate)} \\(sans boost\\)`),
   'l’inspection affiche la chance Shiny de base sans multiplicateur de booster');
+// Chance de cette carte (pas seulement de sa rareté), sans effet Shiny.
+function expectedDrop(card, type) {
+  const pool = api.packPool(type);
+  const count = pool.filter(c => c.rarity === card.rarity).length;
+  return Math.round(count / api.slotRarityShares(type, api.packSlotsFor(type)[0], pool)[card.rarity])
+    .toLocaleString('fr-FR');
+}
+let drop = w.document.querySelector('.insp-drop-odds');
+assert.equal(drop.previousElementSibling.className, 'insp-odds');
+assert.ok(drop.textContent.includes(`1 sur ${expectedDrop(inspectedCard, 'classic')}`));
+assert.match(drop.textContent, /par carte · pack classique/);
+api.openInspect(api.state.collection[1]);
+assert.ok(w.document.querySelector('.insp-drop-odds').textContent.includes(`1 sur ${expectedDrop(inspectedCard, 'classic')}`));
+assert.equal(w.document.querySelectorAll('.insp-drop-odds').length, 1);
+const videoCard = api.packPool('video')[0];
+api.openInspect(videoCard);
+assert.ok(w.document.querySelector('.insp-drop-odds').textContent.includes(`1 sur ${expectedDrop(videoCard, 'video')}`));
+assert.match(w.document.querySelector('.insp-drop-odds').textContent, /1er tirage · pack vidéo/);
+api.openInspect({ id: 'inconnu', name: 'Inconnu', rarity: 'common' });
+assert.equal(w.document.querySelector('.insp-drop-odds').textContent, 'Chance de drop indisponible');
 const shiny = api.state.collection[1];
 assert.ok(api.cardFrame(shiny).querySelector('.cf-mutation').textContent.includes('Shiny'));
 const stats = api.statsFor(api.collectionIds(), 0);
