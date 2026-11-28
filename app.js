@@ -3298,8 +3298,7 @@
     if (!card) return;
     const oldCount = qs(inspectCard.parentElement, '.insp-count');
     if (oldCount) oldCount.remove();
-    const oldOdds = qs(inspectCard.parentElement, '.insp-odds');
-    if (oldOdds) oldOdds.remove();
+    inspectCard.parentElement.querySelectorAll('.insp-odds, .insp-drop-odds').forEach((node) => node.remove());
     const info = RARITIES[card.rarity] || RARITIES.common;
     inspectCard.replaceChildren(cardFrame(card, { eager: true, alt: `${card.name} — ${info.label}` }));
     inspectCard.style.setProperty('--r-color', info.color);
@@ -3345,6 +3344,22 @@
       : '✦ Chance de Shiny indisponible';
     odds.setAttribute('aria-label', odds.textContent);
     inspectCard.parentElement.append(odds);
+
+    // Chance de la carte de base, indépendamment de sa mutation, par tirage.
+    // Les cartes vidéo sont exclusives à leur pack ; les autres utilisent le
+    // pack classique, sans plafond de doublons ni boost.
+    const type = cardVideoInfo(card) ? 'video' : 'classic';
+    const pool = packPool(type);
+    const baseId = card.baseId || card.id;
+    const baseCard = pool.find((candidate) => candidate.id === baseId);
+    const sameRarity = baseCard ? pool.filter((candidate) => candidate.rarity === baseCard.rarity) : [];
+    const shares = slotRarityShares(type, packSlotsFor(type)[0], pool);
+    const dropRate = sameRarity.length ? (shares[baseCard.rarity] || 0) / sameRarity.length : 0;
+    const dropOdds = el('p', 'insp-drop-odds');
+    dropOdds.textContent = dropRate > 0
+      ? `Chance de drop : environ 1 sur ${fmt(Math.round(1 / dropRate))} (${type === 'video' ? '1er tirage · pack vidéo' : 'par carte · pack classique'})`
+      : 'Chance de drop indisponible';
+    inspectCard.parentElement.append(dropOdds);
     inspectX.focus({ preventScroll: true });
   }
 

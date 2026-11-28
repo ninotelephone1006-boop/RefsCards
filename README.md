@@ -462,6 +462,12 @@ de mutation après sa sélection** ; les créations par fusion aussi. Recharger 
 sauvegarde, inspecter une carte, acheter, offrir ou récupérer une carte du marché
 ne déclenche jamais de nouveau tirage.
 
+Dans l'inspection, la chance de drop affichée sous la chance Shiny correspond
+à la carte de base, mutation comprise ou non : poids de sa rareté renormalisé
+sur le pool, divisé par le nombre de cartes de cette rareté. C'est la chance
+par carte dans le Pack Classique, ou au premier tirage du Pack Vidéo pour les
+cartes vidéo exclusives (le plafond de doublons peut modifier le second tirage).
+
 ### Shiny
 
 | Rareté de la carte | Chance conditionnelle Shiny |
