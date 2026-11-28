@@ -5140,3 +5140,105 @@ h2 .creator-badge,h3 .creator-badge{vertical-align:-.1em}
 }
 
 } /* fin : prefers-reduced-motion: no-preference */
+
+
+/* ==========================================================================
+   ANIMATIONS PREMIUM 2 — 20 animations supplémentaires
+   ========================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+:root{--rf2-ease:cubic-bezier(.2,1.35,.4,1)}
+
+/* 01. Compteur de la collection qui bat */
+.coll-count{display:inline-block;animation:rf2-count 3.6s ease-in-out infinite}
+@keyframes rf2-count{0%,78%,100%{scale:1}84%{scale:1.16}90%{scale:.97}}
+
+/* 02. Reflet sur la barre de collection */
+.coll-bar{position:relative}
+.coll-bar::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(100deg,transparent 35%,#ffffff99 50%,transparent 65%);translate:-100% 0;animation:rf2-glint 3.2s ease-in-out infinite}
+@keyframes rf2-glint{0%,45%{translate:-100% 0}85%,100%{translate:100% 0}}
+
+/* 03. Titre de la collection qui glisse */
+.coll-title h2{animation:rf2-from-left .65s var(--rf2-ease) backwards}
+@keyframes rf2-from-left{from{opacity:0;translate:-36px 0}}
+
+/* 04. Filtres en cascade */
+.coll-filters .chip:not(.is-active){animation:rf2-drop .5s var(--rf2-ease) backwards}
+.coll-filters .chip:nth-child(2){animation-delay:.05s}
+.coll-filters .chip:nth-child(3){animation-delay:.1s}
+.coll-filters .chip:nth-child(4){animation-delay:.15s}
+.coll-filters .chip:nth-child(n+5){animation-delay:.2s}
+@keyframes rf2-drop{from{opacity:0;translate:0 -16px;scale:.8}}
+
+/* 05. Filtre sélectionné qui rebondit */
+.chip.is-active{animation:rf2-pick .5s var(--rf2-ease)}
+@keyframes rf2-pick{0%{scale:.82}55%{scale:1.14}100%{scale:1}}
+
+/* 06. Cartes verrouillées : le ??? flotte */
+.coll-tile.is-locked .lock-q{animation:rf2-mystery 3s ease-in-out infinite;animation-delay:calc(var(--i,0) * -170ms)}
+@keyframes rf2-mystery{0%,100%{translate:0 2px;opacity:.65}50%{translate:0 -5px;opacity:1}}
+
+/* 07. Compteur du butin qui pulse */
+.recap-count{animation:rf2-heart 2.4s ease-in-out infinite}
+@keyframes rf2-heart{0%,60%,100%{scale:1}68%{scale:1.2}76%{scale:1}84%{scale:1.13}}
+
+/* 08. Points lumineux en radar */
+.recap-kicker i,.foot-left i{animation:rf2-radar 1.8s ease-out infinite}
+@keyframes rf2-radar{0%{box-shadow:0 0 0 0 #b388ffcc}100%{box-shadow:0 0 0 9px #b388ff00}}
+
+/* 09. Pièce du porte-monnaie qui tourne */
+.wallet:not(.bump):not(.spend) .coin-glyph{animation:rf2-coin 5s ease-in-out infinite}
+@keyframes rf2-coin{0%,76%{rotate:y 0deg}100%{rotate:y 360deg}}
+
+/* 10. Pourcentage de découpe qui vibre */
+.hint-pct.hot{animation:rf2-hot .45s ease-in-out infinite}
+@keyframes rf2-hot{0%,100%{scale:1;rotate:0deg}30%{scale:1.2;rotate:-4deg}70%{scale:1.12;rotate:4deg}}
+
+/* 11. Objets de l’inventaire en lévitation */
+.inventory-card-img{animation:rf2-hover 3.8s ease-in-out infinite}
+.inventory-card:nth-child(even) .inventory-card-img{animation-delay:-1.9s}
+@keyframes rf2-hover{0%,100%{translate:0 0;rotate:-2deg}50%{translate:0 -8px;rotate:2deg}}
+
+/* 12. Inventaire vide : apparition douce */
+.inventory-empty{animation:rf2-zoom .6s var(--rf2-ease) backwards}
+@keyframes rf2-zoom{from{opacity:0;scale:.82;translate:0 24px}}
+
+/* 13. Liste d’amis qui arrive par la droite */
+.friend-row{animation:rf2-from-right .55s var(--rf2-ease) backwards}
+.friend-row:nth-child(2){animation-delay:.06s}
+.friend-row:nth-child(3){animation-delay:.12s}
+.friend-row:nth-child(4){animation-delay:.18s}
+.friend-row:nth-child(n+5){animation-delay:.24s}
+@keyframes rf2-from-right{from{opacity:0;translate:44px 0}}
+
+/* 14. Photo de profil qui respire */
+.avatar-wrap{animation:rf2-breathe 4.2s ease-in-out infinite}
+@keyframes rf2-breathe{0%,100%{scale:1;translate:0 0}50%{scale:1.035;translate:0 -4px}}
+
+/* 15. Cloche qui sonne s’il y a du nouveau */
+.notif-btn:has(.notif-badge:not([hidden])){transform-origin:50% 10%;animation:rf2-ring 3.4s ease-in-out infinite}
+@keyframes rf2-ring{0%,70%,100%{rotate:0deg}74%{rotate:16deg}78%{rotate:-14deg}82%{rotate:10deg}86%{rotate:-7deg}90%{rotate:3deg}}
+
+/* 16. Pastille de notification qui saute */
+.notif-badge:not([hidden]){animation:rf2-hop 1.9s ease-in-out infinite}
+@keyframes rf2-hop{0%,60%,100%{translate:0 0;scale:1}70%{translate:0 -5px;scale:1.18}80%{translate:0 0;scale:.92}88%{translate:0 -2px;scale:1.05}}
+
+/* 17. Notifications et nouveautés en cascade */
+.notif-row,.news-entry{animation:rf2-unfold .5s var(--rf2-ease) backwards}
+:is(.notif-row,.news-entry):nth-child(2){animation-delay:.07s}
+:is(.notif-row,.news-entry):nth-child(3){animation-delay:.14s}
+:is(.notif-row,.news-entry):nth-child(n+4){animation-delay:.21s}
+@keyframes rf2-unfold{from{opacity:0;translate:0 20px;scale:.94}}
+
+/* 18. Icônes de quêtes qui gigotent */
+.quest-head .quest-icon{animation:rf2-wiggle 4s ease-in-out infinite;animation-delay:calc(var(--i,0) * 220ms)}
+@keyframes rf2-wiggle{0%,74%,100%{rotate:0deg;scale:1}80%{rotate:-14deg;scale:1.14}86%{rotate:11deg;scale:1.12}92%{rotate:-5deg}}
+
+/* 19. Bouton de fermeture qui pivote */
+@media (hover:hover){:is(.sheet-x,.inspect-x,.fusion-x):hover{animation:rf2-turn .45s var(--rf2-ease)}}
+@keyframes rf2-turn{from{rotate:-180deg;scale:.8}}
+
+/* 20. Résultat du pile ou face qui explose */
+.flip-result:not(:empty){animation:rf2-reveal .75s var(--rf2-ease) backwards}
+@keyframes rf2-reveal{0%{opacity:0;scale:2.6;rotate:-10deg;filter:blur(8px)}55%{opacity:1;scale:.9;rotate:3deg;filter:blur(0)}78%{scale:1.08;rotate:-1deg}100%{scale:1;rotate:0deg}}
+
+} /* fin des 20 animations */
