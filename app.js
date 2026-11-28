@@ -665,7 +665,8 @@
   const inspect = $('inspect');
   const inspectCard = $('inspect-card');
   const inspectX = $('inspect-x');
-  const inspectBackdrop = $('inspect-backdrop');
+  const inspectScroll = $('inspect-scroll');
+  const inspectCount = $('inspect-count');
   const authScreen = $('auth-screen');
   const loadingScreen = $('loading-screen');
   const loadingText = $('loading-text');
@@ -3305,9 +3306,8 @@
 
   function openInspect(card, stat) {
     if (!card) return;
-    const oldCount = qs(inspectCard.parentElement, '.insp-count');
-    if (oldCount) oldCount.remove();
-    inspectCard.parentElement.querySelectorAll('.insp-odds, .insp-drop-odds').forEach((node) => node.remove());
+    inspectCount.replaceChildren();
+    inspectCount.hidden = !stat;
     const info = RARITIES[card.rarity] || RARITIES.common;
     inspectCard.replaceChildren(cardFrame(card, { eager: true, alt: `${card.name} — ${info.label}` }));
     inspectCard.style.setProperty('--r-color', info.color);
@@ -3321,11 +3321,11 @@
     resetInspTilt();
     inspectReturnFocus = document.activeElement;
     inspect.hidden = false;
+    inspectScroll.scrollTop = 0;
     void inspect.offsetWidth;
     inspect.classList.add('is-open');
     SFX.tick();
     if (stat) {
-      const box = el('div', 'insp-count');
       const mk = (cls, n, label, variant) => {
         const cell = el('button', `ic-cell ${cls}`);
         cell.type = 'button';
@@ -3334,25 +3334,21 @@
         if (variant === card) cell.classList.add('is-on');
         on(cell, 'click', () => {
           inspectCard.replaceChildren(cardFrame(variant, { eager: true, alt: `${variant.name} — ${info.label}` }));
-          box.querySelectorAll('.ic-cell').forEach((c) => c.classList.toggle('is-on', c === cell));
+          inspectCount.querySelectorAll('.ic-cell').forEach((c) => c.classList.toggle('is-on', c === cell));
           if (sellBtn) sellBtn.hidden = !(countMap().get(variant.id) > 0);
           SFX.tick();
         });
         return cell;
       };
-      box.append(
+      inspectCount.append(
         mk('', stat.normal, 'Normale' + (stat.normal > 1 ? 's' : ''), stat.card),
         mk('ic-shiny', stat.shiny, '✦ Shiny', stat.shinyCard)
       );
-      inspectCard.parentElement.append(box);
     }
     const shinyRate = CardMutations.definitions.find((mutation) => mutation.id === 'shiny')?.rates[card.rarity] || 0;
-    const odds = el('p', 'insp-odds');
-    odds.textContent = shinyRate > 0
+    $('inspect-shiny-odds').textContent = shinyRate > 0
       ? `✦ Chance de Shiny : 1 sur ${fmt(Math.round(1 / shinyRate))} (sans boost)`
       : '✦ Chance de Shiny indisponible';
-    odds.setAttribute('aria-label', odds.textContent);
-    inspectCard.parentElement.append(odds);
 
     // Chance de la carte de base, indépendamment de sa mutation, par tirage.
     // Les cartes vidéo sont exclusives à leur pack ; les autres utilisent le
@@ -3364,11 +3360,9 @@
     const sameRarity = baseCard ? pool.filter((candidate) => candidate.rarity === baseCard.rarity) : [];
     const shares = slotRarityShares(type, packSlotsFor(type)[0], pool);
     const dropRate = sameRarity.length ? (shares[baseCard.rarity] || 0) / sameRarity.length : 0;
-    const dropOdds = el('p', 'insp-drop-odds');
-    dropOdds.textContent = dropRate > 0
+    $('inspect-drop-odds').textContent = dropRate > 0
       ? `Chance de drop : environ 1 sur ${fmt(Math.round(1 / dropRate))} (${type === 'video' ? '1er tirage · pack vidéo' : 'par carte · pack classique'})`
       : 'Chance de drop indisponible';
-    inspectCard.parentElement.append(dropOdds);
     inspectX.focus({ preventScroll: true });
   }
 
@@ -3389,7 +3383,9 @@
   }
 
   on(inspectX, 'click', closeInspect);
-  on(inspectBackdrop, 'click', closeInspect);
+  on(inspectScroll, 'click', (event) => {
+    if (event.target === inspectScroll) closeInspect();
+  });
   on($('inspect-sell'), 'click', () => { if (inspectCardId) quickSellCard(inspectCardId); });
 
   /* ----------------------------------------------------------- vers le butin */

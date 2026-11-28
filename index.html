@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.28-5">
+  <meta name="app-version" content="2026.11.28-6">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,8 +25,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.28-5">
-  <link rel="stylesheet" href="pixel-theme.css?v=2026.11.28-5">
+  <link rel="stylesheet" href="styles.css?v=2026.11.28-6">
+  <link rel="stylesheet" href="pixel-theme.css?v=2026.11.28-6">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -51,7 +51,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.28-5" defer></script>
+  <script src="app.js?v=2026.11.28-6" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -1060,16 +1060,6 @@
         </div>
       </footer>
 
-      <!-- ============================ INSPECTION =========================== -->
-      <div class="inspect" id="inspect" hidden role="dialog" aria-modal="true" aria-label="Carte en grand">
-        <div class="inspect-backdrop" id="inspect-backdrop"></div>
-        <div class="inspect-dialog">
-          <button class="inspect-x" id="inspect-x" type="button" aria-label="Fermer l'inspection">✕</button>
-          <div class="inspect-card" id="inspect-card"></div>
-        </div>
-        <button class="inspect-sell" id="inspect-sell" type="button" hidden>🏷️ Vente rapide</button>
-      </div>
-
       <!-- ============================== QUÊTES =============================== -->
       <section class="view quests-view" id="quests-view" aria-label="Quêtes et succès">
         <div class="page-scroll">
@@ -1346,6 +1336,25 @@
         </div>
       </div>
     </main>
+
+    <!-- Inspection sur toute la hauteur visible, hors de la zone du jeu qui rogne le contenu. -->
+    <div class="inspect" id="inspect" hidden role="dialog" aria-modal="true" aria-label="Carte en grand">
+      <div class="inspect-backdrop" aria-hidden="true"></div>
+      <div class="inspect-scroll" id="inspect-scroll">
+        <div class="inspect-dialog">
+          <div class="inspect-preview">
+            <button class="inspect-x" id="inspect-x" type="button" aria-label="Fermer l'inspection">✕</button>
+            <div class="inspect-card" id="inspect-card"></div>
+          </div>
+          <div class="inspect-odds">
+            <p class="insp-odds" id="inspect-shiny-odds"></p>
+            <p class="insp-drop-odds" id="inspect-drop-odds"></p>
+          </div>
+          <div class="insp-count" id="inspect-count" hidden></div>
+          <button class="inspect-sell" id="inspect-sell" type="button" hidden>🏷️ Vente rapide</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ============================ NAVIGATION ============================ -->
     <nav class="tabbar" id="tabbar" aria-label="Navigation principale" inert>

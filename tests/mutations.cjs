@@ -50,7 +50,18 @@ api.renderCollection();
 assert.ok(w.document.querySelector('#coll-grid .coll-shiny-dot'), 'pastille shiny attendue sur la vignette');
 assert.equal(w.document.querySelector('#coll-grid .coll-pill').textContent, 'x3', 'les 3 exemplaires sont comptés');
 const inspectedCard = api.state.collection[0];
-api.openInspect(inspectedCard);
+const inspect = w.document.getElementById('inspect');
+const oddsPanel = inspect.querySelector('.inspect-odds');
+assert.equal(inspect.parentElement.id, 'app', 'la fiche peut utiliser tout l’écran, hors de la zone rognée du jeu');
+w.document.querySelector('#coll-grid .coll-shiny-dot').closest('button').click();
+assert.equal(inspect.hidden, false);
+assert.equal(oddsPanel.previousElementSibling.querySelector('#inspect-card').id, 'inspect-card');
+assert.equal(oddsPanel.nextElementSibling.id, 'inspect-count', 'les taux précèdent le choix de variante');
+assert.equal(oddsPanel.nextElementSibling.nextElementSibling.id, 'inspect-sell', 'la vente reste dans le flux sous les taux');
+const oddsText = oddsPanel.textContent;
+inspect.querySelector('.ic-shiny').click();
+assert.ok(inspect.querySelector('.mutation-shiny'), 'la variante Shiny est affichée');
+assert.equal(oddsPanel.textContent, oddsText, 'la variante conserve les taux de la carte de base');
 const shinyRate = api.shinyRate(inspectedCard);
 assert.match(w.document.querySelector('.insp-odds').textContent,
   new RegExp(`1 sur ${Math.round(1 / shinyRate)} \\(sans boost\\)`),

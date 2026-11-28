@@ -1756,10 +1756,8 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   position: absolute;
   inset: 0;
   z-index: 60;
-  display: grid;
-  place-items: center;
-  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
 }
+.inspect:not(.is-open) { pointer-events: none; }
 .inspect-backdrop {
   position: absolute;
   inset: 0;
@@ -1769,23 +1767,38 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible {
   opacity: 0;
   transition: opacity 0.26s ease;
 }
+.inspect-scroll {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
 .inspect-dialog {
-  position: relative;
-  z-index: 1;
-  width: clamp(150px, calc(71.43vh - 164px), 460px);
-  max-width: 92vw;
+  /* Centré si tout tient, aligné en haut et défilable sinon. */
+  margin: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
   opacity: 0;
   transform: translateY(16px) scale(0.94);
   transition: opacity 0.3s var(--ease-out), transform 0.36s var(--ease-spring);
 }
 .inspect.is-open .inspect-backdrop { opacity: 1; }
 .inspect.is-open .inspect-dialog { opacity: 1; transform: none; }
+.inspect-preview {
+  position: relative;
+  width: clamp(110px, calc(71.43vh - 162px), 460px);
+  width: clamp(110px, calc(71.43dvh - 162px), 460px);
+  max-width: calc(100% - 24px);
+}
 .inspect-sell {
-  position: absolute;
-  left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 2;
-  transform: translateX(-50%);
+  margin-top: 12px;
   padding: 11px 22px;
   border-radius: 999px;
   border: 1px solid #fbbf2480;
@@ -3450,9 +3463,10 @@ body:has(.inspect.is-open) .update-banner{display:none}
 .coll-pill{animation:pill-bump .5s cubic-bezier(.2,1.6,.4,1) both}
 .cf.mutation-shiny{animation:shiny-pulse 2.6s ease-in-out infinite}
 .inspect.is-open .inspect-dialog{animation:insp-spring .55s cubic-bezier(.2,1.4,.35,1) both}
-.insp-count{display:flex;justify-content:center;gap:10px;margin-top:14px;animation:insp-rise .45s cubic-bezier(.2,1.3,.4,1) both}
-.insp-odds{margin:12px 0 0;color:#fff0aa;font-size:13px;font-weight:700;text-align:center;text-shadow:0 0 12px #f7dd8455;animation:insp-rise .45s cubic-bezier(.2,1.3,.4,1) both}
-.insp-drop-odds{margin:5px 0 0;color:#e6ebdf;font-size:12px;font-weight:700;text-align:center}
+.insp-count{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:12px;animation:insp-rise .45s cubic-bezier(.2,1.3,.4,1) both}
+.inspect-odds{width:max-content;max-width:100%;margin-top:12px;padding:8px 12px;border:1px solid #ffffff24;border-radius:12px;background:#1a1226;text-align:center;font-size:13px;line-height:1.4;font-weight:700}
+.insp-odds{margin:0;color:#fff0aa}
+.insp-drop-odds{margin:3px 0 0;color:#e6ebdf}
 .ic-cell{min-width:92px;padding:8px 14px;border-radius:14px;background:#1a1226e6;border:1px solid #ffffff33;text-align:center;color:#fff}
 .ic-cell b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
 .ic-cell small{font-size:11px;letter-spacing:.06em;opacity:.85}
@@ -3477,7 +3491,7 @@ body:has(.inspect.is-open) .update-banner{display:none}
 @keyframes arrow-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
 @keyframes result-glow{0%,100%{box-shadow:0 0 10px var(--fs-color,#fff)}50%{box-shadow:0 0 28px var(--fs-color,#fff),0 0 48px var(--fs-color,#fff)}}
 @media (prefers-reduced-motion:reduce){
-  .coll-tile,.coll-shiny-dot,.coll-pill,.cf.mutation-shiny,.insp-count,.ic-shiny,.fusion-dialog.is-fusing,.fusion-dialog.is-fusing .fs-card.result,.fs-arrow,.fs-card.result,.fusion-row.is-selected{animation:none!important}
+  .inspect.is-open .inspect-dialog,.coll-tile,.coll-shiny-dot,.coll-pill,.cf.mutation-shiny,.insp-count,.ic-shiny,.fusion-dialog.is-fusing,.fusion-dialog.is-fusing .fs-card.result,.fs-arrow,.fs-card.result,.fusion-row.is-selected{animation:none!important}
 }
 
 
