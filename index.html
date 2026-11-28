@@ -610,8 +610,7 @@
                les entrées PUBLIÉES ; le compte propriétaire voit en plus ses
                brouillons, stockés dans un document Firestore que les règles
                réservent à lui seul (gameNews/drafts). -->
-          <section class="news-card" data-preview="journal-nouveautes"
-                   data-preview-label="Journal des nouveautés" aria-labelledby="news-card-title">
+          <section class="news-card" aria-labelledby="news-card-title">
             <div class="news-card-head">
               <h3 id="news-card-title">📰 Nouveautés</h3>
               <p class="news-summary" id="news-summary">Chargement des nouveautés…</p>
@@ -728,22 +727,6 @@
               <p class="admin-news-msg" id="admin-news-msg" role="status"></p>
             </section>
 
-            <!-- Aperçus : toute balise d'index.html qui porte data-preview="…"
-                 reste invisible pour les joueurs tant qu'elle n'est pas publiée
-                 ici. « Publier pour tous » la rend visible par tout le monde ;
-                 « Tout publier (release) » relâche toute la mise à jour d'un
-                 coup. C'est ce qui permet de préparer une fonctionnalité
-                 directement en production, sans que personne ne la voie. -->
-            <section class="admin-preview" id="admin-preview" aria-labelledby="admin-preview-title">
-              <h4 id="admin-preview-title">🧪 Aperçus · fonctionnalités futures</h4>
-              <p class="admin-preview-sub">Les blocs marqués <code>data-preview</code> dans la page ne sont visibles que par toi. Publie-les quand la mise à jour est prête.</p>
-              <div class="preview-list" id="admin-preview-list"></div>
-              <div class="admin-preview-actions">
-                <button class="mini-btn primary" id="admin-preview-release-all" type="button" hidden>🚀 Tout publier (release)</button>
-              </div>
-              <p class="admin-preview-count" id="admin-preview-count"></p>
-              <p class="admin-preview-msg" id="admin-preview-msg" role="status"></p>
-            </section>
           </section>
         </div>
       </section>
@@ -1200,7 +1183,7 @@
            (lisible par le seul compte propriétaire). Les brouillons ne sont
            donc jamais envoyés aux autres joueurs : ce n'est pas un simple
            masquage côté page. -->
-      <div class="sheet sheet-news" id="news-sheet" data-preview="journal-nouveautes" hidden>
+      <div class="sheet sheet-news" id="news-sheet" hidden>
         <div class="sheet-backdrop" data-close-news></div>
         <div class="sheet-dialog sheet-news-dialog" role="dialog" aria-modal="true" aria-labelledby="news-title">
           <button class="sheet-x" type="button" data-close-news aria-label="Fermer les nouveautés">✕</button>

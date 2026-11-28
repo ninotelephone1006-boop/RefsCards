@@ -15,11 +15,8 @@ const assert = require('node:assert/strict');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ADMIN_EMAIL = 'ninotelephone1006@gmail.com';
 
-/* `released` : aperçus déjà publiés. Le journal lui-même est un aperçu
-   (`journal-nouveautes`) : ces tests le considèrent publié, sinon il reste
-   invisible pour les joueurs — c'est justement ce que vérifie preview-flow. */
-function newsDoc(entries, released = []) {
-  return { schema: 'news-v1', entries, released, updatedAt: new Date() };
+function newsDoc(entries) {
+  return { schema: 'news-v1', entries, updatedAt: new Date() };
 }
 
 function makeStore() {

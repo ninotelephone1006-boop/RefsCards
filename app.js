@@ -5013,11 +5013,8 @@
        joueurs, juste après le profil — `creator: true` est alors publié. */
     loadDecoLayouts();
     /* Nouveautés : `published` pour tout le monde, `drafts` pour le seul
-       compte propriétaire. Fire-and-forget : le jeu ne dépend pas du journal.
-       applyPreview() tout de suite : le propriétaire voit ses aperçus même si
-       Firestore est indisponible (règles pas encore publiées, hors ligne…). */
+       compte propriétaire. Fire-and-forget : le jeu ne dépend pas du journal. */
     loadNews(true);
-    applyPreview();
     /* Échanges désactivés : seul le marché existe (cartes + packs en vente).
        Les anciennes propositions trades/ ne sont plus chargées ni proposées.
        Le réseau social (amis, marché, cadeaux, défis) n'est branché qu'à
@@ -6618,10 +6615,9 @@
     if (!adminPanel) return;
     const allowed = isAdmin();
     adminPanel.hidden = !allowed;
-    /* Les blocs Nouveautés et Aperçus du panneau suivent la même règle : rien
-       à afficher pour un autre compte. */
+    /* Le bloc Nouveautés du panneau suit la même règle : rien à afficher
+       pour un autre compte. */
     renderNewsAdmin();
-    renderPreviewAdmin();
     if (!allowed) {
       setAdminMsg('');
       return;
@@ -6752,11 +6748,6 @@
   const newsAdminCount = $('admin-news-count');
   const newsAdminMsg = $('admin-news-msg');
 
-  const previewAdminList = $('admin-preview-list');
-  const previewAdminCount = $('admin-preview-count');
-  const previewAdminMsg = $('admin-preview-msg');
-  const previewReleaseAll = $('admin-preview-release-all');
-
   let newsPublished = [];   // entrées visibles par tous (les plus récentes d'abord)
   let newsDrafts = [];      // brouillons : chargés uniquement pour l'admin
   let newsLoadedAt = 0;
@@ -6813,11 +6804,11 @@
 
   async function readNewsDoc(id) {
     const ref = newsRef(id);
-    if (!ref || typeof ref.get !== 'function') return { entries: [], released: [] };
+    if (!ref || typeof ref.get !== 'function') return [];
     const snap = await ref.get();
-    if (!snap || !snap.exists) return { entries: [], released: [] };
+    if (!snap || !snap.exists) return [];
     const data = typeof snap.data === 'function' ? snap.data() : snap.data;
-    return { entries: newsEntries(data), released: previewIds(data && data.released) };
+    return newsEntries(data);
   }
 
   function newsPayload(entries) {
@@ -6830,7 +6821,6 @@
     }));
   }
 
-  /* Brouillons : un document privé, sans les aperçus. */
   async function writeNewsDoc(id, entries) {
     const ref = newsRef(id);
     if (!ref || typeof ref.set !== 'function') throw new Error('cloud indisponible');
@@ -6841,18 +6831,8 @@
     }, { merge: true });
   }
 
-  /* Document public : les entrées publiées ET la liste des aperçus relâchés
-     (`released`). Les deux vivent dans le même document pour qu'un joueur
-     n'ait qu'une seule lecture à faire par session. */
   async function writePublishedDoc() {
-    const ref = newsRef(NEWS_PUBLISHED_DOC);
-    if (!ref || typeof ref.set !== 'function') throw new Error('cloud indisponible');
-    await ref.set({
-      schema: NEWS_SCHEMA,
-      entries: newsPayload(newsPublished),
-      released: previewReleased.slice(0, PREVIEW_MAX),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    await writeNewsDoc(NEWS_PUBLISHED_DOC, newsPublished);
   }
 
   function newsUnavailable() {
@@ -7019,201 +6999,6 @@
     return 'Enregistrement impossible pour le moment. Vérifie ta connexion.';
   }
 
-  /* ------------------- aperçus : masquer une fonctionnalité ----------------
-     Une balise de index.html marquée data-preview="identifiant" (et, pour un
-     libellé lisible, data-preview-label="…") n'est visible que par le compte
-     propriétaire tant qu'elle n'est pas publiée. C'est le mécanisme à utiliser
-     pour une nouveauté déjà dans le code mais pas encore sortie :
-
-       <section id="pack-du-mois" data-preview="pack-du-mois"
-                data-preview-label="Pack du mois">…</section>
-
-     Rien d'autre à faire côté feuille de style : le jeu pose
-     [data-preview-locked] et styles.css masque le bloc (display:none
-     !important), y compris s'il est en display:flex/grid.
-
-     Le propriétaire publie depuis Administration → 🧪 Aperçus :
-       - « Publier pour tous » ajoute l'identifiant dans gameNews/published
-         (champ `released`), lisible par tout le monde ;
-       - « Tout publier (release) » relâche tous les aperçus d'un coup.
-     La liste est gardée en cache local pour appliquer l'état dès le
-     chargement suivant, avant même la réponse de Firestore — un aperçu est
-     donc privé par défaut, jamais visible par erreur.
-
-     Pour une fonctionnalité dont le CODE doit aussi être neutralisé (pas
-     seulement son bloc HTML), tester previewVisible('identifiant') dans les
-     gestionnaires concernés. */
-  const PREVIEW_CACHE_KEY = 'refs-cards:preview-released';
-  const PREVIEW_MAX = 50;
-  const PREVIEW_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
-
-  let previewReleased = [];
-
-  function previewId(value) {
-    const id = String(value || '').trim().toLowerCase();
-    return PREVIEW_ID_RE.test(id) ? id : '';
-  }
-
-  function previewIds(list) {
-    const out = [];
-    if (!Array.isArray(list)) return out;
-    for (const raw of list) {
-      const id = previewId(raw);
-      if (id && !out.includes(id)) out.push(id);
-      if (out.length >= PREVIEW_MAX) break;
-    }
-    return out;
-  }
-
-  function previewCache() {
-    try {
-      const raw = window.localStorage.getItem(PREVIEW_CACHE_KEY);
-      return raw ? previewIds(JSON.parse(raw)) : [];
-    } catch (error) { return []; }
-  }
-
-  function savePreviewCache() {
-    try {
-      window.localStorage.setItem(PREVIEW_CACHE_KEY, JSON.stringify(previewReleased));
-    } catch (error) { /* stockage bloqué : l'état viendra de Firestore */ }
-  }
-
-  function previewNodes() {
-    return Array.prototype.slice.call(document.querySelectorAll('[data-preview]'));
-  }
-
-  /* Identifiants déclarés dans index.html, dans l'ordre du document. */
-  function previewRegistry() {
-    const map = new Map();
-    previewNodes().forEach((node) => {
-      const id = previewId(node.getAttribute('data-preview'));
-      if (!id) return;
-      const label = String(node.getAttribute('data-preview-label') || '').trim();
-      if (!map.has(id)) map.set(id, label || id);
-      else if (map.get(id) === id && label) map.set(id, label);
-    });
-    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
-  }
-
-  function previewVisible(id) {
-    const key = previewId(id);
-    if (!key) return true;
-    return isAdmin() || previewReleased.includes(key);
-  }
-
-  function previewLabel(id) {
-    const found = previewRegistry().find((entry) => entry.id === id);
-    return found ? found.label : id;
-  }
-
-  /* Applique l'état à tous les blocs : masqués pour les joueurs tant que
-     l'identifiant n'est pas dans `released`, toujours visibles pour le
-     propriétaire (il doit pouvoir relire son aperçu). */
-  function applyPreview() {
-    previewNodes().forEach((node) => {
-      const id = previewId(node.getAttribute('data-preview'));
-      if (!id) return;
-      const visible = isAdmin() || previewReleased.includes(id);
-      node.classList.toggle('is-preview-locked', !visible);
-      if (visible) node.removeAttribute('data-preview-locked');
-      else node.setAttribute('data-preview-locked', '1');
-    });
-    renderPreviewAdmin();
-  }
-
-  function renderPreviewAdmin() {
-    if (!previewAdminList) return;
-    const registry = previewRegistry();
-    if (!registry.length) {
-      previewAdminList.replaceChildren(el('p', 'preview-empty',
-        'Aucun aperçu déclaré. Ajoute data-preview="identifiant" sur la balise à réserver à ton compte.'));
-      if (previewAdminCount) previewAdminCount.textContent = '';
-      if (previewReleaseAll) previewReleaseAll.hidden = true;
-      return;
-    }
-    previewAdminList.replaceChildren(...registry.map(({ id, label }) => {
-      const visible = previewReleased.includes(id);
-      const row = el('div', 'preview-row');
-      const text = el('div', 'preview-row-text');
-      text.append(el('strong', 'preview-row-label', label));
-      text.append(el('code', 'preview-row-id', id));
-      row.append(text);
-      row.append(el('span', visible ? 'preview-state is-open' : 'preview-state',
-        visible ? 'Publié' : 'Privé · toi seul'));
-      const button = el('button', 'mini-btn', visible ? 'Repasser en privé' : 'Publier pour tous');
-      button.type = 'button';
-      on(button, 'click', () => { setPreviewReleased(id, !visible); });
-      row.append(button);
-      return row;
-    }));
-    const hiddenCount = registry.filter(({ id }) => !previewReleased.includes(id)).length;
-    if (previewAdminCount) {
-      previewAdminCount.textContent = hiddenCount
-        ? `${hiddenCount} aperçu${hiddenCount > 1 ? 's' : ''} privé${hiddenCount > 1 ? 's' : ''} · ${registry.length - hiddenCount} publié${registry.length - hiddenCount > 1 ? 's' : ''}`
-        : `Tous les aperçus (${registry.length}) sont publiés.`;
-    }
-    if (previewReleaseAll) previewReleaseAll.hidden = hiddenCount === 0;
-  }
-
-  function setPreviewMsg(message) {
-    if (previewAdminMsg) previewAdminMsg.textContent = message || '';
-  }
-
-  /* Publication d'un aperçu (ou retour en privé). On écrit `released` dans le
-     document public ; en cas d'échec, l'état précédent est restauré pour ne
-     jamais laisser croire que c'est publié. */
-  async function setPreviewReleased(id, released) {
-    if (!isAdmin() || newsBusy) return;
-    const key = previewId(id);
-    if (!key) return;
-    const next = released
-      ? previewIds(previewReleased.concat(key))
-      : previewReleased.filter((item) => item !== key);
-    const previous = previewReleased;
-    newsBusy = true;
-    try {
-      previewReleased = next;
-      await writePublishedDoc();
-      savePreviewCache();
-      applyPreview();
-      setPreviewMsg(released
-        ? `« ${previewLabel(key)} » est publié : visible par tous les joueurs.`
-        : `« ${previewLabel(key)} » est de nouveau privé : toi seul le vois.`);
-    } catch (error) {
-      previewReleased = previous;
-      applyPreview();
-      setPreviewMsg(newsWriteError(error));
-    } finally {
-      newsBusy = false;
-    }
-  }
-
-  /* Release : publie tous les aperçus d'un coup. */
-  async function releaseAllPreviews() {
-    if (!isAdmin() || newsBusy) return;
-    const registry = previewRegistry();
-    const next = previewIds(previewReleased.concat(registry.map((entry) => entry.id)));
-    if (next.length === previewReleased.length) {
-      setPreviewMsg('Tous les aperçus sont déjà publiés.');
-      return;
-    }
-    const previous = previewReleased;
-    newsBusy = true;
-    try {
-      previewReleased = next;
-      await writePublishedDoc();
-      savePreviewCache();
-      applyPreview();
-      setPreviewMsg(`Release : ${registry.length} aperçu${registry.length > 1 ? 's' : ''} publié${registry.length > 1 ? 's' : ''}.`);
-    } catch (error) {
-      previewReleased = previous;
-      applyPreview();
-      setPreviewMsg(newsWriteError(error));
-    } finally {
-      newsBusy = false;
-    }
-  }
-
   /* Lecture du journal : `published` pour tout le monde, `drafts` en plus pour
      le compte propriétaire — et jamais pour les autres. */
   function loadNews(force) {
@@ -7226,15 +7011,11 @@
     newsLoading = (async () => {
       try {
         const published = await readNewsDoc(NEWS_PUBLISHED_DOC);
-        const drafts = admin ? await readNewsDoc(NEWS_DRAFTS_DOC) : { entries: [], released: [] };
+        const drafts = admin ? await readNewsDoc(NEWS_DRAFTS_DOC) : [];
         if (!currentUser || currentUser.uid !== uid) return false; // compte changé entre-temps
-        newsPublished = published.entries;
+        newsPublished = published;
         const publishedIds = new Set(newsPublished.map((entry) => entry.id));
-        newsDrafts = drafts.entries.filter((entry) => !publishedIds.has(entry.id));
-        /* Aperçus : l'état publié arrive avec le même document. */
-        previewReleased = published.released;
-        savePreviewCache();
-        applyPreview();
+        newsDrafts = drafts.filter((entry) => !publishedIds.has(entry.id));
         newsErrorText = '';
         newsLoadedAt = Date.now();
         newsLoadedFor = uid;
@@ -7267,10 +7048,6 @@
     });
     setNewsMsg('');
     setNewsAdminMsg('');
-    setPreviewMsg('');
-    /* Les aperçus publiés sont publics : ils restent visibles, mais le panneau
-       d'administration (et ses boutons) ne doit plus rien montrer. */
-    applyPreview();
     renderNews();
     renderNewsAdmin();
   }
@@ -7337,11 +7114,7 @@
       await writePublishedDoc();
       newsLoadedAt = Date.now();
       newsErrorText = '';
-      /* Si le journal lui-même est encore en aperçu privé, les joueurs ne le
-         voient pas encore : le message doit rester exact. */
-      const message = previewVisible('journal-nouveautes')
-        ? 'Publié : la nouveauté est visible par tous les joueurs.'
-        : 'Entrée publiée · le journal est encore en aperçu privé (Administration → 🧪 Aperçus).';
+      const message = 'Publié : la nouveauté est visible par tous les joueurs.';
       setNewsMsg(message);
       setNewsAdminMsg(message);
       /* Le brouillon correspondant disparaît (au mieux : s'il reste, il est
@@ -7435,13 +7208,6 @@
     });
   }
 
-  /* État initial des aperçus : la liste publiée est en cache local, ce qui
-     évite de laisser apparaître une fonctionnalité encore privée le temps de
-     la réponse Firestore. */
-  previewReleased = previewCache();
-  applyPreview();
-
-  on(previewReleaseAll, 'click', () => { releaseAllPreviews(); });
   on(newsOpenBtn, 'click', openNewsSheet);
   on(newsSheetBtn, 'click', openNewsSheet);
   on(newsSaveBtn, 'click', () => { saveNewsDraft(); });
