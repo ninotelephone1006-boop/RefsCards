@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.28-3">
+  <meta name="app-version" content="2026.11.28-5">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,8 +25,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.28-4">
-  <link rel="stylesheet" href="pixel-theme.css?v=2026.11.27-8">
+  <link rel="stylesheet" href="styles.css?v=2026.11.28-5">
+  <link rel="stylesheet" href="pixel-theme.css?v=2026.11.28-5">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
   <script src="https://www.gstatic.com/firebasejs/13.4.0/firebase-app-compat.js" defer></script>
@@ -51,7 +51,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.28-4" defer></script>
+  <script src="app.js?v=2026.11.28-5" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -169,7 +169,7 @@
         <div class="pack-head">
           <p class="kicker"><span>✦</span> SÉRIE 01 · BOOSTER MYSTÈRE <span>✦</span></p>
           <h1>Déchire. Révèle. <em>Collectionne.</em></h1>
-          <p class="pack-sub">Choisis un booster dans ton inventaire pour l’ouvrir.</p>
+          <p class="pack-sub">Choisis un booster dans ton inventaire.</p>
         </div>
 
         <img class="game-logo" src="assets/icons/logo-refs-cards.png" width="150" height="150" alt="Refs Cards" draggable="false">
@@ -213,6 +213,9 @@
           </div>
         </div>
 
+        <button class="odds-toggle" id="odds-toggle" type="button" aria-expanded="false" aria-controls="pack-odds">
+          <span aria-hidden="true">ⓘ</span> Taux d’obtention <span class="odds-toggle-caret" aria-hidden="true">▾</span>
+        </button>
         <div class="pack-odds" id="pack-odds" aria-label="Taux d’obtention par carte"></div>
       </section>
 

@@ -48,3 +48,6 @@ html, body { background: #061070; }
 .coll-bar i, .quest-bar i { background: #ffdf00; }
 .toast, .update-banner { border-radius: 0; background: #0a218b; border: 2px solid #ffdf00; box-shadow: 4px 4px 0 #02073e; }
 button:focus-visible, a:focus-visible, [role='button']:focus-visible { outline: 3px solid #ffed00; outline-offset: 3px; }
+.odds-toggle { border-radius: 0; border: 2px solid #5178ff; background: #1029ad; color: #ffed00; box-shadow: 2px 2px 0 #02073e; }
+.odds-toggle:hover { background: #254cff; color: #fff; border-color: #ffed00; }
+.odds-toggle[aria-expanded='true'] { color: #ffed00; border-color: #ffdf00; background: #173abf; }

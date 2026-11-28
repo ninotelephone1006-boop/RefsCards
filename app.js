@@ -605,6 +605,7 @@
   const pack = $('pack');
   const packFlap = $('pack-flap');
   const packFloat = $('pack-float');
+  const packHint = $('pack-hint');
   const gapGlow = qs(pack, '.gap-glow');
   const gapCards = qs(pack, '.gap-cards');
   const packSave = qs(pack, '.pack-and-save');
@@ -660,6 +661,7 @@
   const revealKicker = $('reveal-kicker');
   const soundBtn = $('sound-btn');
   const packOdds = $('pack-odds');
+  const oddsToggle = $('odds-toggle');
   const inspect = $('inspect');
   const inspectCard = $('inspect-card');
   const inspectX = $('inspect-x');
@@ -2589,6 +2591,13 @@
   }
 
   on(packArea, 'pointerdown', onDragStart);
+  // Les probabilités restent repliées par défaut : dépliage à la demande.
+  if (oddsToggle && packOdds) {
+    on(oddsToggle, 'click', () => {
+      const open = packOdds.classList.toggle('is-open');
+      oddsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+  }
   on(packArea, 'pointermove', (e) => {
     if (drag || state.phase !== 'pack' || reduceMotion.matches) return;
     const r = packArea.getBoundingClientRect();
@@ -4530,10 +4539,14 @@
       }
     }
     // Le paquet : il doit tenir sous le titre, au-dessus des probabilités.
+    // On retire la hauteur de la barre d'indication (« GLISSE VERS LA DROITE »)
+    // pour que le haut du booster ne soit jamais masqué ni le bas chevauché.
     const areaH = packArea.clientHeight;
     const areaW = packArea.clientWidth;
     if (areaH > 0 && areaW > 0) {
-      const w = Math.min(areaW * 0.62, areaH * 0.56, 286);
+      const hintH = packHint ? packHint.offsetHeight + 12 : 56;
+      const availH = Math.max(140, areaH - hintH - 4);
+      const w = Math.min(areaW * 0.62, availH * 0.5628, 286);
       pack.style.width = `${Math.max(132, w).toFixed(0)}px`;
     }
   }
