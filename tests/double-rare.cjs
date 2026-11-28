@@ -99,14 +99,14 @@ function yesterdayKey() {
   const save = { coins: 5000, firstPack: false, decoReleaseClaimed: true, collection: [], friends: [], packsOpened: 0, packStock: { classic: 0, rare: 0 }, streakDate: '', streak: 0, claimedDays: [] };
   const { w, doc, store } = await boot(save);
   const t = w.__test;
-  assert.equal(t.promoUnitPrice('doubleRare'), 1445);
+  assert.equal(t.promoUnitPrice('doubleRare'), 1530);
   assert.deepEqual(JSON.parse(JSON.stringify(t.packTableFor('doubleRare'))), JSON.parse(JSON.stringify(t.packTableFor('rare'))));
   assert.deepEqual(JSON.parse(JSON.stringify(t.packSlotsFor('doubleRare'))), [...JSON.parse(JSON.stringify(t.packSlotsFor('rare'))), ...JSON.parse(JSON.stringify(t.packSlotsFor('rare')))]);
   assert.equal(t.packShinyFor('doubleRare'), 2);
   assert.equal(t.drawPack(false, t.packPool('doubleRare'), 'doubleRare').length, 10);
   doc.querySelector('[data-pack="doubleRare"][data-qty="2"]')?.click();
   doc.getElementById('buy-doubleRare').click(); await wait(400);
-  assert.equal(store.playerSaves.me.coins, 3555);
+  assert.equal(store.playerSaves.me.coins, 3470);
   assert.equal(store.playerSaves.me.packStock.doubleRare, 1);
   doc.getElementById('open-doubleRare').click();
   assert.match(doc.getElementById('pack-img-main').src, /Packraredouble.png/);
@@ -116,7 +116,7 @@ function yesterdayKey() {
   assert.equal(doc.getElementById('double-promo-sheet').hidden, true);
   w.close();
   const expired = await boot(save, Date.parse('2026-11-26T19:35:00Z'), true);
-  assert.equal(expired.w.__test.promoUnitPrice('doubleRare'), 1700);
+  assert.equal(expired.w.__test.promoUnitPrice('doubleRare'), 1800);
   assert.equal(expired.doc.getElementById('double-promo-line').hidden, true);
   expired.w.close();
   console.log('PASS Double Rare : tirage, achat, sauvegarde, annonce unique et expiration');

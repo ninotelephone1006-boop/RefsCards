@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.28-2">
+  <meta name="app-version" content="2026.11.28-3">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.28-2">
+  <link rel="stylesheet" href="styles.css?v=2026.11.28-3">
   <link rel="stylesheet" href="pixel-theme.css?v=2026.11.27-8">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
@@ -51,7 +51,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.28-2" defer></script>
+  <script src="app.js?v=2026.11.28-3" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -282,8 +282,8 @@
               </div>
               <div class="shop-info">
                 <h3>Pack Classique</h3>
-                <p class="shop-desc">5 cartes · taux fixes par carte</p>
-                <p class="shop-odds">Taux d’obtention fixes par carte</p>
+                <p class="shop-desc">5 cartes · taux fixes par carte · Shiny ×1</p>
+                <p class="shop-odds" data-pack-ev="classic">Valeur moyenne ≈ 313 🪙</p>
                 <p class="shop-stock" id="shop-stock-classic">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs classiques">
                   <button class="qty-btn" type="button" data-pack="classic" data-delta="-1" aria-label="Moins">−</button>
@@ -306,8 +306,8 @@
               </div>
               <div class="shop-info">
                 <h3>Pack Rare <span class="shop-rare-tag">doré</span></h3>
-                <p class="shop-desc">5 cartes · 1 Rare+ et 1 Épique+ garanties · chances de Shiny ×2</p>
-                <p class="shop-odds">Valeur moyenne ≈ 878 🪙 · 🎲 Pack rentable : 2 chances sur 5</p>
+                <p class="shop-desc">5 cartes · raretés élevées bien plus fréquentes · Shiny ×2</p>
+                <p class="shop-odds" data-pack-ev="rare">Valeur moyenne ≈ 653 🪙</p>
                 <p class="shop-stock" id="shop-stock-rare">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs rares">
                   <button class="qty-btn" type="button" data-pack="rare" data-delta="-1" aria-label="Moins">−</button>
@@ -328,9 +328,9 @@
               <div class="shop-img-wrap"><img class="shop-img" src="assets/Packraredouble.png" alt="Pack Double Rare Refs Cards" draggable="false"></div>
               <div class="shop-info">
                 <h3>Pack Double Rare <span class="shop-ultra-tag">×2</span></h3>
-                <p class="shop-desc">10 cartes · mêmes chances que le Pack Rare · 2 Rare+ et 2 Épique+ garanties · Shiny ×2</p>
-                <p class="shop-odds">🎲 Pack rentable : 2 chances sur 5</p>
-                <p class="shop-promo-line" id="double-promo-line" hidden><span class="shop-promo-off">−15 %</span><span class="shop-promo-txt">SORTIE · <s>1 700</s> <strong>1 445</strong> 🪙</span><span class="shop-promo-clock" id="double-promo-clock">48:00:00</span></p>
+                <p class="shop-desc">10 cartes · mêmes chances que le Pack Rare · Shiny ×2</p>
+                <p class="shop-odds" data-pack-ev="doubleRare">Valeur moyenne ≈ 1 305 🪙</p>
+                <p class="shop-promo-line" id="double-promo-line" hidden><span class="shop-promo-off">−15 %</span><span class="shop-promo-txt">SORTIE · <s>1 800</s> <strong>1 530</strong> 🪙</span><span class="shop-promo-clock" id="double-promo-clock">48:00:00</span></p>
                 <p class="shop-stock" id="shop-stock-doubleRare">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs double rare">
                   <button class="qty-btn" type="button" data-pack="doubleRare" data-delta="-1" aria-label="Moins">−</button>
@@ -338,7 +338,7 @@
                   <button class="qty-btn" type="button" data-pack="doubleRare" data-delta="1" aria-label="Plus">+</button>
                   <span class="qty-quick"><button class="qty-chip" type="button" data-pack="doubleRare" data-qty="1">×1</button><button class="qty-chip" type="button" data-pack="doubleRare" data-qty="5">×5</button><button class="qty-chip" type="button" data-pack="doubleRare" data-qty="10">×10</button></span>
                 </div>
-                <button class="shop-buy shop-buy-ultra" id="buy-doubleRare" type="button">ACHETER · 1 700 🪙</button>
+                <button class="shop-buy shop-buy-ultra" id="buy-doubleRare" type="button">ACHETER · 1 800 🪙</button>
               </div>
             </article>
 
@@ -349,7 +349,7 @@
               <div class="shop-info">
                 <h3>Pack Légende</h3>
                 <p class="shop-desc">10 cartes · chances normales</p>
-                <p class="shop-odds">Valeur moyenne ≈ 788 🪙 · 🎲 Pack rentable : 1 chance sur 2</p>
+                <p class="shop-odds" data-pack-ev="legend">Valeur moyenne ≈ 521 🪙</p>
                 <p class="shop-stock" id="shop-stock-legend">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs légendes">
                   <button class="qty-btn" type="button" data-pack="legend" data-delta="-1" aria-label="Moins">−</button>
@@ -372,7 +372,7 @@
               <div class="shop-info">
                 <h3>Pack Vidéo</h3>
                 <p class="shop-desc">2 cartes animées · fps, son et boucle réglés carte par carte</p>
-                <p class="shop-odds">Valeur moyenne ≈ 153 🪙 · 🎲 Pack rentable : 1 chance sur 3</p>
+                <p class="shop-odds" data-pack-ev="video">Valeur moyenne ≈ 436 🪙</p>
                 <p class="shop-stock" id="shop-stock-video">Tu en as 0</p>
                 <div class="qty-row" role="group" aria-label="Quantité de packs vidéo">
                   <button class="qty-btn" type="button" data-pack="video" data-delta="-1" aria-label="Moins">−</button>
@@ -384,7 +384,7 @@
                     <button class="qty-chip" type="button" data-pack="video" data-qty="10">×10</button>
                   </span>
                 </div>
-                <button class="shop-buy shop-buy-video" id="buy-video" type="button">ACHETER · 1 000 🪙</button>
+                <button class="shop-buy shop-buy-video" id="buy-video" type="button">ACHETER · 600 🪙</button>
               </div>
             </article>
 
@@ -395,12 +395,12 @@
               </div>
               <div class="shop-info">
                 <h3>Pack Ultra Rare <span class="shop-ultra-tag">ultra</span></h3>
-                <p class="shop-desc">5 cartes · Épique+, Mythique+ et Légendaire+ garantis · chances de Shiny ×7</p>
-                <p class="shop-odds">Valeur moyenne ≈ 1 964 🪙 · 🎲 Pack rentable : 1 chance sur 3</p>
+                <p class="shop-desc">5 cartes · aucune commune ni inhabituelle · Shiny ×7</p>
+                <p class="shop-odds" data-pack-ev="ultra">Valeur moyenne ≈ 1 522 🪙</p>
                 <!-- Offre de sortie : −20 % pendant 24 h (masquée hors promo) -->
                 <p class="shop-promo-line" id="ultra-promo-line" hidden>
                   <span class="shop-promo-off">−20 %</span>
-                  <span class="shop-promo-txt">SORTIE · <s>10 000</s> <strong id="ultra-promo-price">8 000</strong> 🪙</span>
+                  <span class="shop-promo-txt">SORTIE · <s>2 200</s> <strong id="ultra-promo-price">1 760</strong> 🪙</span>
                   <span class="shop-promo-clock" id="ultra-promo-clock">24:00:00</span>
                 </p>
                 <p class="shop-stock" id="shop-stock-ultra">Tu en as 0</p>
@@ -414,7 +414,7 @@
                     <button class="qty-chip" type="button" data-pack="ultra" data-qty="10">×10</button>
                   </span>
                 </div>
-                <button class="shop-buy shop-buy-ultra" id="buy-ultra" type="button">ACHETER · 10 000 🪙</button>
+                <button class="shop-buy shop-buy-ultra" id="buy-ultra" type="button">ACHETER · 2 200 🪙</button>
               </div>
             </article>
           </div>
@@ -1312,7 +1312,7 @@
           <h3 class="promo-title" id="double-promo-title">Double Rare<em>.</em></h3>
           <p class="promo-sub" id="double-promo-desc">Deux fois plus de cartes, les mêmes chances que le Pack Rare. Pour sa sortie : <strong>−15 % pendant 48 h</strong> !</p>
           <div class="promo-body"><figure class="promo-pack"><span class="promo-halo" aria-hidden="true"></span><span class="promo-off" aria-hidden="true"><b>−15</b><small>%</small></span><img src="assets/Packraredouble.png" alt="Pack Double Rare" draggable="false"></figure>
-            <div class="promo-info"><p class="promo-price"><span class="promo-price-label">Prix de sortie</span><span class="promo-price-row"><s class="promo-price-old">1 700 🪙</s><strong class="promo-price-new">1 445 🪙</strong></span></p><p class="promo-perks">10 cartes · 2 Rare+ et 2 Épique+ garanties · Shiny ×2</p><p class="promo-timer" role="timer"><span class="promo-timer-label">Fin de l'offre dans</span><span class="promo-clock" id="double-sheet-clock">48:00:00</span></p></div></div>
+            <div class="promo-info"><p class="promo-price"><span class="promo-price-label">Prix de sortie</span><span class="promo-price-row"><s class="promo-price-old">1 800 🪙</s><strong class="promo-price-new">1 530 🪙</strong></span></p><p class="promo-perks">10 cartes · mêmes chances que le Pack Rare · Shiny ×2</p><p class="promo-timer" role="timer"><span class="promo-timer-label">Fin de l'offre dans</span><span class="promo-clock" id="double-sheet-clock">48:00:00</span></p></div></div>
           <div class="sheet-actions promo-actions"><button class="mini-btn" id="double-promo-later" type="button">Plus tard</button><button class="mini-btn primary promo-cta" id="double-promo-see" type="button">DÉCOUVRIR LE PACK →</button></div>
           <div class="promo-bar" aria-hidden="true"><i id="double-bar-fill"></i></div><p class="promo-hint">Offre de lancement limitée · Une seule annonce</p>
         </div>
@@ -1340,11 +1340,11 @@
               <p class="promo-price">
                 <span class="promo-price-label">Prix de sortie</span>
                 <span class="promo-price-row">
-                  <s class="promo-price-old">10 000 🪙</s>
-                  <strong class="promo-price-new" id="promo-price">8 000 🪙</strong>
+                  <s class="promo-price-old">2 200 🪙</s>
+                  <strong class="promo-price-new" id="promo-price">1 760 🪙</strong>
                 </span>
               </p>
-              <p class="promo-perks">5 cartes · Épique+, Mythique+ et Légendaire+ garantis · Shiny ×7</p>
+              <p class="promo-perks">5 cartes · aucune commune ni inhabituelle · Shiny ×7</p>
               <p class="promo-timer" role="timer">
                 <span class="promo-timer-label">Fin de l'offre dans</span>
                 <span class="promo-clock" id="promo-clock">24:00:00</span>

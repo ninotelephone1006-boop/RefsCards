@@ -250,9 +250,10 @@ function yesterdayKey() {
       assert.ok(m, `pourcentage introuvable pour ${key}`);
       return parseFloat(m[1].replace(',', '.'));
     };
-    assert.ok(pct('rare') > pct('common'), 'rare doit être plus fréquent que commune en pack rare');
-    assert.ok(pct('divine') > 1.5, 'divine doit être un peu plus fréquente en pack rare');
-    assert.ok(pct('secret') > 0.5, 'secrète doit être un peu plus fréquente en pack rare');
+    assert.ok(pct('rare') > pct('common'), 'rare doit être bien plus fréquent que commune en pack rare');
+    assert.ok(pct('epic') > 5, 'épique doit être fréquent en pack rare');
+    assert.ok(pct('divine') > 0.01 && pct('divine') < 1, 'divine reste exceptionnelle en pack rare');
+    assert.ok(pct('secret') < 0.5, 'secrète reste un coup de chance même en pack rare');
     // Achat rare ×1 = 1 000 🪙.
     doc.getElementById('buy-rare').click();
     await wait(400);

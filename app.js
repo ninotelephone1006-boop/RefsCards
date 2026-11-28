@@ -6,9 +6,10 @@
 (() => {
   'use strict';
 
-  /* Boutique : le bonus de rentabilité est propre à chaque pack ; le pack
-     classique n'en bénéficie pas afin de préserver ses taux par carte. */
-  const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1700, legend: 800, video: 1000, ultra: 10000 };
+  /* Boutique : prix en pièces. Tous les packs rendent EN MOYENNE moins que
+     leur prix (cf. « Équilibrage » plus bas) : ouvrir un booster reste un
+     pari, pas une source de pièces infinie. */
+  const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1800, legend: 800, video: 600, ultra: 2200 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
 
   /* ============================================ OFFRE DE SORTIE · ULTRA RARE
@@ -273,13 +274,13 @@
       shake: 'shake', sound: 'classic'
     },
     rare: {
-      title: 'RARE DORÉ', sub: '5 cartes · 1 Rare+ et 1 Épique+ garanties',
+      title: 'RARE DORÉ', sub: '5 cartes · raretés élevées plus fréquentes',
       colors: ['#ffffff', '#fbbf24', '#f59e0b', '#fde68a', '#fef3c7'],
       burstDelay: 300, revealDelay: 1050, sparks: 34, dots: 44, confetti: 40, rain: 36,
       shake: 'shake', sound: 'rare'
     },
     doubleRare: {
-      title: 'DOUBLE RARE', sub: '10 cartes · 2 Rare+ et 2 Épique+ garanties',
+      title: 'DOUBLE RARE', sub: '10 cartes · mêmes chances que le Pack Rare',
       colors: ['#ffffff', '#ff24cf', '#ff86e7', '#c80087', '#ffe1fa'],
       burstDelay: 350, revealDelay: 1150, sparks: 40, dots: 50, confetti: 45, rain: 40,
       shake: 'shake', sound: 'rare'
@@ -297,7 +298,7 @@
       shake: 'shake', sound: 'video'
     },
     ultra: {
-      title: 'ULTRA RARE', sub: '5 cartes · raretés extrêmes garanties',
+      title: 'ULTRA RARE', sub: '5 cartes · aucune commune, Shiny ×7',
       colors: ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#c4a1ff'],
       burstDelay: 360, revealDelay: 1380, sparks: 36, dots: 55, confetti: 54, rain: 64,
       shake: 'ultra-shake', sound: 'ultra'
@@ -353,61 +354,106 @@
 
   /* Treize raretés : propriétés visuelles, récompenses et fusions. Les taux
      de tirage sont définis dans PACK_TABLES, indépendamment de ces propriétés. */
+  /* ============================================================ RARETÉS
+     Échelle STRICTEMENT croissante : chaque palier est plus rare ET plus
+     précieux que le précédent, sans exception. « Légendaire » passe avant
+     « Mythique » (le mythe est au-dessus de la légende), et les paliers
+     « Secrète » restent au sommet, au-delà du tirage normal.
+
+     `reward` = valeur en pièces d'une carte de cette rareté (premier
+     exemplaire). Les valeurs sont exponentiellement croissantes : ≈ ×1,6 par
+     palier, avec un vrai saut sur les Secrètes. `weight` n'est qu'un repère
+     historique (le tirage utilise PACK_TABLES). */
   const RARITIES = {
-    common:     { label: 'Commune',      rank: 0, weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
-    uncommon:   { label: 'Inhabituelle', rank: 1, weight: 22,  color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 35,  fx: 'calm', next: 'rare' },
-    rare:       { label: 'Rare',         rank: 2, weight: 16,  color: '#5fb8ff', ink: '#06243a', glow: '#4aa8ff', reward: 55,  fx: 'rare', next: 'superrare' },
-    superrare:  { label: 'Super Rare',   rank: 3, weight: 11,  color: '#67e0d0', ink: '#032a26', glow: '#3fd8c8', reward: 80,  fx: 'rare', next: 'epic' },
-    epic:       { label: 'Épique',       rank: 4, weight: 8,   color: '#b47bff', ink: '#24093c', glow: '#a457ff', reward: 120, fx: 'epic', next: 'ultraepic' },
-    ultraepic:  { label: 'Ultra épique', rank: 5, weight: 5,   color: '#ff8ccb', ink: '#3a0524', glow: '#ff5cb8', reward: 175, fx: 'epic', next: 'mythic' },
-    mythic:     { label: 'Mythique',     rank: 6, weight: 3.5, color: '#ffa469', ink: '#331204', glow: '#ff8a3d', reward: 240, fx: 'gold', next: 'legendary' },
-    legendary:  { label: 'Légendaire',   rank: 7, weight: 2.5, color: '#ffd45e', ink: '#3a2600', glow: '#ffb347', reward: 340, fx: 'gold', next: 'divine' },
-    divine:     { label: 'Divine',       rank: 8, weight: 1.5, color: '#a7f3ff', ink: '#032830', glow: '#7ce8ff', reward: 520, fx: 'gold', next: 'secret' },
-    secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: 'ultrasecret' },
-    ultrasecret:{ label: 'Ultra Secrète',rank: 10, weight: 0.3, color: '#c084fc', ink: '#2a0a3d', glow: '#a855f7', reward: 1400, fx: 'gold', next: 'hypersecret' },
-    hypersecret:{ label: 'Hyper Secrète',rank: 11, weight: 0.2, color: '#fb7185', ink: '#3d0714', glow: '#f43f5e', reward: 2200, fx: 'gold', next: 'unique' },
-    unique:     { label: 'Unique',       rank: 12, weight: 0.01, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 5000, fx: 'gold', next: null }
+    common:     { label: 'Commune',       rank: 0,  weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 35,    fx: 'calm', next: 'uncommon' },
+    uncommon:   { label: 'Inhabituelle',  rank: 1,  weight: 22,   color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 55,    fx: 'calm', next: 'rare' },
+    rare:       { label: 'Rare',          rank: 2,  weight: 16,   color: '#5fb8ff', ink: '#06243a', glow: '#4aa8ff', reward: 100,   fx: 'rare', next: 'superrare' },
+    superrare:  { label: 'Super Rare',    rank: 3,  weight: 11,   color: '#67e0d0', ink: '#032a26', glow: '#3fd8c8', reward: 165,   fx: 'rare', next: 'epic' },
+    epic:       { label: 'Épique',        rank: 4,  weight: 8,    color: '#b47bff', ink: '#24093c', glow: '#a457ff', reward: 285,   fx: 'epic', next: 'ultraepic' },
+    ultraepic:  { label: 'Ultra épique',  rank: 5,  weight: 5,    color: '#ff8ccb', ink: '#3a0524', glow: '#ff5cb8', reward: 470,   fx: 'epic', next: 'legendary' },
+    legendary:  { label: 'Légendaire',    rank: 6,  weight: 2.5,  color: '#ffd45e', ink: '#3a2600', glow: '#ffb347', reward: 770,   fx: 'gold', next: 'mythic' },
+    mythic:     { label: 'Mythique',      rank: 7,  weight: 3.5,  color: '#ffa469', ink: '#331204', glow: '#ff8a3d', reward: 1250,  fx: 'gold', next: 'divine' },
+    divine:     { label: 'Divine',        rank: 8,  weight: 1.5,  color: '#a7f3ff', ink: '#032830', glow: '#7ce8ff', reward: 2000,  fx: 'gold', next: 'secret' },
+    secret:     { label: 'Secrète',       rank: 9,  weight: 0.5,  color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 3300,  fx: 'gold', next: 'ultrasecret' },
+    ultrasecret:{ label: 'Ultra Secrète', rank: 10, weight: 0.3,  color: '#c084fc', ink: '#2a0a3d', glow: '#a855f7', reward: 5200,  fx: 'gold', next: 'hypersecret' },
+    hypersecret:{ label: 'Hyper Secrète', rank: 11, weight: 0.2,  color: '#fb7185', ink: '#3d0714', glow: '#f43f5e', reward: 8800,  fx: 'gold', next: 'unique' },
+    unique:     { label: 'Unique',        rank: 12, weight: 0.01, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 14000, fx: 'gold', next: null }
   };
 
-  /* Une fusion ne peut jamais produire mieux qu'Ultra épique. */
+  /* Une fusion ne peut jamais produire mieux qu'Ultra épique : Légendaire et
+     au-delà ne s'obtiennent qu'en ouvrant des boosters. */
   const FUSION_MAX_RANK = RARITIES.ultraepic.rank;
   const canFuseInto = (info) => Boolean(info && info.next && RARITIES[info.next] && RARITIES[info.next].rank <= FUSION_MAX_RANK);
 
   const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
 
-  /* Tables de tirage par pack. Les taux classiques sont des probabilités
-     par carte : pas de garantie, de plafond de doublons ni de bonus rentable.
-     Les autres packs conservent leurs garanties et règles spécifiques. */
+  /* ========================================================= ÉQUILIBRAGE
+     Taux par CARTE, en pourcentage, pour chaque pack. Les poids sont
+     relatifs : le tirage les renormalise sur les raretés présentes dans le
+     pool. Aucune garantie, aucune remontée automatique : chaque carte est
+     tirée indépendamment.
+
+     Repères mesurés (voir tests/pack-odds.cjs) :
+       - Pack Classique : Légendaire+ ≈ 0,7 % par pack, Divine+ ≈ 0,05 %,
+         Unique ≈ 1 pack sur 5 000 ;
+       - Pack Rare : Légendaire+ ≈ 8,7 %, Divine+ ≈ 0,6 % ;
+       - Pack Ultra : Légendaire+ ≈ 27 %, Divine+ ≈ 2,3 %, Unique ≈ 1 sur 13 000.
+     Tous les packs rendent en moyenne 61 % à 73 % de leur prix : le jeu
+     reste un défi, sans être une machine à sous qui rend l'argent. */
   const PACK_TABLES = {
-    classic: { common: 45.30, uncommon: 22, rare: 15, superrare: 7, epic: 5, ultraepic: 2.5, mythic: 1.2, legendary: 0.8, divine: 0.4, secret: 0.35, ultrasecret: 0.25, hypersecret: 0.17, unique: 0.03 },
-    rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    doubleRare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    video: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 20.5, divine: 14, secret: 10, ultrasecret: 0.8, hypersecret: 0.2, unique: 0.0125 }
+    /* 500 🪙 · 5 cartes : le pack de référence, très majoritairement commun. */
+    classic: {
+      common: 55.61, uncommon: 24.75, rare: 12.38, superrare: 4.95,
+      epic: 1.73, ultraepic: 0.43, legendary: 0.10, mythic: 0.03,
+      divine: 0.008, secret: 0.002, ultrasecret: 0.0006,
+      hypersecret: 0.00015, unique: 0.004
+    },
+    /* 1 000 🪙 · 5 cartes : mêmes règles, mais les raretés élevées sont
+       beaucoup plus fréquentes (Rare 25 %, Épique 8 %, Légendaire 1,3 %). */
+    rare: {
+      common: 21.18, uncommon: 25, rare: 25, superrare: 15,
+      epic: 8, ultraepic: 4, legendary: 1.3, mythic: 0.4,
+      divine: 0.09, secret: 0.02, ultrasecret: 0.005,
+      hypersecret: 0.0012, unique: 0.001
+    },
+    doubleRare: {
+      common: 21.18, uncommon: 25, rare: 25, superrare: 15,
+      epic: 8, ultraepic: 4, legendary: 1.3, mythic: 0.4,
+      divine: 0.09, secret: 0.02, ultrasecret: 0.005,
+      hypersecret: 0.0012, unique: 0.001
+    },
+    /* 800 🪙 · 10 cartes : beaucoup de volume, donc une table plus basse :
+       c'est le pack pour remplir la collection, pas pour chercher du rare. */
+    legend: {
+      common: 63.86, uncommon: 23.24, rare: 9.30, superrare: 2.71,
+      epic: 0.70, ultraepic: 0.155, legendary: 0.031, mythic: 0.008,
+      divine: 0.0015, secret: 0.0003, ultrasecret: 0.00008,
+      hypersecret: 0.00002, unique: 0.0004
+    },
+    /* 600 🪙 · 2 cartes vidéo : le pool ne contient que des cartes vidéo
+       (Rare/Épique + l'Hyper Secrète Bierrypiano). */
+    video: { rare: 39.85, epic: 60.07, hypersecret: 0.08 },
+    /* 2 200 🪙 · 5 cartes : aucune commune ni inhabituelle, table riche. */
+    ultra: {
+      common: 0, uncommon: 0, rare: 19.95, superrare: 21.94, epic: 30.92,
+      ultraepic: 20.95, legendary: 4.59, mythic: 1.20, divine: 0.35,
+      secret: 0.08, ultrasecret: 0.02, hypersecret: 0.005, unique: 0.0015
+    }
   };
-  /* Slots par pack : 'std' = table complète ; { minRank } = garantie
-     (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
-     La longueur de la liste = nombre de cartes du pack (cf. PACK_CARD_COUNT). */
+
+  /* Un slot par carte ; tous identiques : aucun palier n'est offert. La
+     structure reste générique (un slot peut imposer un rang minimum via
+     { minRank }) pour une future offre, mais aucun pack ne s'en sert. */
   const PACK_SLOTS = {
     classic: ['std', 'std', 'std', 'std', 'std'],
-    rare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
-    doubleRare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }, 'std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
+    rare: ['std', 'std', 'std', 'std', 'std'],
+    doubleRare: ['std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std'],
     legend: ['std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std'],
     video: ['std', 'std'],
-    ultra: ['std', 'std', { minRank: 4 }, { minRank: 6 }, { minRank: 7 }]
+    ultra: ['std', 'std', 'std', 'std', 'std']
   };
-  const PACK_UNIQUE_CHANCE = { standard: 1 / 10000, ultra: 1 / 8000 };
   const PACK_SHINY_MULTIPLIER = { classic: 1, rare: 2, doubleRare: 2, legend: 1, video: 1, ultra: 7 };
-  /* Coup de pouce « pack rentable » : probabilité qu'un pack dont la valeur
-     brute (somme des récompenses de rareté, hors réduction doublon) est sous
-     son prix soit remonté au moins au prix payé (voir boostPackProfit).
-     Légende : 1 sur 2, Rare / Double Rare : 2 sur 5,
-     Vidéo / Ultra Rare : 1 sur 3. Un pack déjà rentable ne change pas. */
-  const PACK_PROFIT_CHANCE = { classic: 0, rare: 2 / 5, doubleRare: 2 / 5, legend: 1 / 2, video: 1 / 3, ultra: 1 / 3 };
-  function packProfitChanceFor(packType) {
-    return PACK_PROFIT_CHANCE[packType] || 0;
-  }
+
   function packTableFor(packType) {
     return PACK_TABLES[packType] || PACK_TABLES.classic;
   }
@@ -1446,6 +1492,24 @@
     dailyTrack.replaceChildren(frag);
   }
 
+  /* Valeur moyenne d'un pack, recalculée depuis sa table : le libellé de la
+     boutique ne peut pas diverger des taux réels. */
+  function packAverageValue(packType) {
+    const list = packPool(packType);
+    const shares = slotRarityShares(packType, 'std', list);
+    const perCard = Object.entries(shares).reduce((sum, [key, chance]) => {
+      const info = RARITIES[key];
+      return info ? sum + chance * info.reward : sum;
+    }, 0);
+    return Math.round(perCard * cardCountFor(packType));
+  }
+  function renderPackValues() {
+    document.querySelectorAll('[data-pack-ev]').forEach((node) => {
+      const value = packAverageValue(node.dataset.packEv);
+      if (value > 0) node.textContent = `Valeur moyenne ≈ ${fmt(value)} 🪙`;
+    });
+  }
+
   function renderShop() {
     const available = dailyAvailable();
     if (freeClaim) {
@@ -1462,6 +1526,7 @@
     if (tabBadgeShop) tabBadgeShop.hidden = !available;
     renderDailyCalendar();
     renderDailyTrack();
+    renderPackValues();
 
     const stockText = (n) => `Tu en as ${n}`;
     if (shopStockClassic) shopStockClassic.textContent = stockText(state.packStock.classic || 0);
@@ -1602,12 +1667,12 @@
       },
       rare: {
         title: 'Booster Rare',
-        desc: '5 cartes · 1 Rare+ et 1 Épique+ garanties · Shiny ×2.',
+        desc: '5 cartes · raretés élevées plus fréquentes · Shiny ×2.',
         rare: true,
       },
       doubleRare: {
         title: 'Booster Double Rare',
-        desc: '10 cartes · mêmes chances que le Pack Rare · 2 Rare+ et 2 Épique+ garanties · Shiny ×2.',
+        desc: '10 cartes · mêmes chances que le Pack Rare · Shiny ×2.',
         rare: false,
         double: true,
       },
@@ -1624,7 +1689,7 @@
       },
       ultra: {
         title: 'Booster Ultra Rare',
-        desc: '5 cartes · Épique+, Mythique+ et Légendaire+ garantis · Shiny ×7.',
+        desc: '5 cartes · aucune commune ni inhabituelle · Shiny ×7.',
         rare: false,
         ultra: true,
       },
@@ -1742,12 +1807,13 @@
 
   /* --------------------------------------------------------------- tirage */
 
-  /* Nouveau moteur de tirage (voir PACK_TABLES / PACK_SLOTS plus haut) :
-     1. on tire la rareté du slot (table du pack, garantie éventuelle),
+  /* Moteur de tirage (voir PACK_TABLES / PACK_SLOTS plus haut) :
+     1. on tire la rareté du slot selon la table du pack,
      2. puis la carte, uniformément parmi les cartes de cette rareté.
-     Plafond : 2 copies par pack (1 pour la vidéo), aucun en classique.
-     Si la rareté tirée n'a plus de carte disponible (plafond atteint), on
-     retire parmi les raretés encore disponibles. */
+     Aucune garantie, aucune remontée : la valeur moyenne d'un pack reste
+     inférieure à son prix. Plafond : 2 copies par pack (1 pour la vidéo),
+     aucun en classique. Si la rareté tirée n'a plus de carte disponible
+     (plafond atteint), on retire parmi les raretés encore disponibles. */
   const MAX_SAME_CARD_PER_PACK = 2;
 
   /* Poids de chaque rareté pour un slot donné, restreints au pool :
@@ -1781,23 +1847,12 @@
   }
 
   /* Partage de raretés réellement utilisé par le tirage et son affichage :
-     hors classique, l'Unique a une probabilité fixe indépendamment des garanties. */
+     simple renormalisation des poids de la table sur le pool. */
   function slotRarityShares(packType, slot, pool) {
     const weights = slotRarityWeights(packType, slot, pool);
     const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
     if (total <= 0) return {};
-    const nonUniqueTotal = total - (weights.unique || 0);
     const shares = {};
-    if (packType !== 'classic' && weights.unique > 0 && nonUniqueTotal > 0) {
-      const uniqueChance = packType === 'ultra'
-        ? PACK_UNIQUE_CHANCE.ultra
-        : PACK_UNIQUE_CHANCE.standard;
-      Object.entries(weights).forEach(([key, weight]) => {
-        if (key !== 'unique') shares[key] = (weight / nonUniqueTotal) * (1 - uniqueChance);
-      });
-      shares.unique = uniqueChance;
-      return shares;
-    }
     Object.entries(weights).forEach(([key, weight]) => { shares[key] = weight / total; });
     return shares;
   }
@@ -1831,16 +1886,6 @@
     Object.keys(weights).forEach((key) => {
       if (availableCards(key, packCounts, validPool, maxSame).length) usable[key] = weights[key];
     });
-    if (packType !== 'classic' && usable.unique && Object.keys(usable).some((key) => key !== 'unique')) {
-      const uniqueChance = packType === 'ultra'
-        ? PACK_UNIQUE_CHANCE.ultra
-        : PACK_UNIQUE_CHANCE.standard;
-      const uniqueCards = availableCards('unique', packCounts, validPool, maxSame);
-      if (uniqueCards.length && Math.random() < uniqueChance) {
-        return uniqueCards[Math.floor(Math.random() * uniqueCards.length)];
-      }
-      delete usable.unique;
-    }
     if (Object.keys(usable).length) weights = usable;
     const rarity = rollRarity(weights);
     if (!rarity) return null;
@@ -1857,59 +1902,6 @@
   function packCardValue(card) {
     const info = RARITIES[card && card.rarity] || RARITIES.common;
     return CardMutations.multiply(card, info.reward, 'reward') || 0;
-  }
-
-  /* Coup de pouce « pack rentable » (PACK_PROFIT_CHANCE) : si le tirage vaut
-     moins que le prix réellement payé (promo incluse) et que le coup de pouce
-     se déclenche, on remonte les cartes les plus faibles, une par une, à la
-     plus petite rareté qui suffit à atteindre le prix — ou à la plus haute
-     disponible si même elle ne suffit pas (on continue alors sur la carte
-     suivante). Pool du pack et plafond de copies par pack sont respectés,
-     et le remplacement repasse par le tirage Shiny du pack. Si le pool ne
-     permet pas d'atteindre le prix, le pack est remonté au maximum possible. */
-  function boostPackProfit(drawn, packType, pool, maxSame) {
-    const price = promoUnitPrice(packType);
-    const chance = packProfitChanceFor(packType);
-    if (!drawn.length || !price || !chance || Math.random() >= chance) return;
-    let total = drawn.reduce((sum, card) => sum + packCardValue(card), 0);
-    if (total >= price) return;
-    const baseKey = (card) => card.baseId || String(card.id || '').split('::')[0];
-    const counts = new Map();
-    drawn.forEach((card) => counts.set(baseKey(card), (counts.get(baseKey(card)) || 0) + 1));
-    const raritiesByReward = Object.keys(RARITIES).sort((a, b) => RARITIES[a].reward - RARITIES[b].reward);
-    const upgraded = new Set();
-    while (total < price && upgraded.size < drawn.length) {
-      let idx = -1;
-      let lowest = Infinity;
-      drawn.forEach((card, i) => {
-        if (upgraded.has(i)) return;
-        const value = packCardValue(card);
-        if (value < lowest) { lowest = value; idx = i; }
-      });
-      if (idx < 0) break;
-      upgraded.add(idx);
-      const oldKey = baseKey(drawn[idx]);
-      counts.set(oldKey, (counts.get(oldKey) || 0) - 1);
-      const deficit = price - (total - lowest);
-      let chosen = null;
-      for (const rarity of raritiesByReward) {
-        if (RARITIES[rarity].reward < deficit) continue;
-        const candidates = availableCards(rarity, counts, pool, maxSame);
-        if (candidates.length) { chosen = candidates[Math.floor(Math.random() * candidates.length)]; break; }
-      }
-      if (!chosen) {
-        for (const rarity of [...raritiesByReward].reverse()) {
-          if (RARITIES[rarity].reward <= lowest) continue;
-          const candidates = availableCards(rarity, counts, pool, maxSame);
-          if (candidates.length) { chosen = candidates[Math.floor(Math.random() * candidates.length)]; break; }
-        }
-      }
-      if (!chosen) { counts.set(oldKey, (counts.get(oldKey) || 0) + 1); continue; }
-      const rolled = CardMutations.roll(chosen, Math.random, packShinyFor(packType));
-      drawn[idx] = rolled;
-      counts.set(baseKey(rolled), (counts.get(baseKey(rolled)) || 0) + 1);
-      total = total - lowest + packCardValue(rolled);
-    }
   }
 
   /* `boosted` est conservé pour compatibilité (anciens appels) : le pack
@@ -1956,8 +1948,6 @@
       const card = pickCardForSlot(packType, slot, packCounts, cardPool, maxSame);
       if (card) record(card);
     });
-    /* Hors démo : coup de pouce rentabilité (1/2, 2/5 ou 1/3 selon le pack). */
-    if (!wantsDemo) boostPackProfit(drawn, packType, cardPool, maxSame);
     // Tri croissant : la carte la moins rare est révélée en premier, la plus
     // rare reste au fond de la pile pour faire monter la tension.
     return drawn.sort((a, b) => RARITIES[a.rarity].rank - RARITIES[b.rarity].rank);
@@ -4614,8 +4604,18 @@
     openInspect(cardById(slot.dataset.cardId));
   });
 
-  /* Moyenne des taux de base par slot, adaptée aux garanties et au pool.
-     Hors classique, doublons et bonus de rentabilité peuvent les modifier. */
+  /* Formate un taux : 2 décimales au-dessus de 0,01 %, 4 en dessous, et
+     « 1 sur N » pour les raretés qui relèvent du coup de chance. */
+  function oddsPctLabel(pct) {
+    const fr = (value, digits) => value.toFixed(digits).replace(/\.?0+$/, '').replace('.', ',');
+    if (pct >= 0.01) return `${fr(pct, 2)} %`;
+    if (pct >= 0.0001) return `${fr(pct, 4)} %`;
+    if (pct > 0) return `1 sur ${Math.round(100 / pct).toLocaleString('fr-FR')}`;
+    return '0 %';
+  }
+
+  /* Moyenne des taux de base par slot, renormalisée sur le pool du pack.
+     Aucun slot garanti, aucun bonus : ce qui est affiché est ce qui tombe. */
   function renderOdds(boosted, pool, packType) {
     if (!packOdds) return;
     packOdds.replaceChildren();
@@ -4636,15 +4636,15 @@
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const label = `${r.label} ${pct.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')} %`;
+      const label = `${r.label} ${oddsPctLabel(pct)}`;
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
     if (type !== 'classic') {
-      packOdds.append(el('span', 'pack-odds-video-note', 'Taux de base par carte avant plafond de doublons et bonus de rentabilité.'));
+      packOdds.append(el('span', 'pack-odds-video-note', 'Taux de base par carte · aucun palier garanti, aucun bonus.'));
     }
     if (type === 'ultra') {
-      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : GROSSES RARETÉS MASSIVEMENT BOOSTÉES · SHINY ×7'));
+      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : AUCUNE COMMUNE · SHINY ×7'));
     } else if (type === 'rare' || type === 'doubleRare') {
       packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES · SHINY ×2'));
     }
