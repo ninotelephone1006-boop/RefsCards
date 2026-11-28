@@ -508,6 +508,24 @@
     return n;
   };
 
+  /* Animations Web (WAAPI) : présentes sur tous les navigateurs récents, mais
+     absentes de certaines WebView / anciens Safari. Toutes les animations
+     optionnelles doivent se replier proprement (CSS ou pas d'animation) sans
+     jamais bloquer une ouverture de booster. */
+  const canAnimate = () => {
+    try {
+      return typeof Element !== 'undefined' && !!Element.prototype &&
+        typeof Element.prototype.animate === 'function';
+    } catch (error) {
+      return false;
+    }
+  };
+
+  /* Les particules, secousses et flashs appartiennent à l'écran du booster :
+     si le joueur ouvre le Shop pendant une mise en scène (suspense, cascade),
+     ces effets ne doivent pas déborder sur un autre onglet. */
+  const packScreenActive = () => !app || app.dataset.tab === 'pack';
+
   /* Badge « Créateur » : le marteau pixel-art affiché à côté du pseudo du
      compte propriétaire (ninotelephone1006@gmail.com). Le drapeau `creator`
      voyage dans le profil public (playerProfiles), donc TOUT le monde voit
@@ -2148,7 +2166,14 @@
       }
     }
 
-    return { resize, spark, dot, confetti, rain, ring };
+    function clear() {
+      parts.length = 0;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      ctx.clearRect(0, 0, w, h);
+    }
+
+    return { resize, spark, dot, confetti, rain, ring, clear };
   })();
 
   /* ---------------------------------------------------------- poussières */
@@ -2512,17 +2537,23 @@
         trackProgress();
       }
     }
-    SFX.tearStop();
-    SFX.rip();
+    if (packScreenActive()) {
+      SFX.tearStop();
+      SFX.rip();
+    }
     pack.classList.add('is-ripped', 'is-pack-ripped');
     pack.dataset.packType = type;
     if (type === 'ultra') pack.classList.add('is-ultra-ripped');
     packFlap.classList.add('is-gone');
     packFlap.style.transform = '';
 
-    /* Jingle signature du pack (audio.js packOpen, repli tolérant). */
-    if (SFX && typeof SFX.packOpen === 'function') SFX.packOpen(type);
-    else if (type === 'ultra' && SFX && typeof SFX.ultraOpen === 'function') SFX.ultraOpen();
+    /* Jingle signature du pack (audio.js packOpen, repli tolérant). Joué
+       seulement si l'écran du booster est visible : un déchir resté en cours
+       pendant un changement d'onglet ne doit pas sonner sur le Shop. */
+    if (packScreenActive()) {
+      if (SFX && typeof SFX.packOpen === 'function') SFX.packOpen(type);
+      else if (type === 'ultra' && SFX && typeof SFX.ultraOpen === 'function') SFX.ultraOpen();
+    }
 
     const r = cut.getBoundingClientRect();
     const s = stage.getBoundingClientRect();
@@ -2533,9 +2564,9 @@
     const cy = packRect.height > 0 ? packRect.top - s.top + packRect.height * 0.48 : lineY;
     const colors = theme.colors;
 
-    showPackOpening(type);
+    if (packScreenActive()) showPackOpening(type);
 
-    if (!reduceMotion.matches) {
+    if (!reduceMotion.matches && packScreenActive()) {
       for (let i = 0; i < theme.sparks; i++) {
         FX.spark(x0 + (r.width * i) / Math.max(1, theme.sparks), lineY + (Math.random() - 0.5) * 8, colors[i % colors.length], {
           speedMin: 140,
@@ -2550,6 +2581,9 @@
     }
 
     openingLater(() => {
+      /* Le joueur a quitté l'écran du booster pendant la cinématique : elle se
+         termine sans bruit ni flash sur l'autre onglet. */
+      if (!packScreenActive()) return;
       if (packOpening) packOpening.classList.add('is-burst');
       flash.classList.remove('run');
       void flash.offsetWidth;
@@ -2999,6 +3033,14 @@
     btn.style.setProperty('--r-color', info.color);
     btn.style.setProperty('--r-ink', info.ink);
     btn.style.setProperty('--r-glow', info.glow);
+    /* Plus la rareté est haute, plus le retournement est lent et ample : une
+       Commune claque, une Secrète se déploie. La durée est lue par
+       `.card-inner` dans styles.css (`--flip-dur`). */
+    const flipDur = info.rank >= RARITIES.legendary.rank ? 1.15
+      : info.rank >= RARITIES.epic.rank ? 1.02
+        : info.rank >= RARITIES.rare.rank ? 0.92
+          : 0.82;
+    btn.style.setProperty('--flip-dur', `${flipDur}s`);
     btn.setAttribute('aria-label', `Carte ${index + 1} sur ${state.deck.length}. Retourner la carte.`);
 
     const inner = el('span', 'card-inner');
@@ -3095,6 +3137,9 @@
     rays.classList.remove('on');
     tableGlow.removeAttribute('data-rarity');
     app.classList.remove('slow-mo');
+    /* La classe de secousse reste sinon collée à la scène après son animation
+       (et pourrait rejouer, ou fausser un test d'absence d'effet). */
+    stage.classList.remove('shake', 'ultra-shake');
   }
 
   function shakeStage() {
@@ -3135,7 +3180,14 @@
     unique:    { ms: 5200, tier: 4 }
   };
 
+  /* Une seule carte peut « charger » à la fois. Le contrôleur permet de
+     terminer la mise en scène immédiatement si le joueur quitte l'écran du
+     booster (sinon l'overlay de suspense resterait affiché par-dessus un
+     autre onglet, et les battements de cœur continueraient en fond). */
+  let activeCharge = null;
+
   function startCharge(btn, info, cx, cy, sus, done) {
+    if (activeCharge) activeCharge.finish();
     const layer = el('div', 'suspense-layer');
     layer.dataset.tier = String(sus.tier);
     layer.style.setProperty('--x', `${cx.toFixed(0)}px`);
@@ -3162,7 +3214,7 @@
     const timers = [];
     let gap = 440;
     const beat = () => {
-      SFX.tick();
+      if (packScreenActive()) SFX.tick();
       gap = Math.max(85, gap * 0.8);
       timers.push(window.setTimeout(beat, gap));
     };
@@ -3172,15 +3224,35 @@
     const finish = () => {
       if (finished) return;
       finished = true;
+      if (activeCharge && activeCharge.finish === finish) activeCharge = null;
       timers.forEach((t) => window.clearTimeout(t));
       layer.classList.add('is-out');
       window.setTimeout(() => layer.remove(), 420);
-      if (sus.tier >= 3) { flashScreen(); SFX.whoosh(); }
-      if (sus.tier >= 4) window.setTimeout(flashScreen, 140);
+      if (packScreenActive()) {
+        if (sus.tier >= 3) { flashScreen(); SFX.whoosh(); }
+        if (sus.tier >= 4) window.setTimeout(flashScreen, 140);
+      }
       done();
     };
     timers.push(window.setTimeout(finish, sus.ms));
     btn._skipCharge = finish;
+    activeCharge = { finish, btn };
+  }
+
+  /* Termine la charge en cours sans attendre la fin du suspense. Appelée quand
+     on quitte l'onglet Booster : la carte se retourne tout de suite (elle est
+     déjà comptée), sans overlay ni bruit sur l'autre écran. */
+  function abortActiveCharge() {
+    if (activeCharge) activeCharge.finish();
+  }
+
+  /* Exécute un effet différé seulement si l'écran du booster est toujours
+     affiché : une secousse ou un jingle programmé 400 ms plus tôt ne doit pas
+     surgir sur le Shop si le joueur a changé d'onglet entre-temps. */
+  function packLater(fn, ms) {
+    window.setTimeout(() => {
+      if (packScreenActive()) fn();
+    }, ms);
   }
 
   /* Mise en scène d'une rareté autour du point (cx, cy) de la scène : bandeau,
@@ -3193,6 +3265,10 @@
     clearEffects();
     tableGlow.setAttribute('data-rarity', card.rarity);
     app.dataset.rarity = card.rarity;
+    /* Le joueur a quitté l'écran du booster (Shop, Collection…) : la carte est
+       bien comptée, mais particules, rayons, secousse, flash et jingle
+       resteraient visibles par-dessus l'autre onglet. On n'anime donc rien. */
+    if (!packScreenActive()) return;
 
     if (fx === 'calm') {
       if (!quiet) {
@@ -3208,7 +3284,7 @@
     } else if (fx === 'epic') {
       app.classList.add('slow-mo');
       window.setTimeout(() => app.classList.remove('slow-mo'), 1600);
-      window.setTimeout(() => {
+      packLater(() => {
         shakeStage();
         flashScreen();
         if (!quiet) {
@@ -3225,10 +3301,10 @@
         for (let i = 0; i < 60; i++) FX.spark(cx, cy, i % 2 ? info.glow : '#ffffff', { speedMax: 620, g: 260, size: 3, life: 1.1 });
         FX.confetti(cx, cy, [info.color, info.glow, '#ffffff', '#ffe9a3'], 40);
       }
-      window.setTimeout(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
+      packLater(() => { shakeStage(); flashScreen(); }, quiet ? 0 : 260);
     }
 
-    window.setTimeout(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
+    packLater(() => SFX.rarity(SOUND_FX[fx] || 'common'), quiet ? 0 : fx === 'epic' ? 460 : 150);
   }
 
   function revealCard(btn, card) {
@@ -3252,6 +3328,9 @@
 
     const burst = () => rarityBurst(card, cx, cy, quiet);
     const doFlip = () => {
+      /* La carte a pu être retirée entre-temps (réinitialisation, autre pack) :
+         on ne joue pas une mise en scène orpheline. */
+      if (!btn.isConnected) return;
       btn.classList.remove('is-charging');
       delete btn._skipCharge;
       btn.dataset.flipAt = String(performance.now());
@@ -3723,6 +3802,15 @@
     if (newOnes.length && !reduceMotion.matches) window.setTimeout(() => bumpCollectionTab(newOnes), 350);
   }
 
+  /* Quitte l'écran du booster proprement : une carte en suspense se retourne,
+     une cascade en cours se termine tout de suite (les cartes sont déjà
+     comptées au fil des retournements) et plus aucune animation ne continue
+     derrière un autre onglet. */
+  function abortPackCinematics() {
+    abortActiveCharge();
+    if (openingAll) finishOpenAllPack();
+  }
+
   on(tableEl, 'click', (event) => {
     if (openingAll) { skipOpenAll(); return; }
     if (event.target.closest('.card') || !current || flying || packCinematic || state.phase !== 'reveal') return;
@@ -3732,18 +3820,63 @@
 
   /* ------------------------------------------- effets : nouvelle carte & shiny */
 
-  /* Étincelle DOM (indépendante du canvas) animée par WAAPI. */
+  /* Étincelle DOM (indépendante du canvas) animée par WAAPI. Si le navigateur
+     n'a pas WAAPI, une animation CSS équivalente prend le relais : dans tous
+     les cas l'étincelle finit par être retirée du DOM (aucune particule qui
+     reste collée à l'écran après un envol). */
   function domSpark(x, y, color, spread = 70, life = 650) {
     const p = el('i', 'fx-spark');
     p.style.cssText = `left:${x}px;top:${y}px;background:${color};box-shadow:0 0 10px ${color}`;
     document.body.append(p);
     const a = Math.random() * Math.PI * 2;
     const d = spread * (0.4 + Math.random() * 0.8);
-    const anim = p.animate([
-      { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
-      { transform: `translate(calc(-50% + ${Math.cos(a) * d}px), calc(-50% + ${Math.sin(a) * d}px)) scale(0.1)`, opacity: 0 }
-    ], { duration: life, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
-    anim.onfinish = () => p.remove();
+    const dx = Math.cos(a) * d;
+    const dy = Math.sin(a) * d;
+    if (!canAnimate()) {
+      p.style.setProperty('--spark-dx', `${dx.toFixed(1)}px`);
+      p.style.setProperty('--spark-dy', `${dy.toFixed(1)}px`);
+      p.style.setProperty('--spark-life', `${life}ms`);
+      p.classList.add('fx-spark-css');
+      window.setTimeout(() => p.remove(), life + 120);
+      return p;
+    }
+    try {
+      const anim = p.animate([
+        { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.1)`, opacity: 0 }
+      ], { duration: life, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' });
+      anim.onfinish = () => p.remove();
+    } catch (error) {
+      p.remove();
+      return null;
+    }
+    /* Filet de sécurité : même si onfinish ne se déclenche jamais (onglet en
+       arrière-plan, animation annulée), l'étincelle ne reste pas à l'écran. */
+    window.setTimeout(() => p.remove(), life + 400);
+    return p;
+  }
+
+  /* Traînée d'étincelles derrière une carte qui file vers le butin. Rend
+     l'envol lisible (la carte sort du cadre de la pile) sans canvas dédié :
+     les étincelles sont des éléments DOM retirés d'eux-mêmes. */
+  function flightTrail(node, color, duration = 560) {
+    const start = performance.now();
+    const id = window.setInterval(() => {
+      if (!node.isConnected || performance.now() - start > duration) {
+        window.clearInterval(id);
+        return;
+      }
+      const r = node.getBoundingClientRect();
+      if (!r.width) return;
+      domSpark(
+        r.left + r.width / 2 + (Math.random() - 0.5) * r.width * 0.35,
+        r.top + r.height / 2 + (Math.random() - 0.5) * r.height * 0.35,
+        Math.random() < 0.5 ? color : '#ffffff',
+        26,
+        480
+      );
+    }, 70);
+    return id;
   }
 
   /* Nouvelle carte : elle quitte la pile, tourne sur elle-même, rétrécit et
@@ -3752,34 +3885,72 @@
     const tab = document.querySelector('.tab[data-tab="collection"]');
     const icon = tab && (tab.querySelector('svg') || tab);
     if (!icon) return false;
+    /* Sans WAAPI, on laisse l'appelant faire le vol CSS vers le butin : c'est
+       un repli fidèle, et surtout le clic ne peut plus laisser `flying` bloqué
+       (la carte serait sinon impossible à ranger). */
+    if (!canAnimate()) return false;
     const from = btn.getBoundingClientRect();
     const to = icon.getBoundingClientRect();
-    if (!from.width) return false;
+    if (!from.width || !from.height) return false;
     const info = RARITIES[card.rarity] || RARITIES.common;
     const dx = to.left + to.width / 2 - (from.left + from.width / 2);
     const dy = to.top + to.height / 2 - (from.top + from.height / 2);
     const end = Math.max(0.06, 26 / from.width);
     const ghost = el('div', 'coll-ghost');
     ghost.style.cssText = `left:${from.left}px;top:${from.top}px;width:${from.width}px;height:${from.height}px;--g:${info.glow}`;
-    ghost.append(cardFrame(card, { eager: true, alt: '' }));
+    try {
+      ghost.append(cardFrame(card, { eager: true, alt: '' }));
+    } catch (error) {
+      console.warn('[Refs Cards] envol vers la collection impossible :', error);
+      ghost.remove();
+      return false;
+    }
     document.body.append(ghost);
-    btn.style.visibility = 'hidden';
     const T = (x, y, sc, ry, rz) => `translate(${x}px,${y}px) perspective(900px) rotateY(${ry}deg) rotate(${rz}deg) scale(${sc})`;
-    const anim = ghost.animate([
-      { transform: T(0, 0, 1, 0, 0), opacity: 1, offset: 0 },
-      { transform: T(dx * 0.04, -48, 1.14, 200, -8), opacity: 1, offset: 0.22 },
-      { transform: T(dx * 0.62, dy * 0.55 - 40, 0.5, 760, 10), opacity: 1, offset: 0.68 },
-      { transform: T(dx, dy, end, 1440, 0), opacity: 0.85, offset: 1 }
-    ], { duration: 1150, easing: 'cubic-bezier(.55,.05,.25,1)', fill: 'forwards' });
-    const trail = window.setInterval(() => {
-      const r = ghost.getBoundingClientRect();
-      domSpark(r.left + r.width / 2, r.top + r.height / 2, Math.random() < 0.5 ? info.glow : '#ffffff', 36, 520);
-    }, 40);
-    anim.onfinish = () => {
-      window.clearInterval(trail);
+    let anim;
+    try {
+      anim = ghost.animate([
+        { transform: T(0, 0, 1, 0, 0), opacity: 1, offset: 0 },
+        { transform: T(dx * 0.04, -48, 1.14, 200, -8), opacity: 1, offset: 0.22 },
+        { transform: T(dx * 0.62, dy * 0.55 - 40, 0.5, 760, 10), opacity: 1, offset: 0.68 },
+        { transform: T(dx, dy, end, 1440, 0), opacity: 0.85, offset: 1 }
+      ], { duration: 1150, easing: 'cubic-bezier(.55,.05,.25,1)', fill: 'forwards' });
+    } catch (error) {
+      console.warn('[Refs Cards] envol vers la collection impossible :', error);
+      ghost.remove();
+      return false;
+    }
+    /* L'animation est lancée : la vraie carte peut disparaître, le fantôme
+       (et lui seul) continue le vol. */
+    btn.style.visibility = 'hidden';
+    let landed = false;
+    let trail = 0;
+    let safety = 0;
+    const cleanupTrail = () => {
+      if (trail) window.clearInterval(trail);
+      trail = 0;
+    };
+    const land = () => {
+      if (landed) return;
+      landed = true;
+      cleanupTrail();
+      window.clearTimeout(safety);
       ghost.remove();
       landOnCollection(to, tab, info);
     };
+    trail = window.setInterval(() => {
+      const r = ghost.getBoundingClientRect();
+      if (!r.width) return;
+      domSpark(r.left + r.width / 2, r.top + r.height / 2, Math.random() < 0.5 ? info.glow : '#ffffff', 36, 520);
+    }, 40);
+    anim.onfinish = land;
+    if (anim.finished && typeof anim.finished.then === 'function') {
+      anim.finished.then(land).catch(() => { /* animation annulée : le filet s'en charge */ });
+    }
+    /* Filet de sécurité : si l'animation n'émet jamais `finish` (WAAPI
+       interrompu, onglet mis en arrière-plan…), on atterrit quand même et on
+       libère l'intervalle d'étincelles. */
+    safety = window.setTimeout(land, 1700);
     return true;
   }
 
@@ -3804,6 +3975,23 @@
     }
   }
 
+  /* Retire les effets éphémères qui survivent à leur écran (cinématique
+     Shiny, fantôme d'envol, étincelles, étiquette de récompense). Appelé au
+     retour à l'écran du booster : aucun overlay oublié ne peut recouvrir la
+     nouvelle ouverture. */
+  function clearTransientOverlays() {
+    document.querySelectorAll('.shiny-cine, .coll-ghost, .fx-spark, .fx-ring, .fx-float')
+      .forEach((node) => node.remove());
+  }
+
+  /* Échap ferme la cinématique Shiny (un seul écouteur global : rien ne fuit
+     quand l'overlay est retiré par un changement d'onglet). */
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const cine = document.querySelector('.shiny-cine:not(.is-out)');
+    if (cine) cine.click();
+  });
+
   /* « Ouvrir tout » : les nouvelles cartes n'ont pas volé une par une vers
      la Collection ; l'onglet réagit une seule fois pour tout le lot, aux
      couleurs de la plus rare d'entre elles. */
@@ -3822,6 +4010,10 @@
   /* Cinématique shiny : voile sombre, rayons dorés qui tournent, éclat,
      pluie d'étoiles et titre. Un toucher la ferme. */
   function shinyCinematic(card, quiet) {
+    /* Hors de l'écran du booster, ou si une cinématique Shiny est déjà à
+       l'écran (cascade avec plusieurs Shiny), on n'empile pas les overlays :
+       le premier garde son rôle de célébration. */
+    if (!packScreenActive() || document.querySelector('.shiny-cine')) return;
     const ov = el('div', 'shiny-cine' + (quiet ? ' is-quiet' : ''));
     ov.setAttribute('role', 'status');
     ov.append(el('div', 'sc-rays'), el('div', 'sc-flare'));
@@ -3857,21 +4049,37 @@
     btn.classList.remove('is-incoming');
     const target = recapSlots.children[state.loot.length] || recapSlots.lastElementChild;
     const from = btn.getBoundingClientRect();
-    const to = target.getBoundingClientRect();
-    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
-    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
-    const s = Math.max(0.16, to.width / from.width);
+    const to = target ? target.getBoundingClientRect() : from;
+    const geometryOk = from.width > 0 && to.width > 0;
+    const dx = geometryOk ? to.left + to.width / 2 - (from.left + from.width / 2) : 0;
+    const dy = geometryOk ? to.top + to.height / 2 - (from.top + from.height / 2) : 60;
+    const s = geometryOk ? Math.max(0.16, to.width / from.width) : 0.25;
 
-    const toCollection = btn.dataset.isNew === '1' && !reduceMotion.matches && flyToCollection(btn, card);
+    /* Un échec de l'animation « nouvelle carte » ne doit jamais interrompre
+       le rangement : au pire, la carte prend le vol standard vers le butin. */
+    let toCollection = false;
+    if (btn.dataset.isNew === '1' && !reduceMotion.matches && geometryOk) {
+      try {
+        toCollection = flyToCollection(btn, card) === true;
+      } catch (error) {
+        console.warn('[Refs Cards] envol vers la collection ignoré :', error);
+        toCollection = false;
+      }
+    }
+    let trail = 0;
     if (!toCollection) {
       btn.classList.add('is-flying');
       btn.style.setProperty('--fly-x', `${dx.toFixed(1)}px`);
       btn.style.setProperty('--fly-y', `${dy.toFixed(1)}px`);
       btn.style.setProperty('--fly-s', s.toFixed(3));
+      if (geometryOk && !reduceMotion.matches) {
+        trail = flightTrail(btn, (RARITIES[card.rarity] || RARITIES.common).glow);
+      }
     }
 
     window.setTimeout(() => {
       flying = false; // libéré d'abord : une erreur plus bas ne peut plus bloquer le jeu
+      if (trail) window.clearInterval(trail);
       openAll.disabled = false;
       try {
       setRecapCollapsed(false);
@@ -4011,7 +4219,9 @@
       node.style.setProperty('--eject-delay', `${reduceMotion.matches ? 0 : i * dealStep}ms`);
       stack.append(node);
       if (!reduceMotion.matches) {
-        window.setTimeout(() => SFX.deal(), 260 + i * dealStep);
+        window.setTimeout(() => {
+          if (packScreenActive()) SFX.deal();
+        }, 260 + i * dealStep);
       }
     });
 
@@ -4038,7 +4248,6 @@
   function updateHintForNext() {
     if (!current) return;
     revealTitle.innerHTML = 'La pile est prête<em>.</em>';
-    revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     clearEffects();
     revealSub.textContent = 'Touche la carte du dessus pour la retourner.';
     footRight.textContent = '← LA PLUS RARE EST AU FOND';
@@ -4127,6 +4336,8 @@
 
   function resetToPack({ quiet = false } = {}) {
     state.phase = 'pack';
+    abortActiveCharge();
+    clearTransientOverlays();
     recap.classList.remove('is-results');
     revealView.classList.remove('is-results');
     packResults.hidden = true;
@@ -5359,6 +5570,17 @@
   function setTab(tab) {
     if (app.dataset.tab === tab) return;
     app.dataset.tab = tab;
+    /* On quitte l'écran du booster : suspense, cascade, cinématique d'ouverture
+       et overlays éphémères s'arrêtent proprement au lieu de continuer
+       derrière l'onglet ouvert. */
+    if (tab !== 'pack') {
+      abortPackCinematics();
+      hidePackOpening();
+      clearEffects();
+      clearTransientOverlays();
+      FX.clear();
+      flash.classList.remove('run');
+    }
     /* On quitte « En ligne » : on ferme ses écoutes temps réel (elles
        reprendront à la prochaine ouverture, cf. openSocialHub). */
     if (tab !== 'online' && typeof closeSocialHub === 'function') closeSocialHub();
