@@ -311,7 +311,7 @@ function bootApp(url = 'https://refs-cards.test/', extraCards = null, stripBuilt
   const coinsBefore = test.state.coins;
   doc.getElementById('buy-video').click();
   await wait(30);
-  assert.equal(test.state.coins, coinsBefore - 1000, 'achat débite 1 000 🪙');
+  assert.equal(test.state.coins, coinsBefore - 600, 'achat débite 600 🪙');
   assert.equal(test.state.packStock.video, 3, 'un pack vidéo ajouté au stock');
   assert.match(doc.getElementById('shop-stock-video').textContent, /Tu en as 3/, 'stock mis à jour après achat');
 

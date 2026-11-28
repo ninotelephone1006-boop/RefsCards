@@ -17,7 +17,7 @@ Il faut un projet Firebase partagé par toutes les versions du jeu. Le plan Spar
 
 `npm start` sert le site à <http://localhost:8000>. Ce serveur ne crée ni comptes ni sauvegardes : l'authentification et les données restent dans le projet Firebase. La connexion se fait exclusivement avec Google (`GoogleAuthProvider` + `signInWithPopup`). Sans configuration Firebase valide, le bouton reste cliquable mais explique ce qui manque (voir le dépannage ci-dessous).
 
-Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙** (5 cartes, taux fixes par carte), Pack Rare doré **1 000 🪙** (5 cartes, 1 Rare+ et 1 Épique+ garanties, raretés élevées plus fréquentes que les communes), Pack Légende **800 🪙** (`assets/packetlegende.png`, 10 cartes, chances standards) et Pack Vidéo **1 000 🪙** (`assets/packetvideo.png`, 2 cartes animées). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 878 🪙 en rare, ≈ 788 🪙 en légende pour 10 cartes, ≈ 153 🪙 en vidéo pour 2 cartes) pour que l'argent reste un défi — à l'ancien prix de 100 🪙, chaque ouverture rapportait en moyenne ~294 🪙 et l'argent devenait infini. Coup de pouce rentabilité (`PACK_PROFIT_CHANCE` / `boostPackProfit` dans `app.js`, affiché dans le Shop) : si la valeur brute des cartes tirées est sous le prix payé, le pack a **1 chance sur 2** (Légende), **2 chances sur 5** (Rare, Double Rare) ou **1 chance sur 3** (Vidéo, Ultra Rare) d'être remonté au moins au prix — les cartes les plus faibles montent à la plus petite rareté qui suffit, dans le pool et le plafond de copies du pack (hors mode démo ; si le pool ne le permet pas, le pack est remonté au maximum possible). Chaque jour, un **cadeau de connexion gratuit** est à récupérer dans le Shop : un **calendrier** dont les récompenses s'améliorent à chaque jour de connexion d'affilée (cycle de 7 jours, le 7ᵉ est le jackpot ; une journée sautée remet le compteur au jour 1). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
+Le premier pack est offert (il arrive dans l'inventaire). Ensuite, les packs s'achètent dans la **boutique (onglet Shop)** et vont dans l'**inventaire** (onglet Pack) : Pack Classique **500 🪙** (5 cartes), Pack Rare doré **1 000 🪙** (5 cartes, raretés élevées beaucoup plus fréquentes), Pack Double Rare **1 800 🪙** (10 cartes aux chances du Pack Rare), Pack Légende **800 🪙** (`assets/packetlegende.png`, 10 cartes), Pack Vidéo **600 🪙** (`assets/packetvideo.png`, 2 cartes animées) et Pack Ultra Rare **2 200 🪙** (5 cartes, aucune commune). **Aucune garantie** : chaque carte est tirée indépendamment selon la table de son pack, et **tous les packs rendent en moyenne entre 63 % et 73 % de leur prix** (par exemple ≈ 313 🪙 pour 500 🪙 en classique, ≈ 653 🪙 pour 1 000 🪙 en rare). Ouvrir un booster fait donc perdre des pièces en moyenne : les pièces viennent des quêtes, du cadeau quotidien et de la revente, pas du tirage (voir « Équilibrage des packs »). Chaque jour, un **cadeau de connexion gratuit** est à récupérer dans le Shop : un **calendrier** dont les récompenses s'améliorent à chaque jour de connexion d'affilée (cycle de 7 jours, le 7ᵉ est le jackpot ; une journée sautée remet le compteur au jour 1). On peut acheter plusieurs packs d'un coup (quantité 1 à 10 par achat).
 
 ## Chargement des scripts
 
@@ -72,6 +72,47 @@ Le site est statique : un onglet déjà ouvert continue d'exécuter les fichiers
 - **En déploiement** : à chaque mise en production, incrémente les `?v=` des fichiers modifiés **et** `<meta name="app-version">` dans `index.html`. Le bandeau n'apparaît que chez les onglets déjà ouverts : c'est exactement son rôle — les visiteurs qui arrivent après le déploiement reçoivent directement la nouvelle version.
 - **Réglages** : les constantes `FIRST_CHECK_DELAY`, `CHECK_INTERVAL` et `MIN_GAP` sont en tête de `version-check.js`. L'API `window.REFS_CARDS_VERSION_CHECK` expose `check(force)`, `state()`, `dismiss()` et `reload()` (utilisée par les tests et par les boutons).
 - **Pendant une ouverture** : `app.js` pose `body.refs-pack-opening` dès la déchirure. Si le joueur appuie malgré tout sur **Recharger**, `version-check.js` attend la fin de la cinématique (au plus 4 s) au lieu de couper l'ouverture en cours.
+
+## Nouveautés du jeu : brouillons privés et « release »
+
+Le jeu a un journal de mises à jour, **Compte → 📰 Nouveautés**. Le compte propriétaire (`ADMIN_EMAIL` dans `app.js`) rédige ce qui arrive, le relit, puis décide du moment de la sortie : **tant qu'il n'a pas publié, aucun autre joueur ne voit la nouveauté**. Ce n'est pas un masquage dans la page : les brouillons ne quittent pas le serveur.
+
+**Deux documents Firestore, collection `gameNews`**
+
+| Document | Contenu | Qui peut le lire |
+| --- | --- | --- |
+| `gameNews/published` | Les nouveautés **sorties** (`entries: [{ id, title, body, version, date }]`) | Tout le monde, même sans compte |
+| `gameNews/drafts` | Les nouveautés **à venir** (même forme) | Le seul compte propriétaire |
+
+- **Rédiger** : panneau Administration → **📰 Nouveautés · brouillon privé**. Titre, version facultative, détails (une ligne par nouveauté, `- ` pour une puce). **Enregistrer en brouillon** écrit dans `gameNews/drafts` ; rien ne change pour les joueurs.
+- **Relire** : **Relire mes brouillons →** ouvre le journal. Le bloc **🔒 Brouillons · toi seulement** montre le rendu exact, avec **Publier (release)** et **Supprimer**.
+- **Release** : **Publier** copie l'entrée en tête de `gameNews/published`, puis la retire des brouillons. À partir de là, elle s'affiche chez tous les joueurs (au plus tard 2 minutes après, ou à l'ouverture du journal). **Publier (release)** depuis le panneau fait la même chose sans passer par le brouillon.
+- **Retirer** : sur une entrée publiée, le propriétaire voit **Retirer du journal** (confirmation). L'entrée disparaît du document public ; le brouillon n'est pas recréé.
+- **Badge** : le bouton du Compte affiche **NOUVEAU** quand la dernière entrée publiée n'a pas encore été lue. La lecture est mémorisée par compte dans `localStorage` (`refs-cards:news-seen:<uid>`).
+- **Quota** : un joueur lit un seul document (`published`), une fois par connexion puis au plus toutes les 2 minutes (`NEWS_TTL_MS`) ; l'admin lit aussi `drafts`. Aucune écoute temps réel (`onSnapshot`) : le journal n'a pas besoin d'être instantané.
+- **Règles Firestore** : `gameNews/published` est lisible par tous (`get`), `gameNews/drafts` seulement par le propriétaire, et l'écriture (brouillon, publication, retrait) est réservée à ce compte. **Déploie `firestore.rules` avant la nouvelle version du site** : sans ces règles, la collection est refusée (`permission-denied`) et le jeu affiche « Nouveautés indisponibles : publie firestore.rules sur Firebase. » au lieu de planter.
+- **Déconnexion** : le journal et les brouillons sont vidés à la déconnexion (`resetNews()`), comme le panneau d'administration.
+- **Le journal est lui-même un aperçu** (`data-preview="journal-nouveautes"`) : il reste invisible pour les joueurs tant que tu ne l'as pas publié dans **Administration → 🧪 Aperçus**. Pour qu'ils y aient accès tout de suite, ouvre cette section et clique sur **Publier pour tous**.
+- **Test** : `node tests/news-flow.cjs` vérifie qu'un joueur ne lit ni n'affiche jamais `gameNews/drafts`, qu'un brouillon ne publie rien, et que la release rend l'entrée visible par les autres.
+
+## Aperçus : masquer une fonctionnalité à tout le monde sauf soi
+
+Pour préparer une nouveauté **directement en production** sans que personne ne la voie, il suffit de marquer son bloc dans `index.html` :
+
+```html
+<section id="pack-du-mois" data-preview="pack-du-mois" data-preview-label="Pack du mois">
+  …
+</section>
+```
+
+- **Effet immédiat** : le bloc est masqué pour tous les joueurs (`styles.css` applique `[data-preview-locked]{display:none!important}`, donc même un bloc en `flex`/`grid` disparaît). Le compte propriétaire, lui, le voit toujours : il peut relire et tester son aperçu en conditions réelles.
+- **Rien à déployer en plus** : l'attribut peut être ajouté à un bloc **déjà en jeu** pour le retirer aux joueurs le temps de le retravailler, puis le remettre.
+- **Publier** : Administration → **🧪 Aperçus · fonctionnalités futures** liste tous les blocs `data-preview` de la page (libellé + identifiant + état). **Publier pour tous** l'ajoute à `released` dans `gameNews/published` ; **Repasser en privé** le retire. **🚀 Tout publier (release)** relâche toute la mise à jour d'un coup. Les joueurs voient le changement au chargement suivant (ou dans les 2 minutes).
+- **Code aussi concerné** : si la fonctionnalité a des gestionnaires ou un état à neutraliser, entoure-les de `previewVisible('pack-du-mois')` (renvoie `true` pour le propriétaire et pour tout aperçu publié, `false` sinon).
+- **Privé par défaut** : la liste `released` est mise en cache local (`refs-cards:preview-released`) et appliquée dès le chargement, avant la réponse de Firestore. Un aperçu oublié dans le document ne devient donc jamais public par accident : sans identifiant dans `released`, il est masqué.
+- **Coût** : aucun lecture supplémentaire — `released` voyage dans le document `gameNews/published` déjà lu pour le journal.
+- **Règles Firestore** : `released` est validé par la règle `gameNews` (liste de 50 identifiants max). Écriture toujours réservée au propriétaire : un joueur ne peut pas se publier un aperçu lui-même, même en modifiant la page.
+- **Test** : `node tests/preview-flow.cjs` (joueur verrouillé, publication individuelle, release global, retour en privé, cache et règle CSS).
 
 ## Ouverture de booster : pas de plantage ni de booster perdu
 
@@ -133,6 +174,8 @@ npm test                             # toute la suite
 node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 node tests/version-update.cjs        # bandeau « nouvelle version » : détection, Plus tard, Recharger
+node tests/news-flow.cjs            # journal Nouveautés : brouillons privés (admin), release, badge NOUVEAU
+node tests/preview-flow.cjs         # aperçus : fonctionnalité masquée aux joueurs jusqu'à la publication
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/open-all-cascade.cjs      # « Ouvrir tout le pack » : éventail, cascade, Passer, mouvement réduit
 node tests/social-flow.cjs           # page Compte / En ligne (amis, profil, achat marché)
@@ -160,7 +203,7 @@ L'onglet **Collection** se trie selon plusieurs critères, juste sous les filtre
 La barre de navigation compte sept onglets : **Pack**, **Shop**, **Inventaire**, **Collection**, **En ligne**, **Quêtes** et **Compte**.
 
 - **Ouverture depuis l’inventaire** : chaque ouverture consomme un pack. Après la première carte, « Ouvrir tout le pack » révèle le reste en une **cascade animée** (voir « Déroulé d'une ouverture »). Le récap présente les grandes cartes de la plus rare à la plus commune ; « Passer au pack suivant » lance directement un autre pack du même type, s’il en reste. Sinon, « Aller au Shop » prend le relais.
-- **Quatre packs achetables** : **Pack Classique** (`assets/packet.png`, **500 🪙**, 5 cartes, taux fixes par carte), **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, 5 cartes, 1 Rare+ et 1 Épique+ garanties, raretés élevées plus fréquentes que les communes — les pourcentages affichés sous le pack suivent le type choisi), **Pack Légende** (`assets/packetlegende.png`, **800 🪙**, 10 cartes, chances standards) et **Pack Vidéo** (`assets/packetvideo.png`, **1 000 🪙**, 2 cartes animées), achetable et ouvrable comme les autres. Ses cartes ne sortent jamais des autres boosters : elles restent exclusives au Pack Vidéo (visibles, verrouillées, dans la collection). Les prix sont au-dessus de la valeur moyenne d'un pack (≈ 878 🪙 rare, ≈ 788 🪙 légende pour 10 cartes, ≈ 153 🪙 vidéo pour 2 cartes ; 800 🪙 se situe juste au-dessus) pour éviter l'argent infini de l'ancien prix à 100 🪙.
+- **Six packs achetables** : **Pack Classique** (`assets/packet.png`, **500 🪙**, 5 cartes, table de référence), **Pack Rare doré** (`assets/packetrare.png`, **1 000 🪙**, 5 cartes, raretés élevées beaucoup plus fréquentes) , **Pack Double Rare** (`assets/Packraredouble.png`, **1 800 🪙**, 10 cartes aux chances du Pack Rare), **Pack Légende** (`assets/packetlegende.png`, **800 🪙**, 10 cartes, table plus basse mais deux fois plus de volume), **Pack Vidéo** (`assets/packetvideo.png`, **600 🪙**, 2 cartes animées) et **Pack Ultra Rare** (`assets/packetultra.png`, **2 200 🪙**, 5 cartes, aucune commune ni inhabituelle). Les pourcentages affichés sous le pack suivent le type choisi. Aucune garantie sur aucun palier : chaque carte est tirée indépendamment, et **aucun pack ne rembourse son prix en moyenne** (63 % à 73 % de la valeur, cf. « Équilibrage des packs »). Les cartes vidéo ne sortent jamais des autres boosters : elles restent exclusives au Pack Vidéo (visibles, verrouillées, dans la collection).
 - **Achats multiples** : sélecteur de quantité (1 à 10, raccourcis ×1 / ×5 / ×10) par pack ; le bouton affiche le total et se désactive si le solde est insuffisant.
 - **Calendrier de connexion** : un cadeau gratuit par jour dans la bannière 🎁 du Shop, avec un vrai calendrier mensuel (jours récupérés cochés ✓, date du jour entourée) et le défilé des 7 récompenses du cycle. Les cadeaux s'améliorent à chaque jour de connexion d'affilée : J1 1 pack classique + 150 🪙, J2 2 classiques + 200 🪙, J3 1 rare + 250 🪙, J4 700 🪙, J5 1 rare + 1 classique + 300 🪙, J6 1 légende + 400 🪙, J7 jackpot (1 vidéo + 1 légende + 1 000 🪙), puis le cycle recommence. Une journée sans connexion remet la série au J1. Sauvegarde : `playerSaves/{uid}` gagne `streakDate` (dernier cadeau récupéré), `streak` (jours d'affilée) et `claimedDays` (dates cochées du mois affiché) ; les anciennes sauvegardes « 3 gratuits/jour » (`freeDate`/`freeUsed`) migrent automatiquement (quota entamé = cadeau du jour déjà pris) et ne sont plus écrites. Pastille sur l'onglet Shop tant que le cadeau du jour n'est pas récupéré. Le premier pack offert des nouveaux comptes arrive aussi dans l'inventaire. **Republie `firestore.rules`** pour autoriser les nouveaux champs.
 - **Sauvegarde** : `playerSaves/{uid}` gagne `packStock {classic, rare, legend, video}`, `freeDate` et `freeUsed` (les anciennes sauvegardes sans ces champs démarrent à 0, avec migration du premier pack offert). **Republie `firestore.rules`** pour les autoriser.
@@ -240,7 +283,7 @@ Le plan Spark compte **chaque document lu** (y compris l'instantané initial d'u
 
 1. **Découpe manuelle** : le booster flotte au centre (parallaxe souris, `touch-action: none`). Une ligne de découpe lumineuse, guidée par une flèche, attend à 15 % du haut. Glisser vers la droite (doigt ou souris) fait progresser la coupe de 0 à 100 % : trait incandescent, gerbe d'étincelles, rabat soulevé en `clip-path`, bruit de papier/plastique dont le timbre suit la vitesse du geste.
 2. **Seuil** : relâché avant 75 %, le paquet revient en place avec un rebond élastique (et un léger craquement). À partir de 75 %, la déchirure s'achève : le haut s'envole en tournoyant dans un flash, éjecte la pile de cinq cartes et déclenche le *pop* d'ouverture.
-3. **Pile de cartes** : les cinq cartes sont triées de la moins rare à la plus rare, la plus rare au fond. Un clic retourne la carte du dessus (`rotateY`), avec parallaxe/tilt et reflet holographique qui suit le curseur. Les treize raretés ont leur mise en scène, regroupée en trois paliers d'effets : halo coloré (Commune, Inhabituelle), anneau + étincelles (Rare, Super Rare), ralenti + tremblement d'écran (Épique, Ultra épique), rayons rotatifs + pluie + hologramme (Mythique, Légendaire, Divine, Secrète).
+3. **Pile de cartes** : les cinq cartes sont triées de la moins rare à la plus rare, la plus rare au fond. Un clic retourne la carte du dessus (`rotateY`), avec parallaxe/tilt et reflet holographique qui suit le curseur. Les treize raretés ont leur mise en scène, regroupée en trois paliers d'effets : halo coloré (Commune, Inhabituelle), anneau + étincelles (Rare, Super Rare), ralenti + tremblement d'écran (Épique, Ultra épique), rayons rotatifs + pluie + hologramme (Légendaire, Mythique, Divine, Secrète).
 4. **Rangement** : après l'avoir révélée, touche la carte pour la manipuler (tilt/parallaxe), puis appuie sur **Carte suivante** (ou clique à côté dans la table) pour la faire glisser vers le récapitulatif (whoosh) et dévoiler la suivante. Au clavier, Entrée/Espace range la carte révélée. Une fois les cinq cartes rangées, le bouton **Aller au Shop** apparaît (les packs s'achètent dans la boutique et vont dans l'inventaire).
 5. **Ouvrir tout le pack** : dès la première carte retournée, ce bouton ouvre le reste de la pile en une cascade. Les cartes restantes **s'étalent sur la table** (une rangée sur grand écran, deux ou trois sur mobile, taille calculée pour que tout reste visible), **se retournent une à une** de la moins rare à la plus rare, chacune avec sa gerbe de particules ; la **plus rare du lot** est mise en avant (agrandie, halo, bandeau, jingle et effets de son palier), puis les cartes **filent l'une après l'autre vers leur case du butin** avant l'affichage du récap. Les pièces et la collection se mettent à jour au rythme des retournements, exactement comme en révélation manuelle. Pendant la cascade, le bouton devient **« Passer »** : lui, un toucher sur la table, Entrée, Espace ou Échap sautent directement au récap (le double-clic sur « Ouvrir tout » est protégé par un court délai). Une carte au-dessus de Divine encore cachée joue d'abord sa mise en scène complète, puis la cascade enchaîne. Avec `prefers-reduced-motion`, l'ouverture reste instantanée. Si le lot contient de nouvelles cartes, l'onglet Collection réagit une seule fois (« ✦ N nouvelles cartes ! »).
 6. **Demande de fusion** : à la fin du booster (ou dès qu'un doublon existe), une **demande de fusion** s'ouvre : chaque paire de cartes identiques peut être échangée contre une carte de la rareté supérieure (la fusion est sans risque, les légendaires étant au sommet). Elle est aussi accessible à tout moment depuis l'onglet **Collection**, via le bouton `DEMANDE DE FUSION · N DOUBLON(S)` affiché au-dessus de la grille.
@@ -341,25 +384,92 @@ Le lecteur est utilisé partout : révélation, récap miniature, collection, in
 
 > **Règles Firestore** : `packStock` accepte maintenant la clé `video`. Republie `firestore.rules` (`firebase deploy --only firestore:rules`) avant de sauvegarder un Pack Vidéo, sinon le cloud refusera l'écriture.
 
-### Les treize raretés
+### Les raretés
 
-| Clé | Libellé | Tirage | Récompense | Palier d'effets |
-| --- | --- | --- | --- | --- |
-| `common` | Commune | 29,4 % | 20 🪙 | calm |
-| `uncommon` | Inhabituelle | 22 % | 35 🪙 | calm |
-| `rare` | Rare | 16 % | 55 🪙 | rare |
-| `superrare` | Super Rare | 11 % | 80 🪙 | rare |
-| `epic` | Épique | 8 % | 120 🪙 | epic |
-| `ultraepic` | Ultra épique | 5 % | 175 🪙 | epic |
-| `mythic` | Mythique | 3,5 % | 240 🪙 | gold |
-| `legendary` | Légendaire | 2,5 % | 340 🪙 | gold |
-| `divine` | Divine | 1,5 % | 520 🪙 | gold |
-| `secret` | Secrète | 0,55 % | 900 🪙 | gold |
-| `ultrasecret` | Ultra Secrète | 0,3 % | 1400 🪙 | gold |
-| `hypersecret` | Hyper Secrète | 0,2 % | 2200 🪙 | gold |
-| `unique` | Unique | 0,05 % (1/2000) · 0,5 % dans le Pack Ultra Rare (1/200) | 5000 🪙 | gold |
+L'échelle compte **treize paliers strictement croissants** : chaque palier est à
+la fois plus rare et plus précieux que le précédent, sans exception. « Légendaire »
+passe **avant** « Mythique » (le mythe est au-dessus de la légende) et les trois
+paliers « Secrète » ferment la marche, au-delà du tirage normal. Une carte ne
+change jamais de palier : seule sa valeur de revente varie avec les doublons.
 
-Les tables par pack vivent dans `PACK_TABLES` (`app.js`). Pour le Pack Classique, les taux par carte sont : Commune 45,30 %, Inhabituelle 22 %, Rare 15 %, Super Rare 7 %, Épique 5 %, Ultra épique 2,5 %, Mythique 1,2 %, Légendaire 0,8 %, Divine 0,4 %, Secrète 0,35 %, Ultra Secrète 0,25 %, Hyper Secrète 0,17 % et Unique 0,03 %. Ces tirages indépendants n'ont ni garantie, ni plafond de doublons, ni bonus de rentabilité. Les autres packs conservent leurs tables, garanties et bonus : les taux affichés sont leurs taux de base, avant plafond et bonus. Si une rareté manque dans le pool, les taux disponibles sont renormalisés. La fusion suit la chaîne `next` de `RARITIES`.
+| Rang | Clé | Libellé | Récompense | Palier d'effets |
+| ---: | --- | --- | ---: | --- |
+| 0 | `common` | Commune | 35 🪙 | calm |
+| 1 | `uncommon` | Inhabituelle | 55 🪙 | calm |
+| 2 | `rare` | Rare | 100 🪙 | rare |
+| 3 | `superrare` | Super Rare | 165 🪙 | rare |
+| 4 | `epic` | Épique | 285 🪙 | epic |
+| 5 | `ultraepic` | Ultra épique | 470 🪙 | epic |
+| 6 | `legendary` | Légendaire | 770 🪙 | gold |
+| 7 | `mythic` | Mythique | 1 250 🪙 | gold |
+| 8 | `divine` | Divine | 2 000 🪙 | gold |
+| 9 | `secret` | Secrète | 3 300 🪙 | gold |
+| 10 | `ultrasecret` | Ultra Secrète | 5 200 🪙 | gold |
+| 11 | `hypersecret` | Hyper Secrète | 8 800 🪙 | gold |
+| 12 | `unique` | Unique | 14 000 🪙 | gold |
+
+Les valeurs montent d'environ **×1,6 par palier**, avec un vrai saut sur les
+Secrètes : une Unique vaut 400 fois une Commune. C'est ce qui rend l'échelle
+lisible — chaque cran se voit dans la revente, la fusion et le butin.
+
+La colonne `weight` de `RARITIES` n'est qu'un repère historique : **le tirage
+utilise uniquement `PACK_TABLES`**. `PACK_SLOTS` décrit un slot par carte
+(tous « standard » : aucun palier n'est offert, la structure accepte un
+`minRank` pour une future offre). Si une rareté manque dans le pool (pack
+vidéo), les poids sont renormalisés sur les raretés présentes.
+
+La **fusion** combine deux cartes identiques en une carte du palier `next`,
+plafonnée à **Ultra épique** (`FUSION_MAX_RANK`) : Légendaire et au-delà ne
+s'obtiennent qu'en ouvrant des boosters.
+
+### Équilibrage des packs
+
+Taux par carte (les poids sont relatifs, renormalisés sur 100 %) :
+
+| Rareté | Classique | Rare / Double Rare | Légende | Vidéo | Ultra |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Commune | 55,61 % | 21,18 % | 63,86 % | — | — |
+| Inhabituelle | 24,75 % | 25 % | 23,24 % | — | — |
+| Rare | 12,38 % | 25 % | 9,30 % | 39,85 % | 19,95 % |
+| Super Rare | 4,95 % | 15 % | 2,71 % | — | 21,94 % |
+| Épique | 1,73 % | 8 % | 0,70 % | 60,07 % | 30,92 % |
+| Ultra épique | 0,43 % | 4 % | 0,155 % | — | 20,95 % |
+| Légendaire | 0,10 % | 1,3 % | 0,031 % | — | 4,59 % |
+| Mythique | 0,03 % | 0,4 % | 0,008 % | — | 1,20 % |
+| Divine | 0,008 % | 0,09 % | 0,0015 % | — | 0,35 % |
+| Secrète | 0,002 % | 0,02 % | 0,0003 % | — | 0,08 % |
+| Ultra Secrète | 0,0006 % | 0,005 % | 0,0001 % | — | 0,02 % |
+| Hyper Secrète | 0,00015 % | 0,0012 % | 0,00002 % | 0,08 % | 0,005 % |
+| Unique | 0,004 % | 0,001 % | 0,0004 % | — | 0,0015 % |
+
+Conséquences par pack (mesurées sur 12 000 tirages par type) :
+
+| Pack | Prix | Cartes | Valeur moyenne | Part du prix | Légendaire+ | Divine+ | Unique |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Classique | 500 🪙 | 5 | ≈ 313 🪙 | 63 % | 0,7 % | 0,07 % | 1 / 5 000 packs |
+| Rare | 1 000 🪙 | 5 | ≈ 653 🪙 | 65 % | 8,7 % | 0,6 % | 1 / 20 000 packs |
+| Double Rare | 1 800 🪙 | 10 | ≈ 1 306 🪙 | 73 % | 17 % | 1,2 % | 1 / 10 000 packs |
+| Légende | 800 🪙 | 10 | ≈ 521 🪙 | 65 % | 0,4 % | 0,02 % | 1 / 25 000 packs |
+| Vidéo | 600 🪙 | 2 | ≈ 438 🪙 | 73 % | 0,16 % | 0,16 % | — |
+| Ultra | 2 200 🪙 | 5 | ≈ 1 531 🪙 | 70 % | 27 % | 2,3 % | 1 / 13 000 packs |
+
+Principes de la refonte :
+
+1. **Aucune garantie, aucun bonus.** Les anciennes garanties (1 Rare+, 1 Épique+,
+   Mythique+…) et le « coup de pouce rentabilité » (`PACK_PROFIT_CHANCE` /
+   `boostPackProfit`, supprimés) offraient des paliers élevés sans tirage : le
+   Pack Rare sortait une Divine dans **50 %** des packs et l'Ultra une Unique
+   dans **33 %**. Désormais la probabilité affichée est la probabilité réelle.
+2. **Aucun pack rentable.** La valeur moyenne d'un pack est toujours inférieure
+   à son prix (63 % à 73 %) : ouvrir ne fabrique plus de pièces.
+3. **Les hautes raretés redeviennent des événements.** En Pack Rare : Divine
+   tous les 170 packs environ, Secrète+ tous les 700, Unique tous les 20 000 ;
+   en Classique, l'Unique tombe une fois sur 5 000 packs.
+4. **Les prix suivent la valeur.** Les packs chers ont été recalibrés
+   (Vidéo 600 🪙 au lieu de 1 000, Ultra 2 200 🪙 au lieu de 10 000, Double Rare
+   1 800 🪙) pour rester des paris cohérents, pas des pièges.
+5. **Le barème des doublons ne change pas** : 100 % → 72 % → 52 % → 37 % →
+   plancher 35 % de la récompense de rareté (`cardReward`).
 
 L'image `assets/packet.png` fournie ici est un visuel temporaire créé pour le prototype : remplacez-la par votre propre image en conservant le même chemin. Le Pack Vidéo utilise `assets/packetvideo.png` : remplacez ce fichier par votre visuel en gardant le même chemin.
 

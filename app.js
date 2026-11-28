@@ -6,9 +6,10 @@
 (() => {
   'use strict';
 
-  /* Boutique : le bonus de rentabilité est propre à chaque pack ; le pack
-     classique n'en bénéficie pas afin de préserver ses taux par carte. */
-  const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1700, legend: 800, video: 1000, ultra: 10000 };
+  /* Boutique : prix en pièces. Tous les packs rendent EN MOYENNE moins que
+     leur prix (cf. « Équilibrage » plus bas) : ouvrir un booster reste un
+     pari, pas une source de pièces infinie. */
+  const PACK_PRICES = { classic: 500, rare: 1000, doubleRare: 1800, legend: 800, video: 600, ultra: 2200 };
   const PACK_PRICE = PACK_PRICES.classic; // compat : ancien prix unique (100) abandonné
 
   /* ============================================ OFFRE DE SORTIE · ULTRA RARE
@@ -273,13 +274,13 @@
       shake: 'shake', sound: 'classic'
     },
     rare: {
-      title: 'RARE DORÉ', sub: '5 cartes · 1 Rare+ et 1 Épique+ garanties',
+      title: 'RARE DORÉ', sub: '5 cartes · raretés élevées plus fréquentes',
       colors: ['#ffffff', '#fbbf24', '#f59e0b', '#fde68a', '#fef3c7'],
       burstDelay: 300, revealDelay: 1050, sparks: 34, dots: 44, confetti: 40, rain: 36,
       shake: 'shake', sound: 'rare'
     },
     doubleRare: {
-      title: 'DOUBLE RARE', sub: '10 cartes · 2 Rare+ et 2 Épique+ garanties',
+      title: 'DOUBLE RARE', sub: '10 cartes · mêmes chances que le Pack Rare',
       colors: ['#ffffff', '#ff24cf', '#ff86e7', '#c80087', '#ffe1fa'],
       burstDelay: 350, revealDelay: 1150, sparks: 40, dots: 50, confetti: 45, rain: 40,
       shake: 'shake', sound: 'rare'
@@ -297,7 +298,7 @@
       shake: 'shake', sound: 'video'
     },
     ultra: {
-      title: 'ULTRA RARE', sub: '5 cartes · raretés extrêmes garanties',
+      title: 'ULTRA RARE', sub: '5 cartes · aucune commune, Shiny ×7',
       colors: ['#ffffff', '#67e8f9', '#f0abfc', '#fde047', '#c4a1ff'],
       burstDelay: 360, revealDelay: 1380, sparks: 36, dots: 55, confetti: 54, rain: 64,
       shake: 'ultra-shake', sound: 'ultra'
@@ -353,61 +354,106 @@
 
   /* Treize raretés : propriétés visuelles, récompenses et fusions. Les taux
      de tirage sont définis dans PACK_TABLES, indépendamment de ces propriétés. */
+  /* ============================================================ RARETÉS
+     Échelle STRICTEMENT croissante : chaque palier est plus rare ET plus
+     précieux que le précédent, sans exception. « Légendaire » passe avant
+     « Mythique » (le mythe est au-dessus de la légende), et les paliers
+     « Secrète » restent au sommet, au-delà du tirage normal.
+
+     `reward` = valeur en pièces d'une carte de cette rareté (premier
+     exemplaire). Les valeurs sont exponentiellement croissantes : ≈ ×1,6 par
+     palier, avec un vrai saut sur les Secrètes. `weight` n'est qu'un repère
+     historique (le tirage utilise PACK_TABLES). */
   const RARITIES = {
-    common:     { label: 'Commune',      rank: 0, weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 20,  fx: 'calm', next: 'uncommon' },
-    uncommon:   { label: 'Inhabituelle', rank: 1, weight: 22,  color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 35,  fx: 'calm', next: 'rare' },
-    rare:       { label: 'Rare',         rank: 2, weight: 16,  color: '#5fb8ff', ink: '#06243a', glow: '#4aa8ff', reward: 55,  fx: 'rare', next: 'superrare' },
-    superrare:  { label: 'Super Rare',   rank: 3, weight: 11,  color: '#67e0d0', ink: '#032a26', glow: '#3fd8c8', reward: 80,  fx: 'rare', next: 'epic' },
-    epic:       { label: 'Épique',       rank: 4, weight: 8,   color: '#b47bff', ink: '#24093c', glow: '#a457ff', reward: 120, fx: 'epic', next: 'ultraepic' },
-    ultraepic:  { label: 'Ultra épique', rank: 5, weight: 5,   color: '#ff8ccb', ink: '#3a0524', glow: '#ff5cb8', reward: 175, fx: 'epic', next: 'mythic' },
-    mythic:     { label: 'Mythique',     rank: 6, weight: 3.5, color: '#ffa469', ink: '#331204', glow: '#ff8a3d', reward: 240, fx: 'gold', next: 'legendary' },
-    legendary:  { label: 'Légendaire',   rank: 7, weight: 2.5, color: '#ffd45e', ink: '#3a2600', glow: '#ffb347', reward: 340, fx: 'gold', next: 'divine' },
-    divine:     { label: 'Divine',       rank: 8, weight: 1.5, color: '#a7f3ff', ink: '#032830', glow: '#7ce8ff', reward: 520, fx: 'gold', next: 'secret' },
-    secret:     { label: 'Secrète',      rank: 9, weight: 0.5, color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 900, fx: 'gold', next: 'ultrasecret' },
-    ultrasecret:{ label: 'Ultra Secrète',rank: 10, weight: 0.3, color: '#c084fc', ink: '#2a0a3d', glow: '#a855f7', reward: 1400, fx: 'gold', next: 'hypersecret' },
-    hypersecret:{ label: 'Hyper Secrète',rank: 11, weight: 0.2, color: '#fb7185', ink: '#3d0714', glow: '#f43f5e', reward: 2200, fx: 'gold', next: 'unique' },
-    unique:     { label: 'Unique',       rank: 12, weight: 0.01, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 5000, fx: 'gold', next: null }
+    common:     { label: 'Commune',       rank: 0,  weight: 29.4, color: '#e6ebdf', ink: '#20261b', glow: '#e6ebdf', reward: 35,    fx: 'calm', next: 'uncommon' },
+    uncommon:   { label: 'Inhabituelle',  rank: 1,  weight: 22,   color: '#6fe0a8', ink: '#04251a', glow: '#57d39a', reward: 55,    fx: 'calm', next: 'rare' },
+    rare:       { label: 'Rare',          rank: 2,  weight: 16,   color: '#5fb8ff', ink: '#06243a', glow: '#4aa8ff', reward: 100,   fx: 'rare', next: 'superrare' },
+    superrare:  { label: 'Super Rare',    rank: 3,  weight: 11,   color: '#67e0d0', ink: '#032a26', glow: '#3fd8c8', reward: 165,   fx: 'rare', next: 'epic' },
+    epic:       { label: 'Épique',        rank: 4,  weight: 8,    color: '#b47bff', ink: '#24093c', glow: '#a457ff', reward: 285,   fx: 'epic', next: 'ultraepic' },
+    ultraepic:  { label: 'Ultra épique',  rank: 5,  weight: 5,    color: '#ff8ccb', ink: '#3a0524', glow: '#ff5cb8', reward: 470,   fx: 'epic', next: 'legendary' },
+    legendary:  { label: 'Légendaire',    rank: 6,  weight: 2.5,  color: '#ffd45e', ink: '#3a2600', glow: '#ffb347', reward: 770,   fx: 'gold', next: 'mythic' },
+    mythic:     { label: 'Mythique',      rank: 7,  weight: 3.5,  color: '#ffa469', ink: '#331204', glow: '#ff8a3d', reward: 1250,  fx: 'gold', next: 'divine' },
+    divine:     { label: 'Divine',        rank: 8,  weight: 1.5,  color: '#a7f3ff', ink: '#032830', glow: '#7ce8ff', reward: 2000,  fx: 'gold', next: 'secret' },
+    secret:     { label: 'Secrète',       rank: 9,  weight: 0.5,  color: '#e9d4ff', ink: '#231035', glow: '#c79bff', reward: 3300,  fx: 'gold', next: 'ultrasecret' },
+    ultrasecret:{ label: 'Ultra Secrète', rank: 10, weight: 0.3,  color: '#c084fc', ink: '#2a0a3d', glow: '#a855f7', reward: 5200,  fx: 'gold', next: 'hypersecret' },
+    hypersecret:{ label: 'Hyper Secrète', rank: 11, weight: 0.2,  color: '#fb7185', ink: '#3d0714', glow: '#f43f5e', reward: 8800,  fx: 'gold', next: 'unique' },
+    unique:     { label: 'Unique',        rank: 12, weight: 0.01, color: '#fef08a', ink: '#3a2c00', glow: '#facc15', reward: 14000, fx: 'gold', next: null }
   };
 
-  /* Une fusion ne peut jamais produire mieux qu'Ultra épique. */
+  /* Une fusion ne peut jamais produire mieux qu'Ultra épique : Légendaire et
+     au-delà ne s'obtiennent qu'en ouvrant des boosters. */
   const FUSION_MAX_RANK = RARITIES.ultraepic.rank;
   const canFuseInto = (info) => Boolean(info && info.next && RARITIES[info.next] && RARITIES[info.next].rank <= FUSION_MAX_RANK);
 
   const SOUND_FX = { calm: 'common', rare: 'rare', epic: 'epic', gold: 'legendary' };
 
-  /* Tables de tirage par pack. Les taux classiques sont des probabilités
-     par carte : pas de garantie, de plafond de doublons ni de bonus rentable.
-     Les autres packs conservent leurs garanties et règles spécifiques. */
+  /* ========================================================= ÉQUILIBRAGE
+     Taux par CARTE, en pourcentage, pour chaque pack. Les poids sont
+     relatifs : le tirage les renormalise sur les raretés présentes dans le
+     pool. Aucune garantie, aucune remontée automatique : chaque carte est
+     tirée indépendamment.
+
+     Repères mesurés (voir tests/pack-odds.cjs) :
+       - Pack Classique : Légendaire+ ≈ 0,7 % par pack, Divine+ ≈ 0,05 %,
+         Unique ≈ 1 pack sur 5 000 ;
+       - Pack Rare : Légendaire+ ≈ 8,7 %, Divine+ ≈ 0,6 % ;
+       - Pack Ultra : Légendaire+ ≈ 27 %, Divine+ ≈ 2,3 %, Unique ≈ 1 sur 13 000.
+     Tous les packs rendent en moyenne 61 % à 73 % de leur prix : le jeu
+     reste un défi, sans être une machine à sous qui rend l'argent. */
   const PACK_TABLES = {
-    classic: { common: 45.30, uncommon: 22, rare: 15, superrare: 7, epic: 5, ultraepic: 2.5, mythic: 1.2, legendary: 0.8, divine: 0.4, secret: 0.35, ultrasecret: 0.25, hypersecret: 0.17, unique: 0.03 },
-    rare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    doubleRare: { common: 9.4, uncommon: 12, rare: 18, superrare: 14, epic: 13, ultraepic: 11, mythic: 9, legendary: 7, divine: 4, secret: 2.05, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    legend: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    video: { common: 29.4, uncommon: 22, rare: 16, superrare: 11, epic: 8, ultraepic: 5, mythic: 3.5, legendary: 2.5, divine: 1.5, secret: 0.55, ultrasecret: 0.3, hypersecret: 0.2, unique: 0.01 },
-    ultra: { common: 0, uncommon: 0, rare: 2, superrare: 4, epic: 10, ultraepic: 16, mythic: 22, legendary: 20.5, divine: 14, secret: 10, ultrasecret: 0.8, hypersecret: 0.2, unique: 0.0125 }
+    /* 500 🪙 · 5 cartes : le pack de référence, très majoritairement commun. */
+    classic: {
+      common: 55.61, uncommon: 24.75, rare: 12.38, superrare: 4.95,
+      epic: 1.73, ultraepic: 0.43, legendary: 0.10, mythic: 0.03,
+      divine: 0.008, secret: 0.002, ultrasecret: 0.0006,
+      hypersecret: 0.00015, unique: 0.004
+    },
+    /* 1 000 🪙 · 5 cartes : mêmes règles, mais les raretés élevées sont
+       beaucoup plus fréquentes (Rare 25 %, Épique 8 %, Légendaire 1,3 %). */
+    rare: {
+      common: 21.18, uncommon: 25, rare: 25, superrare: 15,
+      epic: 8, ultraepic: 4, legendary: 1.3, mythic: 0.4,
+      divine: 0.09, secret: 0.02, ultrasecret: 0.005,
+      hypersecret: 0.0012, unique: 0.001
+    },
+    doubleRare: {
+      common: 21.18, uncommon: 25, rare: 25, superrare: 15,
+      epic: 8, ultraepic: 4, legendary: 1.3, mythic: 0.4,
+      divine: 0.09, secret: 0.02, ultrasecret: 0.005,
+      hypersecret: 0.0012, unique: 0.001
+    },
+    /* 800 🪙 · 10 cartes : beaucoup de volume, donc une table plus basse :
+       c'est le pack pour remplir la collection, pas pour chercher du rare. */
+    legend: {
+      common: 63.86, uncommon: 23.24, rare: 9.30, superrare: 2.71,
+      epic: 0.70, ultraepic: 0.155, legendary: 0.031, mythic: 0.008,
+      divine: 0.0015, secret: 0.0003, ultrasecret: 0.00008,
+      hypersecret: 0.00002, unique: 0.0004
+    },
+    /* 600 🪙 · 2 cartes vidéo : le pool ne contient que des cartes vidéo
+       (Rare/Épique + l'Hyper Secrète Bierrypiano). */
+    video: { rare: 39.85, epic: 60.07, hypersecret: 0.08 },
+    /* 2 200 🪙 · 5 cartes : aucune commune ni inhabituelle, table riche. */
+    ultra: {
+      common: 0, uncommon: 0, rare: 19.95, superrare: 21.94, epic: 30.92,
+      ultraepic: 20.95, legendary: 4.59, mythic: 1.20, divine: 0.35,
+      secret: 0.08, ultrasecret: 0.02, hypersecret: 0.005, unique: 0.0015
+    }
   };
-  /* Slots par pack : 'std' = table complète ; { minRank } = garantie
-     (rang minimum, ex. 2 = Rare+, 4 = Épique+, 6 = Mythique+, 7 = Légendaire+).
-     La longueur de la liste = nombre de cartes du pack (cf. PACK_CARD_COUNT). */
+
+  /* Un slot par carte ; tous identiques : aucun palier n'est offert. La
+     structure reste générique (un slot peut imposer un rang minimum via
+     { minRank }) pour une future offre, mais aucun pack ne s'en sert. */
   const PACK_SLOTS = {
     classic: ['std', 'std', 'std', 'std', 'std'],
-    rare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
-    doubleRare: ['std', 'std', 'std', { minRank: 2 }, { minRank: 4 }, 'std', 'std', 'std', { minRank: 2 }, { minRank: 4 }],
+    rare: ['std', 'std', 'std', 'std', 'std'],
+    doubleRare: ['std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std'],
     legend: ['std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std', 'std'],
     video: ['std', 'std'],
-    ultra: ['std', 'std', { minRank: 4 }, { minRank: 6 }, { minRank: 7 }]
+    ultra: ['std', 'std', 'std', 'std', 'std']
   };
-  const PACK_UNIQUE_CHANCE = { standard: 1 / 10000, ultra: 1 / 8000 };
   const PACK_SHINY_MULTIPLIER = { classic: 1, rare: 2, doubleRare: 2, legend: 1, video: 1, ultra: 7 };
-  /* Coup de pouce « pack rentable » : probabilité qu'un pack dont la valeur
-     brute (somme des récompenses de rareté, hors réduction doublon) est sous
-     son prix soit remonté au moins au prix payé (voir boostPackProfit).
-     Légende : 1 sur 2, Rare / Double Rare : 2 sur 5,
-     Vidéo / Ultra Rare : 1 sur 3. Un pack déjà rentable ne change pas. */
-  const PACK_PROFIT_CHANCE = { classic: 0, rare: 2 / 5, doubleRare: 2 / 5, legend: 1 / 2, video: 1 / 3, ultra: 1 / 3 };
-  function packProfitChanceFor(packType) {
-    return PACK_PROFIT_CHANCE[packType] || 0;
-  }
+
   function packTableFor(packType) {
     return PACK_TABLES[packType] || PACK_TABLES.classic;
   }
@@ -1446,6 +1492,24 @@
     dailyTrack.replaceChildren(frag);
   }
 
+  /* Valeur moyenne d'un pack, recalculée depuis sa table : le libellé de la
+     boutique ne peut pas diverger des taux réels. */
+  function packAverageValue(packType) {
+    const list = packPool(packType);
+    const shares = slotRarityShares(packType, 'std', list);
+    const perCard = Object.entries(shares).reduce((sum, [key, chance]) => {
+      const info = RARITIES[key];
+      return info ? sum + chance * info.reward : sum;
+    }, 0);
+    return Math.round(perCard * cardCountFor(packType));
+  }
+  function renderPackValues() {
+    document.querySelectorAll('[data-pack-ev]').forEach((node) => {
+      const value = packAverageValue(node.dataset.packEv);
+      if (value > 0) node.textContent = `Valeur moyenne ≈ ${fmt(value)} 🪙`;
+    });
+  }
+
   function renderShop() {
     const available = dailyAvailable();
     if (freeClaim) {
@@ -1462,6 +1526,7 @@
     if (tabBadgeShop) tabBadgeShop.hidden = !available;
     renderDailyCalendar();
     renderDailyTrack();
+    renderPackValues();
 
     const stockText = (n) => `Tu en as ${n}`;
     if (shopStockClassic) shopStockClassic.textContent = stockText(state.packStock.classic || 0);
@@ -1602,12 +1667,12 @@
       },
       rare: {
         title: 'Booster Rare',
-        desc: '5 cartes · 1 Rare+ et 1 Épique+ garanties · Shiny ×2.',
+        desc: '5 cartes · raretés élevées plus fréquentes · Shiny ×2.',
         rare: true,
       },
       doubleRare: {
         title: 'Booster Double Rare',
-        desc: '10 cartes · mêmes chances que le Pack Rare · 2 Rare+ et 2 Épique+ garanties · Shiny ×2.',
+        desc: '10 cartes · mêmes chances que le Pack Rare · Shiny ×2.',
         rare: false,
         double: true,
       },
@@ -1624,7 +1689,7 @@
       },
       ultra: {
         title: 'Booster Ultra Rare',
-        desc: '5 cartes · Épique+, Mythique+ et Légendaire+ garantis · Shiny ×7.',
+        desc: '5 cartes · aucune commune ni inhabituelle · Shiny ×7.',
         rare: false,
         ultra: true,
       },
@@ -1742,12 +1807,13 @@
 
   /* --------------------------------------------------------------- tirage */
 
-  /* Nouveau moteur de tirage (voir PACK_TABLES / PACK_SLOTS plus haut) :
-     1. on tire la rareté du slot (table du pack, garantie éventuelle),
+  /* Moteur de tirage (voir PACK_TABLES / PACK_SLOTS plus haut) :
+     1. on tire la rareté du slot selon la table du pack,
      2. puis la carte, uniformément parmi les cartes de cette rareté.
-     Plafond : 2 copies par pack (1 pour la vidéo), aucun en classique.
-     Si la rareté tirée n'a plus de carte disponible (plafond atteint), on
-     retire parmi les raretés encore disponibles. */
+     Aucune garantie, aucune remontée : la valeur moyenne d'un pack reste
+     inférieure à son prix. Plafond : 2 copies par pack (1 pour la vidéo),
+     aucun en classique. Si la rareté tirée n'a plus de carte disponible
+     (plafond atteint), on retire parmi les raretés encore disponibles. */
   const MAX_SAME_CARD_PER_PACK = 2;
 
   /* Poids de chaque rareté pour un slot donné, restreints au pool :
@@ -1781,23 +1847,12 @@
   }
 
   /* Partage de raretés réellement utilisé par le tirage et son affichage :
-     hors classique, l'Unique a une probabilité fixe indépendamment des garanties. */
+     simple renormalisation des poids de la table sur le pool. */
   function slotRarityShares(packType, slot, pool) {
     const weights = slotRarityWeights(packType, slot, pool);
     const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
     if (total <= 0) return {};
-    const nonUniqueTotal = total - (weights.unique || 0);
     const shares = {};
-    if (packType !== 'classic' && weights.unique > 0 && nonUniqueTotal > 0) {
-      const uniqueChance = packType === 'ultra'
-        ? PACK_UNIQUE_CHANCE.ultra
-        : PACK_UNIQUE_CHANCE.standard;
-      Object.entries(weights).forEach(([key, weight]) => {
-        if (key !== 'unique') shares[key] = (weight / nonUniqueTotal) * (1 - uniqueChance);
-      });
-      shares.unique = uniqueChance;
-      return shares;
-    }
     Object.entries(weights).forEach(([key, weight]) => { shares[key] = weight / total; });
     return shares;
   }
@@ -1831,16 +1886,6 @@
     Object.keys(weights).forEach((key) => {
       if (availableCards(key, packCounts, validPool, maxSame).length) usable[key] = weights[key];
     });
-    if (packType !== 'classic' && usable.unique && Object.keys(usable).some((key) => key !== 'unique')) {
-      const uniqueChance = packType === 'ultra'
-        ? PACK_UNIQUE_CHANCE.ultra
-        : PACK_UNIQUE_CHANCE.standard;
-      const uniqueCards = availableCards('unique', packCounts, validPool, maxSame);
-      if (uniqueCards.length && Math.random() < uniqueChance) {
-        return uniqueCards[Math.floor(Math.random() * uniqueCards.length)];
-      }
-      delete usable.unique;
-    }
     if (Object.keys(usable).length) weights = usable;
     const rarity = rollRarity(weights);
     if (!rarity) return null;
@@ -1857,59 +1902,6 @@
   function packCardValue(card) {
     const info = RARITIES[card && card.rarity] || RARITIES.common;
     return CardMutations.multiply(card, info.reward, 'reward') || 0;
-  }
-
-  /* Coup de pouce « pack rentable » (PACK_PROFIT_CHANCE) : si le tirage vaut
-     moins que le prix réellement payé (promo incluse) et que le coup de pouce
-     se déclenche, on remonte les cartes les plus faibles, une par une, à la
-     plus petite rareté qui suffit à atteindre le prix — ou à la plus haute
-     disponible si même elle ne suffit pas (on continue alors sur la carte
-     suivante). Pool du pack et plafond de copies par pack sont respectés,
-     et le remplacement repasse par le tirage Shiny du pack. Si le pool ne
-     permet pas d'atteindre le prix, le pack est remonté au maximum possible. */
-  function boostPackProfit(drawn, packType, pool, maxSame) {
-    const price = promoUnitPrice(packType);
-    const chance = packProfitChanceFor(packType);
-    if (!drawn.length || !price || !chance || Math.random() >= chance) return;
-    let total = drawn.reduce((sum, card) => sum + packCardValue(card), 0);
-    if (total >= price) return;
-    const baseKey = (card) => card.baseId || String(card.id || '').split('::')[0];
-    const counts = new Map();
-    drawn.forEach((card) => counts.set(baseKey(card), (counts.get(baseKey(card)) || 0) + 1));
-    const raritiesByReward = Object.keys(RARITIES).sort((a, b) => RARITIES[a].reward - RARITIES[b].reward);
-    const upgraded = new Set();
-    while (total < price && upgraded.size < drawn.length) {
-      let idx = -1;
-      let lowest = Infinity;
-      drawn.forEach((card, i) => {
-        if (upgraded.has(i)) return;
-        const value = packCardValue(card);
-        if (value < lowest) { lowest = value; idx = i; }
-      });
-      if (idx < 0) break;
-      upgraded.add(idx);
-      const oldKey = baseKey(drawn[idx]);
-      counts.set(oldKey, (counts.get(oldKey) || 0) - 1);
-      const deficit = price - (total - lowest);
-      let chosen = null;
-      for (const rarity of raritiesByReward) {
-        if (RARITIES[rarity].reward < deficit) continue;
-        const candidates = availableCards(rarity, counts, pool, maxSame);
-        if (candidates.length) { chosen = candidates[Math.floor(Math.random() * candidates.length)]; break; }
-      }
-      if (!chosen) {
-        for (const rarity of [...raritiesByReward].reverse()) {
-          if (RARITIES[rarity].reward <= lowest) continue;
-          const candidates = availableCards(rarity, counts, pool, maxSame);
-          if (candidates.length) { chosen = candidates[Math.floor(Math.random() * candidates.length)]; break; }
-        }
-      }
-      if (!chosen) { counts.set(oldKey, (counts.get(oldKey) || 0) + 1); continue; }
-      const rolled = CardMutations.roll(chosen, Math.random, packShinyFor(packType));
-      drawn[idx] = rolled;
-      counts.set(baseKey(rolled), (counts.get(baseKey(rolled)) || 0) + 1);
-      total = total - lowest + packCardValue(rolled);
-    }
   }
 
   /* `boosted` est conservé pour compatibilité (anciens appels) : le pack
@@ -1956,8 +1948,6 @@
       const card = pickCardForSlot(packType, slot, packCounts, cardPool, maxSame);
       if (card) record(card);
     });
-    /* Hors démo : coup de pouce rentabilité (1/2, 2/5 ou 1/3 selon le pack). */
-    if (!wantsDemo) boostPackProfit(drawn, packType, cardPool, maxSame);
     // Tri croissant : la carte la moins rare est révélée en premier, la plus
     // rare reste au fond de la pile pour faire monter la tension.
     return drawn.sort((a, b) => RARITIES[a.rarity].rank - RARITIES[b.rarity].rank);
@@ -4614,8 +4604,18 @@
     openInspect(cardById(slot.dataset.cardId));
   });
 
-  /* Moyenne des taux de base par slot, adaptée aux garanties et au pool.
-     Hors classique, doublons et bonus de rentabilité peuvent les modifier. */
+  /* Formate un taux : 2 décimales au-dessus de 0,01 %, 4 en dessous, et
+     « 1 sur N » pour les raretés qui relèvent du coup de chance. */
+  function oddsPctLabel(pct) {
+    const fr = (value, digits) => value.toFixed(digits).replace(/\.?0+$/, '').replace('.', ',');
+    if (pct >= 0.01) return `${fr(pct, 2)} %`;
+    if (pct >= 0.0001) return `${fr(pct, 4)} %`;
+    if (pct > 0) return `1 sur ${Math.round(100 / pct).toLocaleString('fr-FR')}`;
+    return '0 %';
+  }
+
+  /* Moyenne des taux de base par slot, renormalisée sur le pool du pack.
+     Aucun slot garanti, aucun bonus : ce qui est affiché est ce qui tombe. */
   function renderOdds(boosted, pool, packType) {
     if (!packOdds) return;
     packOdds.replaceChildren();
@@ -4636,15 +4636,15 @@
       const dot = el('i');
       dot.style.background = r.color;
       dot.style.boxShadow = `0 0 6px ${r.glow}`;
-      const label = `${r.label} ${pct.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')} %`;
+      const label = `${r.label} ${oddsPctLabel(pct)}`;
       row.append(dot, document.createTextNode(label));
       packOdds.append(row);
     });
     if (type !== 'classic') {
-      packOdds.append(el('span', 'pack-odds-video-note', 'Taux de base par carte avant plafond de doublons et bonus de rentabilité.'));
+      packOdds.append(el('span', 'pack-odds-video-note', 'Taux de base par carte · aucun palier garanti, aucun bonus.'));
     }
     if (type === 'ultra') {
-      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : GROSSES RARETÉS MASSIVEMENT BOOSTÉES · SHINY ×7'));
+      packOdds.append(el('span', 'pack-odds-ultra-note', 'PACK ULTRA RARE : AUCUNE COMMUNE · SHINY ×7'));
     } else if (type === 'rare' || type === 'doubleRare') {
       packOdds.append(el('span', 'pack-odds-rare-note', 'PACK RARE : RARETÉS ÉLEVÉES PLUS FRÉQUENTES · SHINY ×2'));
     }
@@ -5012,6 +5012,12 @@
     /* Réglage global des chapeaux : lu (et suivi en temps réel) pour TOUS les
        joueurs, juste après le profil — `creator: true` est alors publié. */
     loadDecoLayouts();
+    /* Nouveautés : `published` pour tout le monde, `drafts` pour le seul
+       compte propriétaire. Fire-and-forget : le jeu ne dépend pas du journal.
+       applyPreview() tout de suite : le propriétaire voit ses aperçus même si
+       Firestore est indisponible (règles pas encore publiées, hors ligne…). */
+    loadNews(true);
+    applyPreview();
     /* Échanges désactivés : seul le marché existe (cartes + packs en vente).
        Les anciennes propositions trades/ ne sont plus chargées ni proposées.
        Le réseau social (amis, marché, cadeaux, défis) n'est branché qu'à
@@ -5140,6 +5146,9 @@
     decoDrag = null;
     refreshDecoLayers();
     renderAdminPanel();
+    /* Journal des nouveautés : on oublie tout de ce compte (les brouillons
+       de l'admin ne doivent jamais rester affichés après la déconnexion). */
+    resetNews();
     if (friendRequestsUnsub) {
       try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
       friendRequestsUnsub = null;
@@ -6609,6 +6618,10 @@
     if (!adminPanel) return;
     const allowed = isAdmin();
     adminPanel.hidden = !allowed;
+    /* Les blocs Nouveautés et Aperçus du panneau suivent la même règle : rien
+       à afficher pour un autre compte. */
+    renderNewsAdmin();
+    renderPreviewAdmin();
     if (!allowed) {
       setAdminMsg('');
       return;
@@ -6686,6 +6699,760 @@
     renderAccount();
     save();
     setAdminMsg(`${fmt(n)} × ${CardMutations.label(card)} ajoutée${n > 1 ? 's' : ''} à ta collection.`);
+  });
+
+  /* ------------------------ nouveautés du jeu (journal) -------------------
+     Journal des mises à jour, avec une règle simple : ce qui n'est pas encore
+     sorti n'appartient qu'au compte propriétaire.
+
+     Deux documents Firestore, dans la collection `gameNews` :
+       - `published` : les nouveautés déjà sorties. Lisibles par TOUT LE MONDE
+         (même sans compte), pour que les joueurs voient ce qui a changé.
+       - `drafts`    : les nouveautés à venir. Les règles Firestore
+         (firestore.rules) n'autorisent leur lecture qu'au compte propriétaire.
+         Un joueur ne les reçoit donc jamais : ce n'est pas un simple masquage
+         dans la page.
+
+     « Publier (release) » copie l'entrée de `drafts` vers `published` : à
+     partir de là elle apparaît chez tout le monde. Rien n'est publié tant que
+     le propriétaire ne l'a pas demandé.
+
+     Quota : un joueur lit un seul document (`published`), une fois par
+     connexion puis au plus toutes les 2 minutes ; l'admin lit aussi `drafts`.
+     Aucune écoute temps réel (onSnapshot) : le journal n'a pas besoin d'être
+     instantané et les lectures restent rares. */
+  const NEWS_COLLECTION = 'gameNews';
+  const NEWS_PUBLISHED_DOC = 'published';
+  const NEWS_DRAFTS_DOC = 'drafts';
+  const NEWS_SCHEMA = 'news-v1';
+  const NEWS_MAX_ENTRIES = 100;
+  const NEWS_TTL_MS = 2 * 60 * 1000;   // relecture au plus toutes les 2 minutes
+  const NEWS_TITLE_MAX = 60;
+  const NEWS_BODY_MAX = 1200;
+  const NEWS_VERSION_MAX = 24;
+  const NEWS_SEEN_PREFIX = 'refs-cards:news-seen:';
+
+  const newsOpenBtn = $('news-open');
+  const newsNewBadge = $('news-new');
+  const newsSummary = $('news-summary');
+  const newsSheet = $('news-sheet');
+  const newsList = $('news-list');
+  const newsEmpty = $('news-empty');
+  const newsSub = $('news-sub');
+  const newsMsg = $('news-msg');
+  const newsDraftsBlock = $('news-drafts-block');
+  const newsDraftsList = $('news-drafts');
+
+  const newsVersionInput = $('admin-news-version');
+  const newsTitleInput = $('admin-news-title-input');
+  const newsBodyInput = $('admin-news-body');
+  const newsSaveBtn = $('admin-news-save');
+  const newsPublishBtn = $('admin-news-publish');
+  const newsSheetBtn = $('admin-news-open');
+  const newsAdminCount = $('admin-news-count');
+  const newsAdminMsg = $('admin-news-msg');
+
+  const previewAdminList = $('admin-preview-list');
+  const previewAdminCount = $('admin-preview-count');
+  const previewAdminMsg = $('admin-preview-msg');
+  const previewReleaseAll = $('admin-preview-release-all');
+
+  let newsPublished = [];   // entrées visibles par tous (les plus récentes d'abord)
+  let newsDrafts = [];      // brouillons : chargés uniquement pour l'admin
+  let newsLoadedAt = 0;
+  let newsLoadedFor = '';
+  let newsLoading = null;
+  let newsBusy = false;
+  let newsErrorText = '';
+
+  function newsId() {
+    return `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  }
+
+  function newsDateLabel(stamp) {
+    const d = new Date(Number(stamp) || 0);
+    if (!Number.isFinite(d.getTime()) || d.getFullYear() < 2000) return '';
+    return `${d.getDate()} ${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  /* Une entrée nettoyée et bornée : le journal ne doit jamais grossir au-delà
+     de ce que les règles Firestore acceptent (titre 60, texte 1 200). */
+  function newsEntry(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const title = String(raw.title || '').trim().slice(0, NEWS_TITLE_MAX);
+    if (!title) return null;
+    return {
+      id: String(raw.id || '').trim().slice(0, 40) || newsId(),
+      title,
+      body: String(raw.body || '').trim().slice(0, NEWS_BODY_MAX),
+      version: String(raw.version || '').trim().replace(/^v/i, '').slice(0, NEWS_VERSION_MAX),
+      date: Number(raw.date) > 0 ? Number(raw.date) : Date.now()
+    };
+  }
+
+  function newsEntries(data) {
+    const list = data && Array.isArray(data.entries) ? data.entries : [];
+    const out = [];
+    const seen = new Set();
+    for (const raw of list) {
+      const entry = newsEntry(raw);
+      if (!entry || seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      out.push(entry);
+      if (out.length >= NEWS_MAX_ENTRIES) break;
+    }
+    return out;
+  }
+
+  function newsRef(id) {
+    if (!cloudReady()) return null;
+    const coll = cloudDb.collection(NEWS_COLLECTION);
+    if (!coll || typeof coll.doc !== 'function') return null;
+    return coll.doc(id);
+  }
+
+  async function readNewsDoc(id) {
+    const ref = newsRef(id);
+    if (!ref || typeof ref.get !== 'function') return { entries: [], released: [] };
+    const snap = await ref.get();
+    if (!snap || !snap.exists) return { entries: [], released: [] };
+    const data = typeof snap.data === 'function' ? snap.data() : snap.data;
+    return { entries: newsEntries(data), released: previewIds(data && data.released) };
+  }
+
+  function newsPayload(entries) {
+    return entries.slice(0, NEWS_MAX_ENTRIES).map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      body: entry.body,
+      version: entry.version,
+      date: entry.date
+    }));
+  }
+
+  /* Brouillons : un document privé, sans les aperçus. */
+  async function writeNewsDoc(id, entries) {
+    const ref = newsRef(id);
+    if (!ref || typeof ref.set !== 'function') throw new Error('cloud indisponible');
+    await ref.set({
+      schema: NEWS_SCHEMA,
+      entries: newsPayload(entries),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
+
+  /* Document public : les entrées publiées ET la liste des aperçus relâchés
+     (`released`). Les deux vivent dans le même document pour qu'un joueur
+     n'ait qu'une seule lecture à faire par session. */
+  async function writePublishedDoc() {
+    const ref = newsRef(NEWS_PUBLISHED_DOC);
+    if (!ref || typeof ref.set !== 'function') throw new Error('cloud indisponible');
+    await ref.set({
+      schema: NEWS_SCHEMA,
+      entries: newsPayload(newsPublished),
+      released: previewReleased.slice(0, PREVIEW_MAX),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
+
+  function newsUnavailable() {
+    if (!cloudReady()) return 'Connecte-toi pour lire les nouveautés.';
+    return newsErrorText;
+  }
+
+  function newsSummaryText() {
+    const unavailable = newsUnavailable();
+    if (unavailable) return unavailable;
+    if (isAdmin()) {
+      const draftLabel = newsDrafts.length === 1 ? '1 brouillon (toi seul)' : `${newsDrafts.length} brouillons (toi seul)`;
+      const pubLabel = newsPublished.length === 1 ? '1 publiée' : `${newsPublished.length} publiées`;
+      return `${pubLabel} · ${draftLabel}`;
+    }
+    if (!newsPublished.length) return 'Aucune nouveauté publiée pour l\'instant.';
+    return newsPublished.length === 1 ? '1 nouveauté publiée.' : `${newsPublished.length} nouveautés publiées.`;
+  }
+
+  /* Corps du texte : lignes « - », « • » ou « * » → liste à puces ; les autres
+     lignes forment un paragraphe. Tout passe par textContent (aucun HTML
+     interprété, même pour un texte écrit par l'admin). */
+  function renderNewsBody(text) {
+    const lines = String(text || '').split('\n');
+    if (!lines.some((line) => line.trim())) return null;
+    const wrap = el('div', 'news-body');
+    let para = [];
+    let bullets = null;
+    const flushPara = () => {
+      if (!para.length) return;
+      wrap.append(el('p', null, para.join(' ')));
+      para = [];
+    };
+    const flushBullets = () => {
+      if (!bullets) return;
+      wrap.append(bullets);
+      bullets = null;
+    };
+    lines.forEach((raw) => {
+      const line = raw.trim();
+      if (!line) { flushPara(); flushBullets(); return; }
+      if (/^[-•*]\s+/.test(line)) {
+        flushPara();
+        if (!bullets) bullets = el('ul', 'news-bullets');
+        bullets.append(el('li', null, line.replace(/^[-•*]\s+/, '')));
+        return;
+      }
+      flushBullets();
+      para.push(line);
+    });
+    flushPara();
+    flushBullets();
+    return wrap;
+  }
+
+  function newsSeenKey() {
+    const uid = currentUser && currentUser.uid;
+    return uid ? `${NEWS_SEEN_PREFIX}${uid}` : '';
+  }
+
+  function newsSeenId() {
+    const key = newsSeenKey();
+    if (!key) return '';
+    try { return window.localStorage.getItem(key) || ''; } catch (error) { return ''; }
+  }
+
+  function hasUnseenNews() {
+    return newsPublished.length > 0 && newsPublished[0].id !== newsSeenId();
+  }
+
+  /* Le joueur a ouvert le journal : le badge « NOUVEAU » disparaît pour lui
+     seul (clé localStorage par compte). */
+  function markNewsSeen() {
+    const key = newsSeenKey();
+    if (!key || !newsPublished.length) return;
+    try { window.localStorage.setItem(key, newsPublished[0].id); } catch (error) { /* stockage bloqué */ }
+    if (newsNewBadge) newsNewBadge.hidden = true;
+  }
+
+  function newsSheetVisible() {
+    return Boolean(newsSheet && !newsSheet.hidden);
+  }
+
+  function setNewsMsg(message) {
+    if (newsMsg) newsMsg.textContent = message || '';
+  }
+
+  function setNewsAdminMsg(message) {
+    if (newsAdminMsg) newsAdminMsg.textContent = message || '';
+  }
+
+  function renderNewsEntry(entry, { draft = false } = {}) {
+    const article = el('article', draft ? 'news-entry is-draft' : 'news-entry');
+    const head = el('div', 'news-entry-head');
+    head.append(el('h4', 'news-entry-title', entry.title));
+    if (entry.version) head.append(el('span', 'news-version', `v${entry.version}`));
+    if (draft) head.append(el('span', 'news-tag', 'BROUILLON'));
+    article.append(head);
+    const date = newsDateLabel(entry.date);
+    if (date) article.append(el('p', 'news-date', date));
+    const body = renderNewsBody(entry.body);
+    if (body) article.append(body);
+
+    if (draft) {
+      const actions = el('div', 'news-entry-actions');
+      const publish = el('button', 'mini-btn primary', 'Publier (release)');
+      publish.type = 'button';
+      on(publish, 'click', () => { publishNewsEntry(entry); });
+      const remove = el('button', 'mini-btn', 'Supprimer');
+      remove.type = 'button';
+      on(remove, 'click', () => { removeNewsDraft(entry); });
+      actions.append(publish, remove);
+      article.append(actions);
+    } else if (isAdmin()) {
+      /* Une entrée publiée reste retirable par le propriétaire (erreur de
+         frappe, sortie annulée…). Personne d'autre n'a ce bouton. */
+      const actions = el('div', 'news-entry-actions');
+      const unpublish = el('button', 'mini-btn', 'Retirer du journal');
+      unpublish.type = 'button';
+      on(unpublish, 'click', () => { unpublishNewsEntry(entry); });
+      actions.append(unpublish);
+      article.append(actions);
+    }
+    return article;
+  }
+
+  function renderNews() {
+    const admin = isAdmin();
+    if (newsList) {
+      newsList.replaceChildren(...newsPublished.map((entry) => renderNewsEntry(entry)));
+    }
+    if (newsEmpty) newsEmpty.hidden = newsPublished.length > 0;
+    if (newsDraftsBlock) newsDraftsBlock.hidden = !admin || !newsDrafts.length;
+    if (newsDraftsList) {
+      newsDraftsList.replaceChildren(...(admin ? newsDrafts : []).map((entry) => renderNewsEntry(entry, { draft: true })));
+    }
+    if (newsSub) {
+      newsSub.textContent = admin
+        ? 'Tes brouillons restent privés ; les entrées publiées sont visibles par tous les joueurs.'
+        : 'Les mises à jour publiées, de la plus récente à la plus ancienne.';
+    }
+    if (newsSummary) newsSummary.textContent = newsSummaryText();
+    if (newsNewBadge) newsNewBadge.hidden = !hasUnseenNews();
+    if (newsSheetVisible()) markNewsSeen();
+  }
+
+  function renderNewsAdmin() {
+    if (!isAdmin()) {
+      setNewsAdminMsg('');
+      if (newsAdminCount) newsAdminCount.textContent = '';
+      return;
+    }
+    if (newsAdminCount) {
+      const drafts = newsDrafts.length;
+      newsAdminCount.textContent = drafts
+        ? `${drafts} brouillon${drafts > 1 ? 's' : ''} en attente · ${newsPublished.length} publiée${newsPublished.length > 1 ? 's' : ''}`
+        : `Aucun brouillon · ${newsPublished.length} entrée${newsPublished.length > 1 ? 's' : ''} publiée${newsPublished.length > 1 ? 's' : ''}`;
+    }
+  }
+
+  function newsWriteError(error) {
+    if (isQuotaExceeded(error)) return 'Quota Firestore atteint : réessaie après minuit (heure du Pacifique).';
+    if (isPermissionDenied(error)) return 'Écriture refusée : publie firestore.rules sur Firebase, puis réessaie.';
+    return 'Enregistrement impossible pour le moment. Vérifie ta connexion.';
+  }
+
+  /* ------------------- aperçus : masquer une fonctionnalité ----------------
+     Une balise de index.html marquée data-preview="identifiant" (et, pour un
+     libellé lisible, data-preview-label="…") n'est visible que par le compte
+     propriétaire tant qu'elle n'est pas publiée. C'est le mécanisme à utiliser
+     pour une nouveauté déjà dans le code mais pas encore sortie :
+
+       <section id="pack-du-mois" data-preview="pack-du-mois"
+                data-preview-label="Pack du mois">…</section>
+
+     Rien d'autre à faire côté feuille de style : le jeu pose
+     [data-preview-locked] et styles.css masque le bloc (display:none
+     !important), y compris s'il est en display:flex/grid.
+
+     Le propriétaire publie depuis Administration → 🧪 Aperçus :
+       - « Publier pour tous » ajoute l'identifiant dans gameNews/published
+         (champ `released`), lisible par tout le monde ;
+       - « Tout publier (release) » relâche tous les aperçus d'un coup.
+     La liste est gardée en cache local pour appliquer l'état dès le
+     chargement suivant, avant même la réponse de Firestore — un aperçu est
+     donc privé par défaut, jamais visible par erreur.
+
+     Pour une fonctionnalité dont le CODE doit aussi être neutralisé (pas
+     seulement son bloc HTML), tester previewVisible('identifiant') dans les
+     gestionnaires concernés. */
+  const PREVIEW_CACHE_KEY = 'refs-cards:preview-released';
+  const PREVIEW_MAX = 50;
+  const PREVIEW_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+
+  let previewReleased = [];
+
+  function previewId(value) {
+    const id = String(value || '').trim().toLowerCase();
+    return PREVIEW_ID_RE.test(id) ? id : '';
+  }
+
+  function previewIds(list) {
+    const out = [];
+    if (!Array.isArray(list)) return out;
+    for (const raw of list) {
+      const id = previewId(raw);
+      if (id && !out.includes(id)) out.push(id);
+      if (out.length >= PREVIEW_MAX) break;
+    }
+    return out;
+  }
+
+  function previewCache() {
+    try {
+      const raw = window.localStorage.getItem(PREVIEW_CACHE_KEY);
+      return raw ? previewIds(JSON.parse(raw)) : [];
+    } catch (error) { return []; }
+  }
+
+  function savePreviewCache() {
+    try {
+      window.localStorage.setItem(PREVIEW_CACHE_KEY, JSON.stringify(previewReleased));
+    } catch (error) { /* stockage bloqué : l'état viendra de Firestore */ }
+  }
+
+  function previewNodes() {
+    return Array.prototype.slice.call(document.querySelectorAll('[data-preview]'));
+  }
+
+  /* Identifiants déclarés dans index.html, dans l'ordre du document. */
+  function previewRegistry() {
+    const map = new Map();
+    previewNodes().forEach((node) => {
+      const id = previewId(node.getAttribute('data-preview'));
+      if (!id) return;
+      const label = String(node.getAttribute('data-preview-label') || '').trim();
+      if (!map.has(id)) map.set(id, label || id);
+      else if (map.get(id) === id && label) map.set(id, label);
+    });
+    return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
+  }
+
+  function previewVisible(id) {
+    const key = previewId(id);
+    if (!key) return true;
+    return isAdmin() || previewReleased.includes(key);
+  }
+
+  function previewLabel(id) {
+    const found = previewRegistry().find((entry) => entry.id === id);
+    return found ? found.label : id;
+  }
+
+  /* Applique l'état à tous les blocs : masqués pour les joueurs tant que
+     l'identifiant n'est pas dans `released`, toujours visibles pour le
+     propriétaire (il doit pouvoir relire son aperçu). */
+  function applyPreview() {
+    previewNodes().forEach((node) => {
+      const id = previewId(node.getAttribute('data-preview'));
+      if (!id) return;
+      const visible = isAdmin() || previewReleased.includes(id);
+      node.classList.toggle('is-preview-locked', !visible);
+      if (visible) node.removeAttribute('data-preview-locked');
+      else node.setAttribute('data-preview-locked', '1');
+    });
+    renderPreviewAdmin();
+  }
+
+  function renderPreviewAdmin() {
+    if (!previewAdminList) return;
+    const registry = previewRegistry();
+    if (!registry.length) {
+      previewAdminList.replaceChildren(el('p', 'preview-empty',
+        'Aucun aperçu déclaré. Ajoute data-preview="identifiant" sur la balise à réserver à ton compte.'));
+      if (previewAdminCount) previewAdminCount.textContent = '';
+      if (previewReleaseAll) previewReleaseAll.hidden = true;
+      return;
+    }
+    previewAdminList.replaceChildren(...registry.map(({ id, label }) => {
+      const visible = previewReleased.includes(id);
+      const row = el('div', 'preview-row');
+      const text = el('div', 'preview-row-text');
+      text.append(el('strong', 'preview-row-label', label));
+      text.append(el('code', 'preview-row-id', id));
+      row.append(text);
+      row.append(el('span', visible ? 'preview-state is-open' : 'preview-state',
+        visible ? 'Publié' : 'Privé · toi seul'));
+      const button = el('button', 'mini-btn', visible ? 'Repasser en privé' : 'Publier pour tous');
+      button.type = 'button';
+      on(button, 'click', () => { setPreviewReleased(id, !visible); });
+      row.append(button);
+      return row;
+    }));
+    const hiddenCount = registry.filter(({ id }) => !previewReleased.includes(id)).length;
+    if (previewAdminCount) {
+      previewAdminCount.textContent = hiddenCount
+        ? `${hiddenCount} aperçu${hiddenCount > 1 ? 's' : ''} privé${hiddenCount > 1 ? 's' : ''} · ${registry.length - hiddenCount} publié${registry.length - hiddenCount > 1 ? 's' : ''}`
+        : `Tous les aperçus (${registry.length}) sont publiés.`;
+    }
+    if (previewReleaseAll) previewReleaseAll.hidden = hiddenCount === 0;
+  }
+
+  function setPreviewMsg(message) {
+    if (previewAdminMsg) previewAdminMsg.textContent = message || '';
+  }
+
+  /* Publication d'un aperçu (ou retour en privé). On écrit `released` dans le
+     document public ; en cas d'échec, l'état précédent est restauré pour ne
+     jamais laisser croire que c'est publié. */
+  async function setPreviewReleased(id, released) {
+    if (!isAdmin() || newsBusy) return;
+    const key = previewId(id);
+    if (!key) return;
+    const next = released
+      ? previewIds(previewReleased.concat(key))
+      : previewReleased.filter((item) => item !== key);
+    const previous = previewReleased;
+    newsBusy = true;
+    try {
+      previewReleased = next;
+      await writePublishedDoc();
+      savePreviewCache();
+      applyPreview();
+      setPreviewMsg(released
+        ? `« ${previewLabel(key)} » est publié : visible par tous les joueurs.`
+        : `« ${previewLabel(key)} » est de nouveau privé : toi seul le vois.`);
+    } catch (error) {
+      previewReleased = previous;
+      applyPreview();
+      setPreviewMsg(newsWriteError(error));
+    } finally {
+      newsBusy = false;
+    }
+  }
+
+  /* Release : publie tous les aperçus d'un coup. */
+  async function releaseAllPreviews() {
+    if (!isAdmin() || newsBusy) return;
+    const registry = previewRegistry();
+    const next = previewIds(previewReleased.concat(registry.map((entry) => entry.id)));
+    if (next.length === previewReleased.length) {
+      setPreviewMsg('Tous les aperçus sont déjà publiés.');
+      return;
+    }
+    const previous = previewReleased;
+    newsBusy = true;
+    try {
+      previewReleased = next;
+      await writePublishedDoc();
+      savePreviewCache();
+      applyPreview();
+      setPreviewMsg(`Release : ${registry.length} aperçu${registry.length > 1 ? 's' : ''} publié${registry.length > 1 ? 's' : ''}.`);
+    } catch (error) {
+      previewReleased = previous;
+      applyPreview();
+      setPreviewMsg(newsWriteError(error));
+    } finally {
+      newsBusy = false;
+    }
+  }
+
+  /* Lecture du journal : `published` pour tout le monde, `drafts` en plus pour
+     le compte propriétaire — et jamais pour les autres. */
+  function loadNews(force) {
+    if (!cloudReady()) return Promise.resolve(false);
+    const uid = currentUser.uid;
+    const fresh = newsLoadedFor === uid && Date.now() - newsLoadedAt < NEWS_TTL_MS;
+    if (!force && fresh) return Promise.resolve(true);
+    if (newsLoading) return newsLoading;
+    const admin = isAdmin();
+    newsLoading = (async () => {
+      try {
+        const published = await readNewsDoc(NEWS_PUBLISHED_DOC);
+        const drafts = admin ? await readNewsDoc(NEWS_DRAFTS_DOC) : { entries: [], released: [] };
+        if (!currentUser || currentUser.uid !== uid) return false; // compte changé entre-temps
+        newsPublished = published.entries;
+        const publishedIds = new Set(newsPublished.map((entry) => entry.id));
+        newsDrafts = drafts.entries.filter((entry) => !publishedIds.has(entry.id));
+        /* Aperçus : l'état publié arrive avec le même document. */
+        previewReleased = published.released;
+        savePreviewCache();
+        applyPreview();
+        newsErrorText = '';
+        newsLoadedAt = Date.now();
+        newsLoadedFor = uid;
+        return true;
+      } catch (error) {
+        /* Règles non publiées : le propriétaire est le seul à pouvoir y
+           remédier, les joueurs n'ont pas besoin de ce détail technique. */
+        newsErrorText = isPermissionDenied(error)
+          ? (admin ? 'Nouveautés indisponibles : publie firestore.rules sur Firebase.' : 'Nouveautés indisponibles pour le moment.')
+          : 'Nouveautés indisponibles pour le moment.';
+        return false;
+      } finally {
+        newsLoading = null;
+        renderNews();
+        renderNewsAdmin();
+      }
+    })();
+    return newsLoading;
+  }
+
+  function resetNews() {
+    newsPublished = [];
+    newsDrafts = [];
+    newsLoadedAt = 0;
+    newsLoadedFor = '';
+    newsErrorText = '';
+    newsBusy = false;
+    [newsVersionInput, newsTitleInput, newsBodyInput].forEach((input) => {
+      if (input) input.value = '';
+    });
+    setNewsMsg('');
+    setNewsAdminMsg('');
+    setPreviewMsg('');
+    /* Les aperçus publiés sont publics : ils restent visibles, mais le panneau
+       d'administration (et ses boutons) ne doit plus rien montrer. */
+    applyPreview();
+    renderNews();
+    renderNewsAdmin();
+  }
+
+  function openNewsSheet() {
+    openSheet(newsSheet);
+    try { SFX.tick(); } catch (error) { /* audio absent : sans importance ici */ }
+    loadNews(false);
+    renderNews();
+  }
+
+  function readNewsComposer() {
+    return {
+      title: String((newsTitleInput && newsTitleInput.value) || '').trim().slice(0, NEWS_TITLE_MAX),
+      version: String((newsVersionInput && newsVersionInput.value) || '').trim().slice(0, NEWS_VERSION_MAX),
+      body: String((newsBodyInput && newsBodyInput.value) || '').trim().slice(0, NEWS_BODY_MAX)
+    };
+  }
+
+  function clearNewsComposer() {
+    /* La version reste : on enchaîne souvent plusieurs entrées de la même MAJ. */
+    if (newsTitleInput) newsTitleInput.value = '';
+    if (newsBodyInput) newsBodyInput.value = '';
+  }
+
+  async function saveNewsDraft() {
+    if (!isAdmin() || newsBusy) return;
+    const data = readNewsComposer();
+    if (!data.title) { setNewsAdminMsg('Donne un titre à la nouveauté.'); return; }
+    newsBusy = true;
+    const entry = newsEntry({ ...data, id: newsId(), date: Date.now() });
+    const next = [entry].concat(newsDrafts.filter((draft) => draft.id !== entry.id)).slice(0, NEWS_MAX_ENTRIES);
+    try {
+      await writeNewsDoc(NEWS_DRAFTS_DOC, next);
+      newsDrafts = next;
+      newsLoadedAt = Date.now();
+      newsErrorText = '';
+      clearNewsComposer();
+      setNewsAdminMsg('Brouillon enregistré · visible par toi seul.');
+      setNewsMsg('Brouillon enregistré · visible par toi seul.');
+    } catch (error) {
+      setNewsAdminMsg(newsWriteError(error));
+    } finally {
+      newsBusy = false;
+      renderNews();
+      renderNewsAdmin();
+    }
+  }
+
+  /* Release d'une entrée : elle passe dans `published` et devient visible par
+     tous les joueurs. Utilisé par le bouton du brouillon et par « Publier ». */
+  async function publishNewsEntry(raw) {
+    if (!isAdmin() || newsBusy) return false;
+    const entry = newsEntry(raw);
+    if (!entry) return false;
+    newsBusy = true;
+    setNewsMsg('Publication…');
+    const previous = newsPublished;
+    const published = [{ ...entry, date: Date.now() }]
+      .concat(newsPublished.filter((item) => item.id !== entry.id))
+      .slice(0, NEWS_MAX_ENTRIES);
+    try {
+      newsPublished = published;
+      await writePublishedDoc();
+      newsLoadedAt = Date.now();
+      newsErrorText = '';
+      /* Si le journal lui-même est encore en aperçu privé, les joueurs ne le
+         voient pas encore : le message doit rester exact. */
+      const message = previewVisible('journal-nouveautes')
+        ? 'Publié : la nouveauté est visible par tous les joueurs.'
+        : 'Entrée publiée · le journal est encore en aperçu privé (Administration → 🧪 Aperçus).';
+      setNewsMsg(message);
+      setNewsAdminMsg(message);
+      /* Le brouillon correspondant disparaît (au mieux : s'il reste, il est
+         dédoublonné à la lecture puisqu'il porte le même identifiant). */
+      if (newsDrafts.some((draft) => draft.id === entry.id)) {
+        const drafts = newsDrafts.filter((draft) => draft.id !== entry.id);
+        try {
+          await writeNewsDoc(NEWS_DRAFTS_DOC, drafts);
+          newsDrafts = drafts;
+        } catch (error) { /* dédoublonné au prochain chargement */ }
+      }
+      return true;
+    } catch (error) {
+      newsPublished = previous;
+      const message = newsWriteError(error);
+      setNewsMsg(message);
+      setNewsAdminMsg(message);
+      return false;
+    } finally {
+      newsBusy = false;
+      renderNews();
+      renderNewsAdmin();
+    }
+  }
+
+  async function publishFromComposer() {
+    if (!isAdmin() || newsBusy) return;
+    const data = readNewsComposer();
+    if (!data.title) { setNewsAdminMsg('Donne un titre à la nouveauté.'); return; }
+    const ok = await publishNewsEntry({ ...data, id: newsId(), date: Date.now() });
+    if (ok) clearNewsComposer();
+  }
+
+  function removeNewsDraft(entry) {
+    if (!isAdmin() || newsBusy) return;
+    askConfirm({
+      title: 'Supprimer ce brouillon ?',
+      message: entry.title,
+      confirmLabel: 'Supprimer',
+      onConfirm: async () => {
+        if (newsBusy) return;
+        newsBusy = true;
+        const next = newsDrafts.filter((draft) => draft.id !== entry.id);
+        try {
+          await writeNewsDoc(NEWS_DRAFTS_DOC, next);
+          newsDrafts = next;
+          newsLoadedAt = Date.now();
+          setNewsMsg('Brouillon supprimé.');
+          setNewsAdminMsg('Brouillon supprimé.');
+        } catch (error) {
+          const message = newsWriteError(error);
+          setNewsMsg(message);
+          setNewsAdminMsg(message);
+        } finally {
+          newsBusy = false;
+          renderNews();
+          renderNewsAdmin();
+        }
+      }
+    });
+  }
+
+  function unpublishNewsEntry(entry) {
+    if (!isAdmin() || newsBusy) return;
+    askConfirm({
+      title: 'Retirer du journal ?',
+      message: `« ${entry.title} » ne sera plus visible par les joueurs.`,
+      confirmLabel: 'Retirer',
+      onConfirm: async () => {
+        if (newsBusy) return;
+        newsBusy = true;
+        const previous = newsPublished;
+        const next = newsPublished.filter((item) => item.id !== entry.id);
+        try {
+          newsPublished = next;
+          await writePublishedDoc();
+          newsLoadedAt = Date.now();
+          setNewsMsg('Entrée retirée du journal.');
+          setNewsAdminMsg('Entrée retirée du journal.');
+        } catch (error) {
+          newsPublished = previous;
+          const message = newsWriteError(error);
+          setNewsMsg(message);
+          setNewsAdminMsg(message);
+        } finally {
+          newsBusy = false;
+          renderNews();
+          renderNewsAdmin();
+        }
+      }
+    });
+  }
+
+  /* État initial des aperçus : la liste publiée est en cache local, ce qui
+     évite de laisser apparaître une fonctionnalité encore privée le temps de
+     la réponse Firestore. */
+  previewReleased = previewCache();
+  applyPreview();
+
+  on(previewReleaseAll, 'click', () => { releaseAllPreviews(); });
+  on(newsOpenBtn, 'click', openNewsSheet);
+  on(newsSheetBtn, 'click', openNewsSheet);
+  on(newsSaveBtn, 'click', () => { saveNewsDraft(); });
+  on(newsPublishBtn, 'click', () => { publishFromComposer(); });
+  if (newsSheet) {
+    newsSheet.querySelectorAll('[data-close-news]').forEach((button) => {
+      on(button, 'click', () => closeSheet(newsSheet));
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && newsSheet && !newsSheet.hidden) closeSheet(newsSheet);
   });
 
   /* ------------------------------------------------------------------ amis */

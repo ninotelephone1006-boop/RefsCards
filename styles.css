@@ -3283,6 +3283,99 @@ html,body{background:var(--bg)}
 .notif-time{margin:5px 0 0;font:700 10px 'Space Grotesk',sans-serif;letter-spacing:.05em;color:#6f6785}
 .notif-unread-dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:#f472b6;box-shadow:0 0 8px #f472b6;align-self:center}
 
+/* -------------------------------------------- nouveautés (journal du jeu) --
+   Carte du Compte, journal et brouillons. Les brouillons n'existent que dans
+   le document Firestore réservé au propriétaire : ces styles ne font que
+   présenter ce que le serveur a bien voulu envoyer. */
+.news-card{margin-top:16px;padding:14px;border:1px solid #8b5cf62e;border-radius:14px;
+  background:linear-gradient(155deg,#17121ff2,#0f0b14f5);text-align:left}
+.news-card-head h3{margin:0;font:800 14px 'Space Grotesk',sans-serif;color:#e9dcff;letter-spacing:-.2px}
+.news-summary{margin:6px 0 12px;font-size:12px;line-height:1.5;color:#a79fbd}
+.news-card .mini-btn{width:100%}
+.news-new{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:999px;
+  background:#fbbf24;color:#1a1206;font:800 9px 'Space Grotesk',sans-serif;letter-spacing:.5px;
+  vertical-align:middle}
+.news-new[hidden]{display:none}
+
+.sheet-news-dialog{width:min(100%,460px);max-height:min(86vh,680px);display:flex;flex-direction:column;text-align:left}
+.news-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;margin:12px 0 4px;padding-right:3px;
+  display:grid;gap:10px;scrollbar-width:thin;scrollbar-color:#3b2f5e transparent}
+.news-entry{padding:12px;border:1px solid #ffffff12;border-radius:12px;background:#0d0912aa}
+.news-entry.is-draft{border-color:#fbbf2455;background:#1b140a99}
+.news-entry-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.news-entry-title{margin:0;font:800 13.5px 'Space Grotesk',sans-serif;color:#fff}
+.news-version{padding:1px 6px;border-radius:999px;background:#8b5cf62e;color:#c4b5fd;
+  font:700 9.5px 'Space Grotesk',sans-serif}
+.news-tag{padding:1px 6px;border-radius:999px;background:#fbbf24;color:#1a1206;
+  font:800 9px 'Space Grotesk',sans-serif;letter-spacing:.4px}
+.news-date{margin:4px 0 0;font-size:10.5px;color:#a79fbd}
+.news-body{margin-top:8px;font-size:12px;line-height:1.55;color:#e3dcf2}
+.news-body p{margin:0 0 6px}
+.news-body p:last-child{margin-bottom:0}
+.news-bullets{margin:0 0 6px;padding-left:16px}
+.news-bullets li{margin:2px 0}
+.news-entry-actions{display:flex;gap:8px;margin-top:10px}
+.news-entry-actions .mini-btn{flex:1 1 auto;width:auto}
+.news-drafts{padding:10px;border:1px dashed #fbbf2455;border-radius:12px;background:#1b140a66}
+.news-drafts[hidden]{display:none}
+.news-drafts h4{margin:0;font:800 12px 'Space Grotesk',sans-serif;color:#fde68a}
+.news-drafts-sub{margin:5px 0 8px;font-size:11px;line-height:1.5;color:#a79fbd}
+.news-draft-list{display:grid;gap:8px}
+.news-empty{margin:10px 0 0;font-size:12px;color:#a79fbd;text-align:center}
+.news-empty[hidden]{display:none}
+.news-msg{margin:10px 0 0;font-size:11.5px;color:#86efac;min-height:14px}
+.news-msg:empty{display:none}
+
+.admin-news{margin-top:16px;padding:12px;border:1px solid #ffffff1a;border-radius:12px;
+  background:#0d0912aa;text-align:left}
+.admin-news h4{margin:0;font:800 13px 'Space Grotesk',sans-serif;color:#fff}
+.admin-news-sub{margin:6px 0 10px;font-size:11.5px;line-height:1.5;color:#a79fbd}
+.admin-news-field{display:block;margin-bottom:8px;font-size:11.5px;font-weight:700;color:#cdc3e4}
+.admin-news-field span{display:block;margin-bottom:3px}
+.admin-news-field small{font-weight:600;color:#8b829e}
+.admin-news-field input,.admin-news-field textarea{width:100%;padding:9px 10px;border-radius:10px;
+  border:1px solid #ffffff1a;background:#0d0912;color:#fff;font:600 13px 'Space Grotesk',sans-serif;
+  box-sizing:border-box;resize:vertical}
+.admin-news-field input:focus,.admin-news-field textarea:focus{outline:none;border-color:#fbbf2480}
+.admin-news-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.admin-news-actions .mini-btn{flex:1 1 auto;width:auto}
+.admin-news-link{margin-top:8px;padding:0;border:0;background:none;color:#a78bfa;cursor:pointer;
+  font:700 11.5px 'Space Grotesk',sans-serif;text-decoration:underline}
+.admin-news-count{margin:8px 0 0;font-size:11.5px;color:#a79fbd}
+.admin-news-count:empty{display:none}
+.admin-news-msg{margin:8px 0 0;font-size:11.5px;color:#86efac;min-height:14px}
+.admin-news-msg:empty{display:none}
+
+/* --- aperçus : fonctionnalités futures réservées au propriétaire ---------
+   app.js pose [data-preview-locked] sur tout bloc data-preview non publié ;
+   le !important garantit le masquage même si le bloc est en flex/grid. */
+[data-preview-locked]{display:none!important}
+
+.admin-preview{margin-top:16px;padding:12px;border:1px solid #38bdf82e;border-radius:12px;
+  background:#0d0912aa;text-align:left}
+.admin-preview h4{margin:0;font:800 13px 'Space Grotesk',sans-serif;color:#bae6fd}
+.admin-preview-sub{margin:6px 0 10px;font-size:11.5px;line-height:1.5;color:#a79fbd}
+.admin-preview-sub code{padding:1px 4px;border-radius:5px;background:#ffffff10;font-size:10.5px;color:#e9dcff}
+.preview-list{display:grid;gap:8px}
+.preview-empty{margin:0;font-size:11.5px;line-height:1.5;color:#8d84a8}
+.preview-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 10px;
+  border:1px solid #ffffff12;border-radius:10px;background:#ffffff05}
+.preview-row-text{flex:1 1 150px;min-width:0;display:grid;gap:2px}
+.preview-row-label{font:800 12px 'Space Grotesk',sans-serif;color:#fff}
+.preview-row-id{font:600 10px ui-monospace,SFMono-Regular,Menlo,monospace;color:#8d84a8;
+  overflow-wrap:anywhere}
+.preview-state{padding:2px 7px;border-radius:999px;background:#fbbf2422;color:#fde68a;
+  font:800 9.5px 'Space Grotesk',sans-serif;letter-spacing:.3px;white-space:nowrap}
+.preview-state.is-open{background:#34d39922;color:#6ee7b7}
+.preview-row .mini-btn{flex:0 0 auto;width:auto}
+.admin-preview-actions{display:flex;gap:8px;margin-top:10px}
+.admin-preview-actions .mini-btn{flex:1 1 auto;width:auto}
+.admin-preview-actions .mini-btn[hidden]{display:none}
+.admin-preview-count{margin:8px 0 0;font-size:11.5px;color:#a79fbd}
+.admin-preview-count:empty{display:none}
+.admin-preview-msg{margin:8px 0 0;font-size:11.5px;color:#86efac;min-height:14px}
+.admin-preview-msg:empty{display:none}
+
 @media(max-width:559px){
   .quest-meta{flex-direction:column;align-items:stretch}
   .quest-claim{width:100%}
