@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.28-1">
+  <meta name="app-version" content="2026.11.28-2">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.28-1">
+  <link rel="stylesheet" href="styles.css?v=2026.11.28-2">
   <link rel="stylesheet" href="pixel-theme.css?v=2026.11.27-8">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
@@ -51,7 +51,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.28-1" defer></script>
+  <script src="app.js?v=2026.11.28-2" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -610,7 +610,8 @@
                les entrées PUBLIÉES ; le compte propriétaire voit en plus ses
                brouillons, stockés dans un document Firestore que les règles
                réservent à lui seul (gameNews/drafts). -->
-          <section class="news-card" aria-labelledby="news-card-title">
+          <section class="news-card" data-preview="journal-nouveautes"
+                   data-preview-label="Journal des nouveautés" aria-labelledby="news-card-title">
             <div class="news-card-head">
               <h3 id="news-card-title">📰 Nouveautés</h3>
               <p class="news-summary" id="news-summary">Chargement des nouveautés…</p>
@@ -725,6 +726,23 @@
               <button class="admin-news-link" id="admin-news-open" type="button">Relire mes brouillons →</button>
               <p class="admin-news-count" id="admin-news-count"></p>
               <p class="admin-news-msg" id="admin-news-msg" role="status"></p>
+            </section>
+
+            <!-- Aperçus : toute balise d'index.html qui porte data-preview="…"
+                 reste invisible pour les joueurs tant qu'elle n'est pas publiée
+                 ici. « Publier pour tous » la rend visible par tout le monde ;
+                 « Tout publier (release) » relâche toute la mise à jour d'un
+                 coup. C'est ce qui permet de préparer une fonctionnalité
+                 directement en production, sans que personne ne la voie. -->
+            <section class="admin-preview" id="admin-preview" aria-labelledby="admin-preview-title">
+              <h4 id="admin-preview-title">🧪 Aperçus · fonctionnalités futures</h4>
+              <p class="admin-preview-sub">Les blocs marqués <code>data-preview</code> dans la page ne sont visibles que par toi. Publie-les quand la mise à jour est prête.</p>
+              <div class="preview-list" id="admin-preview-list"></div>
+              <div class="admin-preview-actions">
+                <button class="mini-btn primary" id="admin-preview-release-all" type="button" hidden>🚀 Tout publier (release)</button>
+              </div>
+              <p class="admin-preview-count" id="admin-preview-count"></p>
+              <p class="admin-preview-msg" id="admin-preview-msg" role="status"></p>
             </section>
           </section>
         </div>
@@ -1182,7 +1200,7 @@
            (lisible par le seul compte propriétaire). Les brouillons ne sont
            donc jamais envoyés aux autres joueurs : ce n'est pas un simple
            masquage côté page. -->
-      <div class="sheet sheet-news" id="news-sheet" hidden>
+      <div class="sheet sheet-news" id="news-sheet" data-preview="journal-nouveautes" hidden>
         <div class="sheet-backdrop" data-close-news></div>
         <div class="sheet-dialog sheet-news-dialog" role="dialog" aria-modal="true" aria-labelledby="news-title">
           <button class="sheet-x" type="button" data-close-news aria-label="Fermer les nouveautés">✕</button>

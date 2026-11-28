@@ -15,8 +15,11 @@ const assert = require('node:assert/strict');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const ADMIN_EMAIL = 'ninotelephone1006@gmail.com';
 
-function newsDoc(entries) {
-  return { schema: 'news-v1', entries, updatedAt: new Date() };
+/* `released` : aperçus déjà publiés. Le journal lui-même est un aperçu
+   (`journal-nouveautes`) : ces tests le considèrent publié, sinon il reste
+   invisible pour les joueurs — c'est justement ce que vérifie preview-flow. */
+function newsDoc(entries, released = []) {
+  return { schema: 'news-v1', entries, released, updatedAt: new Date() };
 }
 
 function makeStore() {
@@ -54,7 +57,7 @@ function makeStore() {
           version: '2026.12.0',
           date: Date.parse('2026-11-27T10:00:00Z')
         }
-      ]),
+      ], ['journal-nouveautes']),
       drafts: newsDoc([
         {
           id: 'draft-secret',
@@ -255,7 +258,7 @@ function textOf(node) {
         version: '2026.12.2',
         date: Date.parse('2026-11-28T12:00:00Z')
       }
-    ]);
+    ], ['journal-nouveautes']);
     const { w, doc, reads } = await boot('ami@example.com', store);
     doc.querySelector('[data-tab="account"]').click();
     await wait(30);
