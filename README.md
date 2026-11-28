@@ -92,27 +92,7 @@ Le jeu a un journal de mises à jour, **Compte → 📰 Nouveautés**. Le compte
 - **Quota** : un joueur lit un seul document (`published`), une fois par connexion puis au plus toutes les 2 minutes (`NEWS_TTL_MS`) ; l'admin lit aussi `drafts`. Aucune écoute temps réel (`onSnapshot`) : le journal n'a pas besoin d'être instantané.
 - **Règles Firestore** : `gameNews/published` est lisible par tous (`get`), `gameNews/drafts` seulement par le propriétaire, et l'écriture (brouillon, publication, retrait) est réservée à ce compte. **Déploie `firestore.rules` avant la nouvelle version du site** : sans ces règles, la collection est refusée (`permission-denied`) et le jeu affiche « Nouveautés indisponibles : publie firestore.rules sur Firebase. » au lieu de planter.
 - **Déconnexion** : le journal et les brouillons sont vidés à la déconnexion (`resetNews()`), comme le panneau d'administration.
-- **Le journal est lui-même un aperçu** (`data-preview="journal-nouveautes"`) : il reste invisible pour les joueurs tant que tu ne l'as pas publié dans **Administration → 🧪 Aperçus**. Pour qu'ils y aient accès tout de suite, ouvre cette section et clique sur **Publier pour tous**.
 - **Test** : `node tests/news-flow.cjs` vérifie qu'un joueur ne lit ni n'affiche jamais `gameNews/drafts`, qu'un brouillon ne publie rien, et que la release rend l'entrée visible par les autres.
-
-## Aperçus : masquer une fonctionnalité à tout le monde sauf soi
-
-Pour préparer une nouveauté **directement en production** sans que personne ne la voie, il suffit de marquer son bloc dans `index.html` :
-
-```html
-<section id="pack-du-mois" data-preview="pack-du-mois" data-preview-label="Pack du mois">
-  …
-</section>
-```
-
-- **Effet immédiat** : le bloc est masqué pour tous les joueurs (`styles.css` applique `[data-preview-locked]{display:none!important}`, donc même un bloc en `flex`/`grid` disparaît). Le compte propriétaire, lui, le voit toujours : il peut relire et tester son aperçu en conditions réelles.
-- **Rien à déployer en plus** : l'attribut peut être ajouté à un bloc **déjà en jeu** pour le retirer aux joueurs le temps de le retravailler, puis le remettre.
-- **Publier** : Administration → **🧪 Aperçus · fonctionnalités futures** liste tous les blocs `data-preview` de la page (libellé + identifiant + état). **Publier pour tous** l'ajoute à `released` dans `gameNews/published` ; **Repasser en privé** le retire. **🚀 Tout publier (release)** relâche toute la mise à jour d'un coup. Les joueurs voient le changement au chargement suivant (ou dans les 2 minutes).
-- **Code aussi concerné** : si la fonctionnalité a des gestionnaires ou un état à neutraliser, entoure-les de `previewVisible('pack-du-mois')` (renvoie `true` pour le propriétaire et pour tout aperçu publié, `false` sinon).
-- **Privé par défaut** : la liste `released` est mise en cache local (`refs-cards:preview-released`) et appliquée dès le chargement, avant la réponse de Firestore. Un aperçu oublié dans le document ne devient donc jamais public par accident : sans identifiant dans `released`, il est masqué.
-- **Coût** : aucun lecture supplémentaire — `released` voyage dans le document `gameNews/published` déjà lu pour le journal.
-- **Règles Firestore** : `released` est validé par la règle `gameNews` (liste de 50 identifiants max). Écriture toujours réservée au propriétaire : un joueur ne peut pas se publier un aperçu lui-même, même en modifiant la page.
-- **Test** : `node tests/preview-flow.cjs` (joueur verrouillé, publication individuelle, release global, retour en privé, cache et règle CSS).
 
 ## Ouverture de booster : pas de plantage ni de booster perdu
 
@@ -175,8 +155,7 @@ node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 node tests/version-update.cjs        # bandeau « nouvelle version » : détection, Plus tard, Recharger
 node tests/news-flow.cjs            # journal Nouveautés : brouillons privés (admin), release, badge NOUVEAU
-node tests/preview-flow.cjs         # aperçus : fonctionnalité masquée aux joueurs jusqu'à la publication
-node tests/card-flow.cjs             # ouverture de booster + chemins d'images
+node tests/card-flow.cjs            # ouverture de booster + chemins d'images
 node tests/open-all-cascade.cjs      # « Ouvrir tout le pack » : éventail, cascade, Passer, mouvement réduit
 node tests/social-flow.cjs           # page Compte / En ligne (amis, profil, achat marché)
 node tests/deco-everywhere.cjs       # décor équipé visible partout (HUD, Compte, amis, marché, classements)

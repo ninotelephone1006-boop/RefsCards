@@ -132,19 +132,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Nouveautés du jeu (journal + aperçus).
+    // Nouveautés du jeu (journal).
     //   gameNews/published : lisible par TOUT LE MONDE, même sans être
-    //                        connecté — c'est le journal visible en jeu, et
-    //                        son champ `released` liste les aperçus déjà
-    //                        publiés (blocs data-preview visibles par tous).
+    //                        connecté — c'est le journal visible en jeu.
     //   gameNews/drafts    : lisible UNIQUEMENT par le compte propriétaire.
     //                        C'est cette règle qui garantit que les nouveautés
     //                        à venir n'arrivent jamais chez les joueurs avant
     //                        la release : elles ne quittent pas le serveur.
-    // Écriture (brouillon, publication, retrait, aperçu) réservée au
-    // propriétaire. Aucune écoute temps réel n'est utilisée : seules des
-    // lectures de document précis (get), d'où l'absence de `list` pour les
-    // joueurs.
+    // Écriture (brouillon, publication, retrait) réservée au propriétaire.
+    // Aucune écoute temps réel n'est utilisée : seules des lectures de
+    // document précis (get), d'où l'absence de `list` pour les joueurs.
     match /gameNews/{docId} {
       function isOwner() {
         return request.auth != null
@@ -158,12 +155,7 @@ service cloud.firestore {
           && request.resource.data.schema.size() <= 32
           && request.resource.data.updatedAt is timestamp
           && request.resource.data.entries is list
-          && request.resource.data.entries.size() <= 100
-          /* Aperçus publiés : identifiants des blocs data-preview visibles
-             par tout le monde (plafonné comme dans app.js). */
-          && (!('released' in request.resource.data)
-              || (request.resource.data.released is list
-                  && request.resource.data.released.size() <= 50));
+          && request.resource.data.entries.size() <= 100;
       }
       allow get: if docId == 'published' || isOwner();
       allow list: if isOwner();
