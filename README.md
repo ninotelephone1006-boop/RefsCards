@@ -73,6 +73,27 @@ Le site est statique : un onglet déjà ouvert continue d'exécuter les fichiers
 - **Réglages** : les constantes `FIRST_CHECK_DELAY`, `CHECK_INTERVAL` et `MIN_GAP` sont en tête de `version-check.js`. L'API `window.REFS_CARDS_VERSION_CHECK` expose `check(force)`, `state()`, `dismiss()` et `reload()` (utilisée par les tests et par les boutons).
 - **Pendant une ouverture** : `app.js` pose `body.refs-pack-opening` dès la déchirure. Si le joueur appuie malgré tout sur **Recharger**, `version-check.js` attend la fin de la cinématique (au plus 4 s) au lieu de couper l'ouverture en cours.
 
+## Nouveautés du jeu : brouillons privés et « release »
+
+Le jeu a un journal de mises à jour, **Compte → 📰 Nouveautés**. Le compte propriétaire (`ADMIN_EMAIL` dans `app.js`) rédige ce qui arrive, le relit, puis décide du moment de la sortie : **tant qu'il n'a pas publié, aucun autre joueur ne voit la nouveauté**. Ce n'est pas un masquage dans la page : les brouillons ne quittent pas le serveur.
+
+**Deux documents Firestore, collection `gameNews`**
+
+| Document | Contenu | Qui peut le lire |
+| --- | --- | --- |
+| `gameNews/published` | Les nouveautés **sorties** (`entries: [{ id, title, body, version, date }]`) | Tout le monde, même sans compte |
+| `gameNews/drafts` | Les nouveautés **à venir** (même forme) | Le seul compte propriétaire |
+
+- **Rédiger** : panneau Administration → **📰 Nouveautés · brouillon privé**. Titre, version facultative, détails (une ligne par nouveauté, `- ` pour une puce). **Enregistrer en brouillon** écrit dans `gameNews/drafts` ; rien ne change pour les joueurs.
+- **Relire** : **Relire mes brouillons →** ouvre le journal. Le bloc **🔒 Brouillons · toi seulement** montre le rendu exact, avec **Publier (release)** et **Supprimer**.
+- **Release** : **Publier** copie l'entrée en tête de `gameNews/published`, puis la retire des brouillons. À partir de là, elle s'affiche chez tous les joueurs (au plus tard 2 minutes après, ou à l'ouverture du journal). **Publier (release)** depuis le panneau fait la même chose sans passer par le brouillon.
+- **Retirer** : sur une entrée publiée, le propriétaire voit **Retirer du journal** (confirmation). L'entrée disparaît du document public ; le brouillon n'est pas recréé.
+- **Badge** : le bouton du Compte affiche **NOUVEAU** quand la dernière entrée publiée n'a pas encore été lue. La lecture est mémorisée par compte dans `localStorage` (`refs-cards:news-seen:<uid>`).
+- **Quota** : un joueur lit un seul document (`published`), une fois par connexion puis au plus toutes les 2 minutes (`NEWS_TTL_MS`) ; l'admin lit aussi `drafts`. Aucune écoute temps réel (`onSnapshot`) : le journal n'a pas besoin d'être instantané.
+- **Règles Firestore** : `gameNews/published` est lisible par tous (`get`), `gameNews/drafts` seulement par le propriétaire, et l'écriture (brouillon, publication, retrait) est réservée à ce compte. **Déploie `firestore.rules` avant la nouvelle version du site** : sans ces règles, la collection est refusée (`permission-denied`) et le jeu affiche « Nouveautés indisponibles : publie firestore.rules sur Firebase. » au lieu de planter.
+- **Déconnexion** : le journal et les brouillons sont vidés à la déconnexion (`resetNews()`), comme le panneau d'administration.
+- **Test** : `node tests/news-flow.cjs` vérifie qu'un joueur ne lit ni n'affiche jamais `gameNews/drafts`, qu'un brouillon ne publie rien, et que la release rend l'entrée visible par les autres.
+
 ## Ouverture de booster : pas de plantage ni de booster perdu
 
 Une erreur pendant la cinématique (tirage vide, image ou Canvas indisponible, animation différée qui échoue) ne doit pas laisser le jeu figé avec un booster déjà consommé, obligé de recharger la page. L'ouverture est donc **atomique** dans `app.js` :
@@ -133,6 +154,7 @@ npm test                             # toute la suite
 node tests/auth-flow.cjs             # états du bouton de connexion Google
 node tests/script-loading.cjs        # scripts classiques + defer + cache-busting
 node tests/version-update.cjs        # bandeau « nouvelle version » : détection, Plus tard, Recharger
+node tests/news-flow.cjs            # journal Nouveautés : brouillons privés (admin), release, badge NOUVEAU
 node tests/card-flow.cjs             # ouverture de booster + chemins d'images
 node tests/open-all-cascade.cjs      # « Ouvrir tout le pack » : éventail, cascade, Passer, mouvement réduit
 node tests/social-flow.cjs           # page Compte / En ligne (amis, profil, achat marché)

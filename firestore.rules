@@ -132,6 +132,37 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Nouveautés du jeu (journal des mises à jour).
+    //   gameNews/published : lisible par TOUT LE MONDE, même sans être
+    //                        connecté — c'est le journal visible en jeu.
+    //   gameNews/drafts    : lisible UNIQUEMENT par le compte propriétaire.
+    //                        C'est cette règle qui garantit que les nouveautés
+    //                        à venir n'arrivent jamais chez les joueurs avant
+    //                        la release : elles ne quittent pas le serveur.
+    // Écriture (brouillon, publication, retrait) réservée au propriétaire.
+    // Aucune écoute temps réel n'est utilisée : seules des lectures de
+    // document précis (get), d'où l'absence de `list` pour les joueurs.
+    match /gameNews/{docId} {
+      function isOwner() {
+        return request.auth != null
+          && request.auth.token.email == 'ninotelephone1006@gmail.com';
+      }
+      function isNewsDoc() {
+        return docId == 'published' || docId == 'drafts';
+      }
+      function validNews() {
+        return request.resource.data.schema is string
+          && request.resource.data.schema.size() <= 32
+          && request.resource.data.entries is list
+          && request.resource.data.entries.size() <= 100
+          && request.resource.data.updatedAt is timestamp;
+      }
+      allow get: if docId == 'published' || isOwner();
+      allow list: if isOwner();
+      allow create, update: if isOwner() && isNewsDoc() && validNews();
+      allow delete: if false;
+    }
+
     // Annuaire code ami -> uid (recherche d'amis par code).
     match /friendCodes/{code} {
       allow read: if request.auth != null;

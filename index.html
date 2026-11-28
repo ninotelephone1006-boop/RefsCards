@@ -9,7 +9,7 @@
   <!-- Version du site : relue par version-check.js. Incrémente-la à chaque
        déploiement (avec les ?v= des fichiers modifiés) : un onglet déjà
        ouvert comparera sa version à celle-ci et proposera de recharger. -->
-  <meta name="app-version" content="2026.11.27-9">
+  <meta name="app-version" content="2026.11.28-1">
   <!-- Logo du jeu (RF doré) : icône de l'onglet, de l'écran d'accueil iPhone /
        Android (PWA) et de la fenêtre autonome. Les fichiers sont dans
        assets/icons/ ; manifest.webmanifest décrit l'installation. -->
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2026.11.27-2">
+  <link rel="stylesheet" href="styles.css?v=2026.11.28-1">
   <link rel="stylesheet" href="pixel-theme.css?v=2026.11.27-8">
   <!-- Les SDK Firebase « compat » sont des scripts classiques (UMD) : ils
        exposent l'objet global `firebase` utilisé par app.js. -->
@@ -51,7 +51,7 @@
        rechargement automatique). Indépendant de app.js : le bandeau
        fonctionne même si une ancienne version est restée en cache. -->
   <script src="version-check.js?v=2026.11.26-2" defer></script>
-  <script src="app.js?v=2026.11.27-6" defer></script>
+  <script src="app.js?v=2026.11.28-1" defer></script>
   <!-- Filet de sécurité : si les scripts locaux ne démarrent pas (ancienne
        version en cache, script bloqué, syntaxe invalide…), le clic sur
        « Se connecter avec Google » affiche une explication au lieu de rester
@@ -606,6 +606,20 @@
             <button class="mini-btn primary" id="notif-settings-open" type="button">Choisir mes notifications</button>
           </section>
 
+          <!-- Nouveautés du jeu : journal des mises à jour. Tout le monde voit
+               les entrées PUBLIÉES ; le compte propriétaire voit en plus ses
+               brouillons, stockés dans un document Firestore que les règles
+               réservent à lui seul (gameNews/drafts). -->
+          <section class="news-card" aria-labelledby="news-card-title">
+            <div class="news-card-head">
+              <h3 id="news-card-title">📰 Nouveautés</h3>
+              <p class="news-summary" id="news-summary">Chargement des nouveautés…</p>
+            </div>
+            <button class="mini-btn primary" id="news-open" type="button">
+              Voir les nouveautés <span class="news-new" id="news-new" hidden>NOUVEAU</span>
+            </button>
+          </section>
+
           <!-- Panneau d'administration : réservé au compte propriétaire
                (voir ADMIN_EMAIL dans app.js). Toujours masqué dans le HTML ;
                seul ce compte précis le dévoile après connexion. Aucune action
@@ -682,6 +696,35 @@
                 <button class="mini-btn primary" id="admin-deco-save" type="button">Enregistrer</button>
               </div>
               <p class="admin-deco-msg" id="admin-deco-msg" role="status"></p>
+            </section>
+
+            <!-- Nouveautés : rédige ici la prochaine mise à jour. « Enregistrer
+                 en brouillon » écrit dans gameNews/drafts, un document que les
+                 règles Firestore réservent au compte propriétaire : les autres
+                 joueurs ne peuvent pas le lire. « Publier (release) » déplace
+                 l'entrée dans gameNews/published, visible par tout le monde. -->
+            <section class="admin-news" id="admin-news" aria-labelledby="admin-news-title">
+              <h4 id="admin-news-title">📰 Nouveautés · brouillon privé</h4>
+              <p class="admin-news-sub">Écris la prochaine mise à jour. Un brouillon n'est lisible que par toi ; « Publier » le rend visible par tous les joueurs, dans Compte → Nouveautés.</p>
+              <label class="admin-news-field" for="admin-news-version">
+                <span>Version <small>(facultatif)</small></span>
+                <input id="admin-news-version" type="text" maxlength="24" autocomplete="off" placeholder="2026.12.0">
+              </label>
+              <label class="admin-news-field" for="admin-news-title-input">
+                <span>Titre</span>
+                <input id="admin-news-title-input" type="text" maxlength="60" autocomplete="off" placeholder="Les Décos arrivent">
+              </label>
+              <label class="admin-news-field" for="admin-news-body">
+                <span>Détails</span>
+                <textarea id="admin-news-body" rows="5" maxlength="1200" placeholder="Une ligne par nouveauté ; commence une ligne par « - » pour une puce."></textarea>
+              </label>
+              <div class="admin-news-actions">
+                <button class="mini-btn" id="admin-news-save" type="button">Enregistrer en brouillon</button>
+                <button class="mini-btn primary" id="admin-news-publish" type="button">Publier (release)</button>
+              </div>
+              <button class="admin-news-link" id="admin-news-open" type="button">Relire mes brouillons →</button>
+              <p class="admin-news-count" id="admin-news-count"></p>
+              <p class="admin-news-msg" id="admin-news-msg" role="status"></p>
             </section>
           </section>
         </div>
@@ -1129,6 +1172,37 @@
           <p class="push-hint" id="push-hint"></p>
           <div class="push-foot">
             <button class="mini-btn" type="button" data-close-push>Plus tard</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================ NOUVEAUTÉS ============================
+           Journal des mises à jour du jeu. Le contenu vient de Firestore :
+           `gameNews/published` (lisible par tout le monde) et `gameNews/drafts`
+           (lisible par le seul compte propriétaire). Les brouillons ne sont
+           donc jamais envoyés aux autres joueurs : ce n'est pas un simple
+           masquage côté page. -->
+      <div class="sheet sheet-news" id="news-sheet" hidden>
+        <div class="sheet-backdrop" data-close-news></div>
+        <div class="sheet-dialog sheet-news-dialog" role="dialog" aria-modal="true" aria-labelledby="news-title">
+          <button class="sheet-x" type="button" data-close-news aria-label="Fermer les nouveautés">✕</button>
+          <p class="kicker"><span>✦</span> JOURNAL DU JEU <span>✦</span></p>
+          <h3 id="news-title">Nouveautés<em>.</em></h3>
+          <p class="sheet-sub" id="news-sub">Les mises à jour publiées, de la plus récente à la plus ancienne.</p>
+
+          <div class="news-scroll">
+            <section class="news-drafts" id="news-drafts-block" hidden aria-labelledby="news-drafts-title">
+              <h4 id="news-drafts-title">🔒 Brouillons · toi seulement</h4>
+              <p class="news-drafts-sub">Invisibles pour les joueurs tant que tu n'as pas appuyé sur « Publier ».</p>
+              <div class="news-draft-list" id="news-drafts"></div>
+            </section>
+            <div class="news-list" id="news-list"></div>
+            <p class="news-empty" id="news-empty" hidden>Aucune nouveauté publiée pour l'instant.</p>
+            <p class="news-msg" id="news-msg" role="status"></p>
+          </div>
+
+          <div class="sheet-actions">
+            <button class="mini-btn" type="button" data-close-news>Fermer</button>
           </div>
         </div>
       </div>

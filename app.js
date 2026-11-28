@@ -5012,6 +5012,9 @@
     /* Réglage global des chapeaux : lu (et suivi en temps réel) pour TOUS les
        joueurs, juste après le profil — `creator: true` est alors publié. */
     loadDecoLayouts();
+    /* Nouveautés : `published` pour tout le monde, `drafts` pour le seul
+       compte propriétaire. Fire-and-forget : le jeu ne dépend pas du journal. */
+    loadNews(true);
     /* Échanges désactivés : seul le marché existe (cartes + packs en vente).
        Les anciennes propositions trades/ ne sont plus chargées ni proposées.
        Le réseau social (amis, marché, cadeaux, défis) n'est branché qu'à
@@ -5140,6 +5143,9 @@
     decoDrag = null;
     refreshDecoLayers();
     renderAdminPanel();
+    /* Journal des nouveautés : on oublie tout de ce compte (les brouillons
+       de l'admin ne doivent jamais rester affichés après la déconnexion). */
+    resetNews();
     if (friendRequestsUnsub) {
       try { friendRequestsUnsub(); } catch (error) { /* déjà fermé */ }
       friendRequestsUnsub = null;
@@ -6609,6 +6615,9 @@
     if (!adminPanel) return;
     const allowed = isAdmin();
     adminPanel.hidden = !allowed;
+    /* Le bloc Nouveautés du panneau suit la même règle : rien à afficher (ni
+       brouillon, ni compteur) pour un autre compte. */
+    renderNewsAdmin();
     if (!allowed) {
       setAdminMsg('');
       return;
@@ -6686,6 +6695,517 @@
     renderAccount();
     save();
     setAdminMsg(`${fmt(n)} × ${CardMutations.label(card)} ajoutée${n > 1 ? 's' : ''} à ta collection.`);
+  });
+
+  /* ------------------------ nouveautés du jeu (journal) -------------------
+     Journal des mises à jour, avec une règle simple : ce qui n'est pas encore
+     sorti n'appartient qu'au compte propriétaire.
+
+     Deux documents Firestore, dans la collection `gameNews` :
+       - `published` : les nouveautés déjà sorties. Lisibles par TOUT LE MONDE
+         (même sans compte), pour que les joueurs voient ce qui a changé.
+       - `drafts`    : les nouveautés à venir. Les règles Firestore
+         (firestore.rules) n'autorisent leur lecture qu'au compte propriétaire.
+         Un joueur ne les reçoit donc jamais : ce n'est pas un simple masquage
+         dans la page.
+
+     « Publier (release) » copie l'entrée de `drafts` vers `published` : à
+     partir de là elle apparaît chez tout le monde. Rien n'est publié tant que
+     le propriétaire ne l'a pas demandé.
+
+     Quota : un joueur lit un seul document (`published`), une fois par
+     connexion puis au plus toutes les 2 minutes ; l'admin lit aussi `drafts`.
+     Aucune écoute temps réel (onSnapshot) : le journal n'a pas besoin d'être
+     instantané et les lectures restent rares. */
+  const NEWS_COLLECTION = 'gameNews';
+  const NEWS_PUBLISHED_DOC = 'published';
+  const NEWS_DRAFTS_DOC = 'drafts';
+  const NEWS_SCHEMA = 'news-v1';
+  const NEWS_MAX_ENTRIES = 100;
+  const NEWS_TTL_MS = 2 * 60 * 1000;   // relecture au plus toutes les 2 minutes
+  const NEWS_TITLE_MAX = 60;
+  const NEWS_BODY_MAX = 1200;
+  const NEWS_VERSION_MAX = 24;
+  const NEWS_SEEN_PREFIX = 'refs-cards:news-seen:';
+
+  const newsOpenBtn = $('news-open');
+  const newsNewBadge = $('news-new');
+  const newsSummary = $('news-summary');
+  const newsSheet = $('news-sheet');
+  const newsList = $('news-list');
+  const newsEmpty = $('news-empty');
+  const newsSub = $('news-sub');
+  const newsMsg = $('news-msg');
+  const newsDraftsBlock = $('news-drafts-block');
+  const newsDraftsList = $('news-drafts');
+
+  const newsVersionInput = $('admin-news-version');
+  const newsTitleInput = $('admin-news-title-input');
+  const newsBodyInput = $('admin-news-body');
+  const newsSaveBtn = $('admin-news-save');
+  const newsPublishBtn = $('admin-news-publish');
+  const newsSheetBtn = $('admin-news-open');
+  const newsAdminCount = $('admin-news-count');
+  const newsAdminMsg = $('admin-news-msg');
+
+  let newsPublished = [];   // entrées visibles par tous (les plus récentes d'abord)
+  let newsDrafts = [];      // brouillons : chargés uniquement pour l'admin
+  let newsLoadedAt = 0;
+  let newsLoadedFor = '';
+  let newsLoading = null;
+  let newsBusy = false;
+  let newsErrorText = '';
+
+  function newsId() {
+    return `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  }
+
+  function newsDateLabel(stamp) {
+    const d = new Date(Number(stamp) || 0);
+    if (!Number.isFinite(d.getTime()) || d.getFullYear() < 2000) return '';
+    return `${d.getDate()} ${MONTHS_FR[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  /* Une entrée nettoyée et bornée : le journal ne doit jamais grossir au-delà
+     de ce que les règles Firestore acceptent (titre 60, texte 1 200). */
+  function newsEntry(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const title = String(raw.title || '').trim().slice(0, NEWS_TITLE_MAX);
+    if (!title) return null;
+    return {
+      id: String(raw.id || '').trim().slice(0, 40) || newsId(),
+      title,
+      body: String(raw.body || '').trim().slice(0, NEWS_BODY_MAX),
+      version: String(raw.version || '').trim().replace(/^v/i, '').slice(0, NEWS_VERSION_MAX),
+      date: Number(raw.date) > 0 ? Number(raw.date) : Date.now()
+    };
+  }
+
+  function newsEntries(data) {
+    const list = data && Array.isArray(data.entries) ? data.entries : [];
+    const out = [];
+    const seen = new Set();
+    for (const raw of list) {
+      const entry = newsEntry(raw);
+      if (!entry || seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      out.push(entry);
+      if (out.length >= NEWS_MAX_ENTRIES) break;
+    }
+    return out;
+  }
+
+  function newsRef(id) {
+    if (!cloudReady()) return null;
+    const coll = cloudDb.collection(NEWS_COLLECTION);
+    if (!coll || typeof coll.doc !== 'function') return null;
+    return coll.doc(id);
+  }
+
+  async function readNewsDoc(id) {
+    const ref = newsRef(id);
+    if (!ref || typeof ref.get !== 'function') return [];
+    const snap = await ref.get();
+    if (!snap || !snap.exists) return [];
+    const data = typeof snap.data === 'function' ? snap.data() : snap.data;
+    return newsEntries(data);
+  }
+
+  async function writeNewsDoc(id, entries) {
+    const ref = newsRef(id);
+    if (!ref || typeof ref.set !== 'function') throw new Error('cloud indisponible');
+    await ref.set({
+      schema: NEWS_SCHEMA,
+      entries: entries.slice(0, NEWS_MAX_ENTRIES).map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        body: entry.body,
+        version: entry.version,
+        date: entry.date
+      })),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
+
+  function newsUnavailable() {
+    if (!cloudReady()) return 'Connecte-toi pour lire les nouveautés.';
+    return newsErrorText;
+  }
+
+  function newsSummaryText() {
+    const unavailable = newsUnavailable();
+    if (unavailable) return unavailable;
+    if (isAdmin()) {
+      const draftLabel = newsDrafts.length === 1 ? '1 brouillon (toi seul)' : `${newsDrafts.length} brouillons (toi seul)`;
+      const pubLabel = newsPublished.length === 1 ? '1 publiée' : `${newsPublished.length} publiées`;
+      return `${pubLabel} · ${draftLabel}`;
+    }
+    if (!newsPublished.length) return 'Aucune nouveauté publiée pour l\'instant.';
+    return newsPublished.length === 1 ? '1 nouveauté publiée.' : `${newsPublished.length} nouveautés publiées.`;
+  }
+
+  /* Corps du texte : lignes « - », « • » ou « * » → liste à puces ; les autres
+     lignes forment un paragraphe. Tout passe par textContent (aucun HTML
+     interprété, même pour un texte écrit par l'admin). */
+  function renderNewsBody(text) {
+    const lines = String(text || '').split('\n');
+    if (!lines.some((line) => line.trim())) return null;
+    const wrap = el('div', 'news-body');
+    let para = [];
+    let bullets = null;
+    const flushPara = () => {
+      if (!para.length) return;
+      wrap.append(el('p', null, para.join(' ')));
+      para = [];
+    };
+    const flushBullets = () => {
+      if (!bullets) return;
+      wrap.append(bullets);
+      bullets = null;
+    };
+    lines.forEach((raw) => {
+      const line = raw.trim();
+      if (!line) { flushPara(); flushBullets(); return; }
+      if (/^[-•*]\s+/.test(line)) {
+        flushPara();
+        if (!bullets) bullets = el('ul', 'news-bullets');
+        bullets.append(el('li', null, line.replace(/^[-•*]\s+/, '')));
+        return;
+      }
+      flushBullets();
+      para.push(line);
+    });
+    flushPara();
+    flushBullets();
+    return wrap;
+  }
+
+  function newsSeenKey() {
+    const uid = currentUser && currentUser.uid;
+    return uid ? `${NEWS_SEEN_PREFIX}${uid}` : '';
+  }
+
+  function newsSeenId() {
+    const key = newsSeenKey();
+    if (!key) return '';
+    try { return window.localStorage.getItem(key) || ''; } catch (error) { return ''; }
+  }
+
+  function hasUnseenNews() {
+    return newsPublished.length > 0 && newsPublished[0].id !== newsSeenId();
+  }
+
+  /* Le joueur a ouvert le journal : le badge « NOUVEAU » disparaît pour lui
+     seul (clé localStorage par compte). */
+  function markNewsSeen() {
+    const key = newsSeenKey();
+    if (!key || !newsPublished.length) return;
+    try { window.localStorage.setItem(key, newsPublished[0].id); } catch (error) { /* stockage bloqué */ }
+    if (newsNewBadge) newsNewBadge.hidden = true;
+  }
+
+  function newsSheetVisible() {
+    return Boolean(newsSheet && !newsSheet.hidden);
+  }
+
+  function setNewsMsg(message) {
+    if (newsMsg) newsMsg.textContent = message || '';
+  }
+
+  function setNewsAdminMsg(message) {
+    if (newsAdminMsg) newsAdminMsg.textContent = message || '';
+  }
+
+  function renderNewsEntry(entry, { draft = false } = {}) {
+    const article = el('article', draft ? 'news-entry is-draft' : 'news-entry');
+    const head = el('div', 'news-entry-head');
+    head.append(el('h4', 'news-entry-title', entry.title));
+    if (entry.version) head.append(el('span', 'news-version', `v${entry.version}`));
+    if (draft) head.append(el('span', 'news-tag', 'BROUILLON'));
+    article.append(head);
+    const date = newsDateLabel(entry.date);
+    if (date) article.append(el('p', 'news-date', date));
+    const body = renderNewsBody(entry.body);
+    if (body) article.append(body);
+
+    if (draft) {
+      const actions = el('div', 'news-entry-actions');
+      const publish = el('button', 'mini-btn primary', 'Publier (release)');
+      publish.type = 'button';
+      on(publish, 'click', () => { publishNewsEntry(entry); });
+      const remove = el('button', 'mini-btn', 'Supprimer');
+      remove.type = 'button';
+      on(remove, 'click', () => { removeNewsDraft(entry); });
+      actions.append(publish, remove);
+      article.append(actions);
+    } else if (isAdmin()) {
+      /* Une entrée publiée reste retirable par le propriétaire (erreur de
+         frappe, sortie annulée…). Personne d'autre n'a ce bouton. */
+      const actions = el('div', 'news-entry-actions');
+      const unpublish = el('button', 'mini-btn', 'Retirer du journal');
+      unpublish.type = 'button';
+      on(unpublish, 'click', () => { unpublishNewsEntry(entry); });
+      actions.append(unpublish);
+      article.append(actions);
+    }
+    return article;
+  }
+
+  function renderNews() {
+    const admin = isAdmin();
+    if (newsList) {
+      newsList.replaceChildren(...newsPublished.map((entry) => renderNewsEntry(entry)));
+    }
+    if (newsEmpty) newsEmpty.hidden = newsPublished.length > 0;
+    if (newsDraftsBlock) newsDraftsBlock.hidden = !admin || !newsDrafts.length;
+    if (newsDraftsList) {
+      newsDraftsList.replaceChildren(...(admin ? newsDrafts : []).map((entry) => renderNewsEntry(entry, { draft: true })));
+    }
+    if (newsSub) {
+      newsSub.textContent = admin
+        ? 'Tes brouillons restent privés ; les entrées publiées sont visibles par tous les joueurs.'
+        : 'Les mises à jour publiées, de la plus récente à la plus ancienne.';
+    }
+    if (newsSummary) newsSummary.textContent = newsSummaryText();
+    if (newsNewBadge) newsNewBadge.hidden = !hasUnseenNews();
+    if (newsSheetVisible()) markNewsSeen();
+  }
+
+  function renderNewsAdmin() {
+    if (!isAdmin()) {
+      setNewsAdminMsg('');
+      if (newsAdminCount) newsAdminCount.textContent = '';
+      return;
+    }
+    if (newsAdminCount) {
+      const drafts = newsDrafts.length;
+      newsAdminCount.textContent = drafts
+        ? `${drafts} brouillon${drafts > 1 ? 's' : ''} en attente · ${newsPublished.length} publiée${newsPublished.length > 1 ? 's' : ''}`
+        : `Aucun brouillon · ${newsPublished.length} entrée${newsPublished.length > 1 ? 's' : ''} publiée${newsPublished.length > 1 ? 's' : ''}`;
+    }
+  }
+
+  function newsWriteError(error) {
+    if (isQuotaExceeded(error)) return 'Quota Firestore atteint : réessaie après minuit (heure du Pacifique).';
+    if (isPermissionDenied(error)) return 'Écriture refusée : publie firestore.rules sur Firebase, puis réessaie.';
+    return 'Enregistrement impossible pour le moment. Vérifie ta connexion.';
+  }
+
+  /* Lecture du journal : `published` pour tout le monde, `drafts` en plus pour
+     le compte propriétaire — et jamais pour les autres. */
+  function loadNews(force) {
+    if (!cloudReady()) return Promise.resolve(false);
+    const uid = currentUser.uid;
+    const fresh = newsLoadedFor === uid && Date.now() - newsLoadedAt < NEWS_TTL_MS;
+    if (!force && fresh) return Promise.resolve(true);
+    if (newsLoading) return newsLoading;
+    const admin = isAdmin();
+    newsLoading = (async () => {
+      try {
+        const published = await readNewsDoc(NEWS_PUBLISHED_DOC);
+        const drafts = admin ? await readNewsDoc(NEWS_DRAFTS_DOC) : [];
+        if (!currentUser || currentUser.uid !== uid) return false; // compte changé entre-temps
+        newsPublished = published;
+        const publishedIds = new Set(published.map((entry) => entry.id));
+        newsDrafts = drafts.filter((entry) => !publishedIds.has(entry.id));
+        newsErrorText = '';
+        newsLoadedAt = Date.now();
+        newsLoadedFor = uid;
+        return true;
+      } catch (error) {
+        /* Règles non publiées : le propriétaire est le seul à pouvoir y
+           remédier, les joueurs n'ont pas besoin de ce détail technique. */
+        newsErrorText = isPermissionDenied(error)
+          ? (admin ? 'Nouveautés indisponibles : publie firestore.rules sur Firebase.' : 'Nouveautés indisponibles pour le moment.')
+          : 'Nouveautés indisponibles pour le moment.';
+        return false;
+      } finally {
+        newsLoading = null;
+        renderNews();
+        renderNewsAdmin();
+      }
+    })();
+    return newsLoading;
+  }
+
+  function resetNews() {
+    newsPublished = [];
+    newsDrafts = [];
+    newsLoadedAt = 0;
+    newsLoadedFor = '';
+    newsErrorText = '';
+    newsBusy = false;
+    [newsVersionInput, newsTitleInput, newsBodyInput].forEach((input) => {
+      if (input) input.value = '';
+    });
+    setNewsMsg('');
+    setNewsAdminMsg('');
+    renderNews();
+    renderNewsAdmin();
+  }
+
+  function openNewsSheet() {
+    openSheet(newsSheet);
+    try { SFX.tick(); } catch (error) { /* audio absent : sans importance ici */ }
+    loadNews(false);
+    renderNews();
+  }
+
+  function readNewsComposer() {
+    return {
+      title: String((newsTitleInput && newsTitleInput.value) || '').trim().slice(0, NEWS_TITLE_MAX),
+      version: String((newsVersionInput && newsVersionInput.value) || '').trim().slice(0, NEWS_VERSION_MAX),
+      body: String((newsBodyInput && newsBodyInput.value) || '').trim().slice(0, NEWS_BODY_MAX)
+    };
+  }
+
+  function clearNewsComposer() {
+    /* La version reste : on enchaîne souvent plusieurs entrées de la même MAJ. */
+    if (newsTitleInput) newsTitleInput.value = '';
+    if (newsBodyInput) newsBodyInput.value = '';
+  }
+
+  async function saveNewsDraft() {
+    if (!isAdmin() || newsBusy) return;
+    const data = readNewsComposer();
+    if (!data.title) { setNewsAdminMsg('Donne un titre à la nouveauté.'); return; }
+    newsBusy = true;
+    const entry = newsEntry({ ...data, id: newsId(), date: Date.now() });
+    const next = [entry].concat(newsDrafts.filter((draft) => draft.id !== entry.id)).slice(0, NEWS_MAX_ENTRIES);
+    try {
+      await writeNewsDoc(NEWS_DRAFTS_DOC, next);
+      newsDrafts = next;
+      newsLoadedAt = Date.now();
+      newsErrorText = '';
+      clearNewsComposer();
+      setNewsAdminMsg('Brouillon enregistré · visible par toi seul.');
+      setNewsMsg('Brouillon enregistré · visible par toi seul.');
+    } catch (error) {
+      setNewsAdminMsg(newsWriteError(error));
+    } finally {
+      newsBusy = false;
+      renderNews();
+      renderNewsAdmin();
+    }
+  }
+
+  /* Release d'une entrée : elle passe dans `published` et devient visible par
+     tous les joueurs. Utilisé par le bouton du brouillon et par « Publier ». */
+  async function publishNewsEntry(raw) {
+    if (!isAdmin() || newsBusy) return false;
+    const entry = newsEntry(raw);
+    if (!entry) return false;
+    newsBusy = true;
+    setNewsMsg('Publication…');
+    const published = [{ ...entry, date: Date.now() }]
+      .concat(newsPublished.filter((item) => item.id !== entry.id))
+      .slice(0, NEWS_MAX_ENTRIES);
+    try {
+      await writeNewsDoc(NEWS_PUBLISHED_DOC, published);
+      newsPublished = published;
+      newsLoadedAt = Date.now();
+      newsErrorText = '';
+      setNewsMsg('Publié : la nouveauté est visible par tous les joueurs.');
+      setNewsAdminMsg('Publié : la nouveauté est visible par tous les joueurs.');
+      /* Le brouillon correspondant disparaît (au mieux : s'il reste, il est
+         dédoublonné à la lecture puisqu'il porte le même identifiant). */
+      if (newsDrafts.some((draft) => draft.id === entry.id)) {
+        const drafts = newsDrafts.filter((draft) => draft.id !== entry.id);
+        try {
+          await writeNewsDoc(NEWS_DRAFTS_DOC, drafts);
+          newsDrafts = drafts;
+        } catch (error) { /* dédoublonné au prochain chargement */ }
+      }
+      return true;
+    } catch (error) {
+      const message = newsWriteError(error);
+      setNewsMsg(message);
+      setNewsAdminMsg(message);
+      return false;
+    } finally {
+      newsBusy = false;
+      renderNews();
+      renderNewsAdmin();
+    }
+  }
+
+  async function publishFromComposer() {
+    if (!isAdmin() || newsBusy) return;
+    const data = readNewsComposer();
+    if (!data.title) { setNewsAdminMsg('Donne un titre à la nouveauté.'); return; }
+    const ok = await publishNewsEntry({ ...data, id: newsId(), date: Date.now() });
+    if (ok) clearNewsComposer();
+  }
+
+  function removeNewsDraft(entry) {
+    if (!isAdmin() || newsBusy) return;
+    askConfirm({
+      title: 'Supprimer ce brouillon ?',
+      message: entry.title,
+      confirmLabel: 'Supprimer',
+      onConfirm: async () => {
+        if (newsBusy) return;
+        newsBusy = true;
+        const next = newsDrafts.filter((draft) => draft.id !== entry.id);
+        try {
+          await writeNewsDoc(NEWS_DRAFTS_DOC, next);
+          newsDrafts = next;
+          newsLoadedAt = Date.now();
+          setNewsMsg('Brouillon supprimé.');
+          setNewsAdminMsg('Brouillon supprimé.');
+        } catch (error) {
+          const message = newsWriteError(error);
+          setNewsMsg(message);
+          setNewsAdminMsg(message);
+        } finally {
+          newsBusy = false;
+          renderNews();
+          renderNewsAdmin();
+        }
+      }
+    });
+  }
+
+  function unpublishNewsEntry(entry) {
+    if (!isAdmin() || newsBusy) return;
+    askConfirm({
+      title: 'Retirer du journal ?',
+      message: `« ${entry.title} » ne sera plus visible par les joueurs.`,
+      confirmLabel: 'Retirer',
+      onConfirm: async () => {
+        if (newsBusy) return;
+        newsBusy = true;
+        const next = newsPublished.filter((item) => item.id !== entry.id);
+        try {
+          await writeNewsDoc(NEWS_PUBLISHED_DOC, next);
+          newsPublished = next;
+          newsLoadedAt = Date.now();
+          setNewsMsg('Entrée retirée du journal.');
+          setNewsAdminMsg('Entrée retirée du journal.');
+        } catch (error) {
+          const message = newsWriteError(error);
+          setNewsMsg(message);
+          setNewsAdminMsg(message);
+        } finally {
+          newsBusy = false;
+          renderNews();
+          renderNewsAdmin();
+        }
+      }
+    });
+  }
+
+  on(newsOpenBtn, 'click', openNewsSheet);
+  on(newsSheetBtn, 'click', openNewsSheet);
+  on(newsSaveBtn, 'click', () => { saveNewsDraft(); });
+  on(newsPublishBtn, 'click', () => { publishFromComposer(); });
+  if (newsSheet) {
+    newsSheet.querySelectorAll('[data-close-news]').forEach((button) => {
+      on(button, 'click', () => closeSheet(newsSheet));
+    });
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && newsSheet && !newsSheet.hidden) closeSheet(newsSheet);
   });
 
   /* ------------------------------------------------------------------ amis */
